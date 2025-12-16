@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 # Configure these values to adjust alert sensitivity across all scanners
 # =============================================================================
 
-PRICE_SURGE_THRESHOLD = 3.0  # Percentage (e.g., 3.0 = 3% price increase)
+PRICE_SURGE_THRESHOLD = 2.0  # Percentage (e.g., 3.0 = 3% price increase)
 VOLUME_SURGE_THRESHOLD = 5.0
 
 

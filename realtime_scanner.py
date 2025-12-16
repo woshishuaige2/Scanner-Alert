@@ -11,6 +11,29 @@ import threading
 import time
 import sys
 import signal
+import winsound  # For sound alerts on Windows
+import re  # For parsing alert reasons
+
+# Optional: Voice announcements (install with: pip install pyttsx3)
+try:
+    import pyttsx3
+    VOICE_ENGINE = pyttsx3.init()
+    VOICE_ENGINE.setProperty('rate', 150)
+    VOICE_ENGINE.setProperty('volume', 1.0)
+    VOICE_AVAILABLE = True
+    print("[INFO] Voice announcements enabled")
+except Exception as e:
+    VOICE_ENGINE = None
+    VOICE_AVAILABLE = False
+    print(f"[WARN] Voice not available: {e}")
+
+# Optional: Push notifications (install with: pip install plyer)
+try:
+    from plyer import notification
+    NOTIFICATIONS_AVAILABLE = True
+except ImportError:
+    NOTIFICATIONS_AVAILABLE = False
+    print("[WARN] plyer not installed. Push notifications disabled. Install with: pip install plyer")
 
 from conditions import (
     AlertCondition,
@@ -61,7 +84,7 @@ class RealtimeSymbolMonitor:
         
         # Alert tracking
         self.last_alert_time = None
-        self.alert_cooldown_seconds = 5  # Prevent duplicate alerts
+        self.alert_cooldown_seconds = 60  # Prevent duplicate alerts (1 minute)
     
     def update_market_data(self, price: float, volume: int, vwap: float = None):
         """Update market data for this symbol"""
@@ -218,14 +241,22 @@ class RealtimeSymbolMonitor:
         # Check if alert should be triggered
         if self.condition_set.check_all(data):
             # Check cooldown
-            if (self.last_alert_time is None or
-                (datetime.now() - self.last_alert_time).total_seconds() > self.alert_cooldown_seconds):
-                self.last_alert_time = datetime.now()
+            now = datetime.now()
+            if self.last_alert_time is None:
+                time_since_last = float('inf')
+            else:
+                time_since_last = (now - self.last_alert_time).total_seconds()
+            
+            if time_since_last > self.alert_cooldown_seconds:
+                print(f"[DEBUG] {self.symbol} alert triggered (cooldown OK: {time_since_last:.1f}s since last)")
+                self.last_alert_time = now
                 return {
                     'triggered': True,
                     'reasons': self.condition_set.get_trigger_summary(),
                     'data': data
                 }
+            else:
+                print(f"[DEBUG] {self.symbol} alert suppressed (cooldown: {time_since_last:.1f}s / {self.alert_cooldown_seconds}s)")
         
         return {'triggered': False, 'reasons': ''}
 
@@ -259,6 +290,7 @@ class RealtimeAlertScanner:
         self.running = False
         self.lock = threading.Lock()
         self.update_count = 0  # Track number of updates received
+        self.alert_history = []  # Track all alerts (timestamp, symbol, reasons)
         
         # Initialize monitors with default conditions
         self._initialize_monitors()
@@ -269,8 +301,8 @@ class RealtimeAlertScanner:
             # Create default condition set
             condition_set = AlertConditionSet(f"{symbol}_default")
             condition_set.add_condition(PriceAboveVWAPCondition())
-            condition_set.add_condition(PriceSurgeCondition())  # Uses PRICE_SURGE_THRESHOLD from conditions.py
-            condition_set.add_condition(VolumeSpike10sCondition())  # 10s volume > 5x avg of past 20 bars
+            condition_set.add_condition(PriceSurgeCondition())  
+            condition_set.add_condition(VolumeSpike10sCondition())  
             
             self.monitors[symbol] = RealtimeSymbolMonitor(symbol, condition_set)
     
@@ -347,20 +379,39 @@ class RealtimeAlertScanner:
     
     def _trigger_alert(self, symbol: str, data: MarketData, reasons: str):
         """Trigger an alert"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        timestamp = datetime.now()
+        time_str = timestamp.strftime("%H:%M:%S")
+        full_timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         
-        # Console log message
-        alert_message = (
-            f"[{timestamp}] ALERT: {symbol}\n"
-            f"  Price: ${data.price:.2f} | Volume: {data.volume:,}\n"
-            f"  Conditions: {reasons}"
-        )
+        # Extract price surge percentage from reasons
+        surge_match = re.search(r'surged (\d+\.\d+)%', reasons)
+        surge_pct = surge_match.group(1) if surge_match else "N/A"
+        
+        # Add to alert history (keep full details)
+        with self.lock:
+            self.alert_history.append({
+                'timestamp': full_timestamp,
+                'symbol': symbol,
+                'price': data.price,
+                'volume': data.volume,
+                'vwap': data.vwap,
+                'reasons': reasons
+            })
+        
+        # Simplified console log message
+        alert_message = f"[{time_str}] {symbol} @ ${data.price:.2f} - Price surged {surge_pct}%"
         print(alert_message)
+        
+        # Play sound alert in separate thread to not block
+        threading.Thread(target=self._play_alert_sound, args=(symbol,), daemon=True).start()
+        
+        # Send push notification in separate thread
+        threading.Thread(target=self._send_push_notification, args=(symbol, data, reasons), daemon=True).start()
         
         # Call registered callbacks
         for callback in self.alert_callbacks:
             try:
-                callback(symbol, timestamp, reasons, data)
+                callback(symbol, full_timestamp, reasons, data)
             except Exception as e:
                 print(f"Error in alert callback: {e}")
     
@@ -379,6 +430,45 @@ class RealtimeAlertScanner:
             if symbol in self.monitors:
                 statuses.append(self.monitors[symbol].get_status_summary())
         return statuses
+    
+    def _play_alert_sound(self, symbol: str):
+        """Play voice announcement of symbol name"""
+        if not VOICE_AVAILABLE or VOICE_ENGINE is None:
+            # Fallback to beeps if voice not available
+            try:
+                for _ in range(3):
+                    winsound.Beep(1000, 200)
+                    time.sleep(0.1)
+            except:
+                pass
+            return
+        
+        try:
+            VOICE_ENGINE.say(f"Alert {symbol}")
+            VOICE_ENGINE.runAndWait()
+        except Exception as e:
+            # Fallback to beeps if voice fails
+            try:
+                for _ in range(3):
+                    winsound.Beep(1000, 200)
+                    time.sleep(0.1)
+            except:
+                pass
+    
+    def _send_push_notification(self, symbol: str, data: MarketData, reasons: str):
+        """Send desktop push notification"""
+        if not NOTIFICATIONS_AVAILABLE:
+            return  # Skip if plyer not installed
+        
+        try:
+            notification.notify(
+                title=f'🚨 Alert: {symbol}',
+                message=f'Price: ${data.price:.2f}\n{reasons}',
+                app_name='Scanner Alert',
+                timeout=10  # Display for 10 seconds
+            )
+        except Exception as e:
+            pass  # Silent fail if notification doesn't work
     
     def stop(self):
         """Stop the scanner"""
@@ -400,7 +490,7 @@ def display_status_table(scanner: RealtimeAlertScanner, alert_info: str = None):
     
     print(" "*40 + "REAL-TIME ALERT SCANNER")
     print("="*105)
-    print(f"Current Time: {current_time} | Updates Received: {scanner.update_count}")
+    print(f"Current Time: {current_time} | Updates Received: {scanner.update_count} | Total Alerts: {len(scanner.alert_history)}")
     print("="*105)
     
     # Table header
@@ -447,7 +537,22 @@ def display_status_table(scanner: RealtimeAlertScanner, alert_info: str = None):
         print(alert_info)
         print("!"*105)
     
-    print("\n[INFO] Table updates every 5 seconds | Press Ctrl+C to stop\n")
+    # Display recent alerts (last 5)
+    if scanner.alert_history:
+        print("\n" + "~"*105)
+        print("📋 RECENT ALERTS (Last 5)")
+        print("~"*105)
+        recent_alerts = scanner.alert_history[-5:]  # Get last 5
+        for alert in reversed(recent_alerts):  # Most recent first
+            # Extract just the time from full timestamp
+            time_only = alert['timestamp'].split()[1][:8]  # Get HH:MM:SS
+            # Extract price surge from reasons
+            surge_match = re.search(r'surged (\d+\.\d+)%', alert['reasons'])
+            surge_pct = surge_match.group(1) if surge_match else "N/A"
+            print(f"[{time_only}] {alert['symbol']} @ ${alert['price']:.2f} - Price surged {surge_pct}%")
+        print("~"*105 + "\n")
+    else:
+        print()
 
 
 # Example usage
@@ -500,14 +605,14 @@ if __name__ == "__main__":
     # Track last alert for display
     last_alert_info = {'message': None, 'triggered': False}
     
-    # Alert handler that captures alert info
+    # Alert handler that captures alert info (simplified format)
     def alert_handler(symbol, timestamp, reasons, data):
-        alert_msg = (
-            f"Symbol: {symbol}\n"
-            f"Time: {timestamp}\n"
-            f"Price: ${data.price:.2f} | Volume: {data.volume:,} | VWAP: ${data.vwap:.2f}\n"
-            f"Conditions: {reasons}"
-        )
+        # Extract just the time from timestamp
+        time_only = timestamp.split()[1][:8] if ' ' in timestamp else timestamp
+        # Extract price surge from reasons
+        surge_match = re.search(r'surged (\d+\.\d+)%', reasons)
+        surge_pct = surge_match.group(1) if surge_match else "N/A"
+        alert_msg = f"{symbol} @ ${data.price:.2f} - Price surged {surge_pct}%"
         last_alert_info['message'] = alert_msg
         last_alert_info['triggered'] = True
     
