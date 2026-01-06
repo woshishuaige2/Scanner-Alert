@@ -392,7 +392,7 @@ def clear_screen():
     print("\n" * 50)
 
 
-def display_status_table(scanner: RealtimeAlertScanner, alert_info: str = None):
+def display_status_table(scanner: RealtimeAlertScanner, alerts_list: deque = None):
     """Display a formatted table of all monitored symbols"""
     # Don't clear screen - just add separator
     print("\n" + "="*105)
@@ -441,11 +441,11 @@ def display_status_table(scanner: RealtimeAlertScanner, alert_info: str = None):
     print("-"*105)
     
     # Show last 5 alerts if present
-    if last_alerts and len(last_alerts) > 0:
+    if alerts_list and len(alerts_list) > 0:
         print("\n" + "!"*105)
         print("🚨 RECENT ALERTS (most recent first) 🚨")
         print("!"*105)
-        for alert in list(last_alerts):
+        for alert in list(alerts_list):
             print(alert)
             print("-"*105)
         print("!"*105)
@@ -593,7 +593,7 @@ if __name__ == "__main__":
     print("[INFO] Press Ctrl+C to stop\n")
     
     # Display initial table
-    display_status_table(scanner)
+    display_status_table(scanner, last_alerts)
     
     last_table_update = time.time()
     table_update_interval = 5  # Update table every 5 seconds
@@ -605,15 +605,15 @@ if __name__ == "__main__":
         current_time = time.time()
         
         # Update table if: 1) interval passed, or 2) alert was triggered
-        if (current_time - last_table_update >= table_update_interval) or last_alert_info['triggered']:
+        if (current_time - last_table_update >= table_update_interval) or last_alert_triggered:
             if should_exit:
                 break
-            display_status_table(scanner)
+            display_status_table(scanner, last_alerts)
             last_table_update = current_time
             
             # Reset alert flag after displaying
-            if last_alert_info['triggered']:
-                last_alert_info['triggered'] = False
+            if last_alert_triggered:
+                last_alert_triggered = False
                 # Keep message for a bit longer
                 time.sleep(2)
     
