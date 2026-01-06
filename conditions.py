@@ -192,56 +192,25 @@ class VolumeSpike10sCondition(AlertCondition):
         return False
 
 
-class VolumeSurgeCondition(AlertCondition):
-    """Condition: Huge surge in volume during the last 10 seconds"""
+class VolumeConfirmationCondition(AlertCondition):
+    """Condition: Volume is sustained. Current 10s volume and previous 10s volume are both > 2x average."""
     
-    def __init__(self, surge_threshold: float = None):
-        """
-        Args:
-            surge_threshold: Volume multiplier threshold (uses VOLUME_SURGE_THRESHOLD if None)
-        """
-        super().__init__("Volume Surge (Last 10s)")
-        self.surge_threshold = surge_threshold if surge_threshold is not None else VOLUME_SURGE_THRESHOLD
-        self.lookback_seconds = 10
+    def __init__(self, multiplier: float = 2.0):
+        super().__init__("Volume Confirmation (Sustained)")
+        self.multiplier = multiplier
     
     def check(self, data: MarketData) -> bool:
-        if not data.volume_history or len(data.volume_history) < 2:
-            self.triggered_reason = ""
+        if not data.volume_history or len(data.volume_history) < 22:
             return False
         
-        # Get volumes from last 10 seconds
-        cutoff_time = data.timestamp - timedelta(seconds=self.lookback_seconds)
-        recent_volumes = {
-            ts: vol for ts, vol in data.volume_history.items()
-            if ts >= cutoff_time
-        }
+        sorted_vols = [v for k, v in sorted(data.volume_history.items())]
+        current_vol = sorted_vols[-1]
+        prev_vol = sorted_vols[-2]
+        avg_vol = sum(sorted_vols[-22:-2]) / 20
         
-        if len(recent_volumes) < 2:
-            self.triggered_reason = ""
-            return False
-        
-        # Get average volume before this spike
-        all_volumes = list(data.volume_history.values())
-        if len(all_volumes) >= 3:
-            avg_volume = sum(all_volumes[:-1]) / (len(all_volumes) - 1)
-        else:
-            avg_volume = min(recent_volumes.values())
-        
-        if avg_volume == 0:
-            self.triggered_reason = ""
-            return False
-        
-        current_volume = data.volume
-        multiplier = current_volume / avg_volume if avg_volume > 0 else 0
-        
-        if multiplier >= self.surge_threshold:
-            self.triggered_reason = (
-                f"Volume surged {multiplier:.2f}x in last 10s "
-                f"(Avg: {avg_volume:.0f} -> Current: {current_volume:.0f})"
-            )
+        if avg_vol > 0 and current_vol > (avg_vol * self.multiplier) and prev_vol > (avg_vol * self.multiplier):
+            self.triggered_reason = f"Sustained volume: Current {current_vol/avg_vol:.1f}x, Prev {prev_vol/avg_vol:.1f}x"
             return True
-        
-        self.triggered_reason = ""
         return False
 
 
