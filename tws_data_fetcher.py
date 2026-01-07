@@ -241,8 +241,9 @@ class TWSDataApp(EClient, EWrapper):
             self.historical_data[req_id] = []
             self.historical_complete[req_id] = False
         
-        # Format end date
-        end_date_str = end_date.strftime("%Y%m%d %H:%M:%S")
+        # Format end date with explicit timezone
+        # TWS expects "YYYYMMDD HH:MM:SS TimeZone"
+        end_date_str = end_date.strftime("%Y%m%d %H:%M:%S") + " US/Eastern"
         
         # Request historical data
         self.reqHistoricalData(
