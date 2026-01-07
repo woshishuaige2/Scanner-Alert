@@ -16,8 +16,8 @@ NGROK_PORT = 18060
 SYMBOLS = ["YCBD"]
 BACKTEST_DATE = "2025-12-12"
 
-# Scenarios: (Take Profit %, Stop Loss %) - Always 2:1 ratio
-SCENARIOS = [(2.0, 1.0), (4.0, 2.0), (10.0, 5.0), (20.0, 10.0)]
+# Scenarios: (Take Profit %, Stop Loss %)
+SCENARIOS = [(2.0, 1.0), (4.0, 2.0), (10.0, 5.0), (20.0, 10.0), (1.0, 10.0)]
 
 def run():
     print(f"\n[INFO] Connecting to TWS at {NGROK_HOST}:{NGROK_PORT}...", flush=True)
