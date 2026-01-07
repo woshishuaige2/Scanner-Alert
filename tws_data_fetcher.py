@@ -170,19 +170,33 @@ class TWSDataApp(EClient, EWrapper):
                 # Trigger callback when we have price and volume update
                 price = self.realtime_data[symbol]['price']
                 if price > 0:
-                    # Calculate simple VWAP approximation
-                    # (in production, you'd track cumulative price*volume)
-                    vwap = self.realtime_data[symbol].get('vwap', price)
-                    if vwap == 0:
-                        vwap = price
+                    # Initialize cumulative tracking if not present
+                    if 'cumulative_pv' not in self.realtime_data[symbol]:
+                        self.realtime_data[symbol]['cumulative_pv'] = 0.0
+                        self.realtime_data[symbol]['cumulative_volume'] = 0.0
+                    
+                    # Calculate incremental volume (size is cumulative daily volume in TWS for some tick types)
+                    # However, in tickSize for VOLUME, size is usually the daily volume.
+                    # We need to calculate the increment.
+                    current_daily_volume = size
+                    last_daily_volume = self.realtime_data[symbol].get('last_daily_volume', 0)
+                    volume_increment = current_daily_volume - last_daily_volume
+                    
+                    if volume_increment > 0:
+                        self.realtime_data[symbol]['cumulative_pv'] += price * volume_increment
+                        self.realtime_data[symbol]['cumulative_volume'] += volume_increment
+                        self.realtime_data[symbol]['last_daily_volume'] = current_daily_volume
+                    
+                    # Calculate accurate cumulative VWAP
+                    if self.realtime_data[symbol]['cumulative_volume'] > 0:
+                        vwap = self.realtime_data[symbol]['cumulative_pv'] / self.realtime_data[symbol]['cumulative_volume']
                     else:
-                        # Weighted update: 90% old VWAP, 10% new price
-                        vwap = vwap * 0.9 + price * 0.1
+                        vwap = price
                     
                     self.realtime_data[symbol]['vwap'] = vwap
                     
                     # Call callback with updated data
-                    callback(symbol, price, size, vwap, datetime.now())
+                    callback(symbol, price, current_daily_volume, vwap, datetime.now())
     
     def get_next_req_id(self):
         """Get next request ID"""

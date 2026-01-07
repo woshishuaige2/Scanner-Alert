@@ -106,17 +106,30 @@ class BacktestAlertScanner:
             candles = sorted(self.symbol_data[symbol].data, key=lambda x: x['timestamp'])
             price_history = {}
             volume_history = {}
+            
+            # Cumulative tracking for accurate VWAP
+            cumulative_pv = 0.0
+            cumulative_volume = 0.0
+            
             for candle in candles:
                 ts = candle['timestamp']
-                price_history[ts] = candle['close']
-                volume_history[ts] = candle['volume']
+                price = candle['close']
+                volume = candle['volume']
                 
-                md = MarketData(symbol, candle['close'], candle['volume'], candle['vwap'], ts, price_history, volume_history)
+                # Update cumulative VWAP
+                cumulative_pv += price * volume
+                cumulative_volume += volume
+                current_vwap = cumulative_pv / cumulative_volume if cumulative_volume > 0 else 0.0
+                
+                price_history[ts] = price
+                volume_history[ts] = volume
+                
+                md = MarketData(symbol, price, volume, current_vwap, ts, price_history, volume_history)
                 cs = self.condition_sets[symbol]
                 if cs.check_all(md):
                     last = self.last_alert_time[symbol]
                     if last is None or (ts - last) >= self.alert_cooldown:
-                        alert = BacktestAlert(symbol, ts, candle['close'], candle['volume'], candle['vwap'], cs.triggered_reasons[:])
+                        alert = BacktestAlert(symbol, ts, price, volume, current_vwap, cs.triggered_reasons[:])
                         self.alerts[symbol].append(alert)
                         self.last_alert_time[symbol] = ts
         return self.alerts
@@ -150,8 +163,10 @@ class BacktestAlertScanner:
                 shares = self.trade_investment / entry_price
                 gross_pl = (exit_price - entry_price) * shares
                 
-                # Commission: $1 for entry, $1 for exit
-                total_commission = self.commission_per_trade * 2
+                # Commission: $0.005 per share, $1 minimum per trade
+                entry_commission = max(1.0, shares * 0.005)
+                exit_commission = max(1.0, shares * 0.005)
+                total_commission = entry_commission + exit_commission
                 net_pl = gross_pl - total_commission
                 
                 # Update current assets for this symbol
