@@ -239,13 +239,28 @@ class AlertConditionSet:
         """
         self.triggered_reasons = []
         
+        # MANDATORY: Price must be above VWAP for any alert to trigger
+        vwap_cond = PriceAboveVWAPCondition()
+        if not vwap_cond.check(data):
+            return False
+            
+        # Check all other conditions in the set
         for condition in self.conditions:
+            # Skip if it's already the VWAP condition (to avoid double checking)
+            if isinstance(condition, PriceAboveVWAPCondition):
+                continue
+                
             if condition.check(data):
                 self.triggered_reasons.append(condition.get_trigger_reason())
             else:
                 return False
         
-        return True
+        # Add VWAP reason at the beginning if other conditions also met
+        if self.triggered_reasons:
+            self.triggered_reasons.insert(0, vwap_cond.get_trigger_reason())
+            return True
+            
+        return False
     
     def get_trigger_summary(self) -> str:
         """Get summary of all triggered conditions"""

@@ -55,11 +55,13 @@ def run():
     print(f"{'WIN RATE SUMMARY (2:1 Reward-to-Risk)':^80}", flush=True)
     print("="*80, flush=True)
     
-    header = f"{'SCENARIO':<20} | {'SYMBOL':<10} | {'ALERTS':<8} | {'WINS':<6} | {'LOSSES':<8} | {'WIN RATE':<10}"
+    header = f"{'SCENARIO':<20} | {'SYMBOL':<10} | {'ALERTS':<8} | {'WINS':<6} | {'LOSSES':<8} | {'WIN RATE':<10} | {'FINAL ASSET':<12}"
     print(header, flush=True)
-    print("-" * 80, flush=True)
+    print("-" * 100, flush=True)
     
     for tp, sl in SCENARIOS:
+        # Reset assets for each scenario to start fresh with $10000
+        scanner.current_assets = {s: scanner.initial_asset for s in SYMBOLS}
         pl_results = scanner.calculate_pl(tp, sl)
         for symbol in SYMBOLS:
             res = pl_results.get(symbol, [])
@@ -68,9 +70,12 @@ def run():
             total = wins + losses
             wr = (wins / total * 100) if total > 0 else 0
             
-            row = f"TP:{tp:>4.1f}% / SL:{sl:>4.1f}% | {symbol:<10} | {len(res):<8} | {wins:<6} | {losses:<8} | {wr:>8.1f}%"
+            # Get final asset for this symbol in this scenario
+            final_asset = scanner.current_assets[symbol]
+            
+            row = f"TP:{tp:>4.1f}% / SL:{sl:>4.1f}% | {symbol:<10} | {len(res):<8} | {wins:<6} | {losses:<8} | {wr:>8.1f}% | ${final_asset:>10.2f}"
             print(row, flush=True)
-        print("-" * 80, flush=True)
+        print("-" * 100, flush=True)
     
     print("\n[INFO] Backtest complete. Disconnecting...", flush=True)
     tws_app.disconnect()

@@ -61,15 +61,22 @@ class BacktestAlertScanner:
         self.last_alert_time: Dict[str, datetime] = {s: None for s in symbols}
         self.alert_cooldown = timedelta(seconds=60)
         self.condition_sets: Dict[str, AlertConditionSet] = {}
+        
+        # Mock Trading Assets
+        self.initial_asset = 10000.0
+        self.trade_investment = 1000.0
+        self.commission_per_trade = 1.0  # $1 minimum commission
+        self.current_assets: Dict[str, float] = {s: self.initial_asset for s in symbols}
+        
         self._initialize_condition_sets()
     
     def _initialize_condition_sets(self):
         for symbol in self.symbols:
             cs = AlertConditionSet(f"{symbol}_backtest")
-            cs.add_condition(PriceAboveVWAPCondition())
+            # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
             cs.add_condition(PriceSurgeCondition())
             cs.add_condition(VolumeSpike10sCondition())
-            cs.add_condition(VolumeConfirmationCondition()) # Added sustained volume check
+            cs.add_condition(VolumeConfirmationCondition())
             self.condition_sets[symbol] = cs
 
     def add_candle(self, symbol, ts, o, h, l, c, v, vwap):
@@ -115,7 +122,7 @@ class BacktestAlertScanner:
         return self.alerts
 
     def calculate_pl(self, tp_pct: float, sl_pct: float):
-        """Calculate P/L for each alert based on subsequent candles"""
+        """Calculate P/L for each alert based on subsequent candles and update assets"""
         results = {s: [] for s in self.symbols}
         for symbol in self.symbols:
             candles = sorted(self.symbol_data[symbol].data, key=lambda x: x['timestamp'])
@@ -137,5 +144,26 @@ class BacktestAlertScanner:
                     elif candle['low'] <= sl_price:
                         outcome = "LOSS"; exit_price = sl_price; exit_time = candle['timestamp']; break
                 
-                results[symbol].append({'alert': alert, 'outcome': outcome, 'entry': entry_price, 'exit': exit_price, 'time': exit_time})
+                # Calculate Mock Trading Result
+                # Investment: $1000
+                # Shares = 1000 / entry_price
+                shares = self.trade_investment / entry_price
+                gross_pl = (exit_price - entry_price) * shares
+                
+                # Commission: $1 for entry, $1 for exit
+                total_commission = self.commission_per_trade * 2
+                net_pl = gross_pl - total_commission
+                
+                # Update current assets for this symbol
+                self.current_assets[symbol] += net_pl
+                
+                results[symbol].append({
+                    'alert': alert, 
+                    'outcome': outcome, 
+                    'entry': entry_price, 
+                    'exit': exit_price, 
+                    'time': exit_time,
+                    'net_pl': net_pl,
+                    'final_asset': self.current_assets[symbol]
+                })
         return results
