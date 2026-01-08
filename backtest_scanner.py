@@ -8,10 +8,13 @@ from conditions import (
     AlertConditionSet,
     MarketData,
     PriceAboveVWAPCondition,
-    ConsecutiveMomentumCondition,
+    TwoStepMomentumCondition,
     VolumeSpike10sCondition,
     VolumeConfirmationCondition,
-    PRICE_SURGE_THRESHOLD
+    PRICE_SURGE_THRESHOLD,
+    THRESH_1,
+    THRESH_2,
+    WINDOW_SEC
 )
 
 # Import TWS integration - REQUIRED
@@ -74,7 +77,7 @@ class BacktestAlertScanner:
         for symbol in self.symbols:
             cs = AlertConditionSet(f"{symbol}_backtest")
             # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
-            cs.add_condition(ConsecutiveMomentumCondition(threshold=1.0))
+            cs.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
             cs.add_condition(VolumeSpike10sCondition())
             cs.add_condition(VolumeConfirmationCondition())
             self.condition_sets[symbol] = cs

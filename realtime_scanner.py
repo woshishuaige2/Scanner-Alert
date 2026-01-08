@@ -18,8 +18,11 @@ from conditions import (
     AlertConditionSet,
     MarketData,
     PriceAboveVWAPCondition,
-    ConsecutiveMomentumCondition,
-    VolumeSpike10sCondition
+    TwoStepMomentumCondition,
+    VolumeSpike10sCondition,
+    THRESH_1,
+    THRESH_2,
+    WINDOW_SEC
 )
 
 # Import TWS integration - REQUIRED
@@ -270,7 +273,7 @@ class RealtimeAlertScanner:
             # Create default condition set
             condition_set = AlertConditionSet(f"{symbol}_default")
             condition_set.add_condition(PriceAboveVWAPCondition())
-            condition_set.add_condition(ConsecutiveMomentumCondition(threshold=1.0))  
+            condition_set.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))  
             condition_set.add_condition(VolumeSpike10sCondition())  
             
             self.monitors[symbol] = RealtimeSymbolMonitor(symbol, condition_set)

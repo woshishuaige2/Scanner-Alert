@@ -21,6 +21,11 @@ from datetime import datetime, timedelta
 PRICE_SURGE_THRESHOLD = 2.0  # Percentage (e.g., 3.0 = 3% price increase)
 VOLUME_SURGE_THRESHOLD = 5.0
 
+# Two-Step Momentum Configuration
+WINDOW_SEC = 5
+THRESH_1 = 0.7  # 0.7% for first window
+THRESH_2 = 0.9  # 0.9% for second window (stronger)
+
 
 @dataclass
 class MarketData:
@@ -73,12 +78,19 @@ class PriceAboveVWAPCondition(AlertCondition):
         return False
 
 
-class ConsecutiveMomentumCondition(AlertCondition):
-    """Condition: Price increases by >1% in two consecutive 5-second windows"""
+class TwoStepMomentumCondition(AlertCondition):
+    """
+    Condition: Two-step confirmation across two consecutive 5-second windows.
+    r1 (t-10s to t-5s) >= 0.7%
+    r2 (t-5s to t) >= 0.9%
+    Also requires current price >= high of the last 10 seconds.
+    """
     
-    def __init__(self, threshold: float = 1.0):
-        super().__init__("Consecutive Momentum (2x 5s > 1%)")
-        self.threshold = threshold
+    def __init__(self, t1: float = THRESH_1, t2: float = THRESH_2, window: int = WINDOW_SEC):
+        super().__init__("Two-Step Momentum")
+        self.t1 = t1
+        self.t2 = t2
+        self.window = window
     
     def check(self, data: MarketData) -> bool:
         if not data.price_history or len(data.price_history) < 3:
@@ -86,29 +98,48 @@ class ConsecutiveMomentumCondition(AlertCondition):
             
         now = data.timestamp
         
-        # Get prices for windows: [now-5s to now] and [now-10s to now-5s]
-        window1_start = now - timedelta(seconds=5)
-        window2_start = now - timedelta(seconds=10)
+        # Define windows
+        w1_start = now - timedelta(seconds=self.window * 2)
+        w1_end = now - timedelta(seconds=self.window)
+        w2_start = w1_end
+        w2_end = now
         
-        # Window 1 (Current 5s)
-        w1_prices = [p for ts, p in data.price_history.items() if window1_start <= ts <= now]
-        # Window 2 (Previous 5s)
-        w2_prices = [p for ts, p in data.price_history.items() if window2_start <= ts < window1_start]
+        # Get prices for each window
+        p_w1 = [p for ts, p in data.price_history.items() if w1_start <= ts <= w1_end]
+        p_w2 = [p for ts, p in data.price_history.items() if w2_start <= ts <= w2_end]
+        p_10s = [p for ts, p in data.price_history.items() if w1_start <= ts <= now]
         
-        if not w1_prices or not w2_prices:
+        if not p_w1 or not p_w2:
             return False
             
-        # Calculate gains in each window
-        # For w1: current price vs price at start of w1
-        w1_gain = ((data.price - w1_prices[0]) / w1_prices[0]) * 100
-        # For w2: price at end of w2 vs price at start of w2
-        w2_gain = ((w1_prices[0] - w2_prices[0]) / w2_prices[0]) * 100
+        # r1 = return from (t-10s -> t-5s)
+        r1 = ((p_w1[-1] - p_w1[0]) / p_w1[0]) * 100
+        # r2 = return from (t-5s -> t)
+        r2 = ((data.price - p_w2[0]) / p_w2[0]) * 100
         
-        if w1_gain >= self.threshold and w2_gain >= self.threshold:
-            self.triggered_reason = f"Momentum: W1 +{w1_gain:.2f}%, W2 +{w2_gain:.2f}%"
+        # Rolling 10s high (excluding current price for comparison)
+        high_10s = max(p_10s) if p_10s else 0
+        
+        # Check conditions
+        if r1 >= self.t1 and r2 >= self.t2 and data.price >= high_10s:
+            # Calculate volume in last 10s if available
+            vol_10s = sum(v for ts, v in data.volume_history.items() if w1_start <= ts <= now) if data.volume_history else 0
+            
+            self.triggered_reason = (
+                f"SIGNAL: r1={r1:.2f}%, r2={r2:.2f}% | "
+                f"Price: ${data.price:.2f} >= High10s: ${high_10s:.2f} | "
+                f"Vol10s: {vol_10s:,.0f}"
+            )
             return True
             
         return False
+
+def passes_spread_filter(best_bid: float, best_ask: float, mid: float) -> bool:
+    """
+    Placeholder for spread filter logic.
+    To be implemented later.
+    """
+    return True
 
 
 class VolumeSpike10sCondition(AlertCondition):
@@ -231,6 +262,12 @@ class AlertConditionSet:
         # MANDATORY: Price must be above VWAP for any alert to trigger
         vwap_cond = PriceAboveVWAPCondition()
         if not vwap_cond.check(data):
+            return False
+            
+        # MANDATORY: Spread filter (placeholder)
+        # In a real scenario, bid/ask would be in MarketData
+        # For now, we use price as a proxy for mid and pass dummy bid/ask
+        if not passes_spread_filter(data.price * 0.999, data.price * 1.001, data.price):
             return False
             
         # Check all other conditions in the set
