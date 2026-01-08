@@ -8,7 +8,7 @@ from conditions import (
     AlertConditionSet,
     MarketData,
     PriceAboveVWAPCondition,
-    PriceSurgeCondition,
+    ConsecutiveMomentumCondition,
     VolumeSpike10sCondition,
     VolumeConfirmationCondition,
     PRICE_SURGE_THRESHOLD
@@ -74,7 +74,7 @@ class BacktestAlertScanner:
         for symbol in self.symbols:
             cs = AlertConditionSet(f"{symbol}_backtest")
             # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
-            cs.add_condition(PriceSurgeCondition())
+            cs.add_condition(ConsecutiveMomentumCondition(threshold=1.0))
             cs.add_condition(VolumeSpike10sCondition())
             cs.add_condition(VolumeConfirmationCondition())
             self.condition_sets[symbol] = cs

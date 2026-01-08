@@ -73,52 +73,41 @@ class PriceAboveVWAPCondition(AlertCondition):
         return False
 
 
-class PriceSurgeCondition(AlertCondition):
-    """Condition: Huge surge in price in the last 10 seconds"""
+class ConsecutiveMomentumCondition(AlertCondition):
+    """Condition: Price increases by >1% in two consecutive 5-second windows"""
     
-    def __init__(self, surge_threshold: float = None):
-        """
-        Args:
-            surge_threshold: Percentage increase threshold (uses PRICE_SURGE_THRESHOLD if None)
-        """
-        super().__init__("Price Surge (Last 10s)")
-        self.surge_threshold = surge_threshold if surge_threshold is not None else PRICE_SURGE_THRESHOLD
-        self.lookback_seconds = 10
+    def __init__(self, threshold: float = 1.0):
+        super().__init__("Consecutive Momentum (2x 5s > 1%)")
+        self.threshold = threshold
     
     def check(self, data: MarketData) -> bool:
-        if not data.price_history or len(data.price_history) < 2:
-            self.triggered_reason = ""
+        if not data.price_history or len(data.price_history) < 3:
             return False
+            
+        now = data.timestamp
         
-        # Get prices from last 10 seconds
-        cutoff_time = data.timestamp - timedelta(seconds=self.lookback_seconds)
-        recent_prices = {
-            ts: price for ts, price in data.price_history.items()
-            if ts >= cutoff_time
-        }
+        # Get prices for windows: [now-5s to now] and [now-10s to now-5s]
+        window1_start = now - timedelta(seconds=5)
+        window2_start = now - timedelta(seconds=10)
         
-        if len(recent_prices) < 2:
-            self.triggered_reason = ""
+        # Window 1 (Current 5s)
+        w1_prices = [p for ts, p in data.price_history.items() if window1_start <= ts <= now]
+        # Window 2 (Previous 5s)
+        w2_prices = [p for ts, p in data.price_history.items() if window2_start <= ts < window1_start]
+        
+        if not w1_prices or not w2_prices:
             return False
+            
+        # Calculate gains in each window
+        # For w1: current price vs price at start of w1
+        w1_gain = ((data.price - w1_prices[0]) / w1_prices[0]) * 100
+        # For w2: price at end of w2 vs price at start of w2
+        w2_gain = ((w1_prices[0] - w2_prices[0]) / w2_prices[0]) * 100
         
-        # Find lowest price in the window
-        min_price = min(recent_prices.values())
-        
-        # Calculate percentage change
-        if min_price == 0:
-            self.triggered_reason = ""
-            return False
-        
-        pct_change = ((data.price - min_price) / min_price) * 100
-        
-        if pct_change >= self.surge_threshold:
-            self.triggered_reason = (
-                f"Price surged {pct_change:.2f}% in last 10s "
-                f"(${min_price:.2f} -> ${data.price:.2f})"
-            )
+        if w1_gain >= self.threshold and w2_gain >= self.threshold:
+            self.triggered_reason = f"Momentum: W1 +{w1_gain:.2f}%, W2 +{w2_gain:.2f}%"
             return True
-        
-        self.triggered_reason = ""
+            
         return False
 
 

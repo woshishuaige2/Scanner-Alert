@@ -18,7 +18,7 @@ from conditions import (
     AlertConditionSet,
     MarketData,
     PriceAboveVWAPCondition,
-    PriceSurgeCondition,
+    ConsecutiveMomentumCondition,
     VolumeSpike10sCondition
 )
 
@@ -270,7 +270,7 @@ class RealtimeAlertScanner:
             # Create default condition set
             condition_set = AlertConditionSet(f"{symbol}_default")
             condition_set.add_condition(PriceAboveVWAPCondition())
-            condition_set.add_condition(PriceSurgeCondition())  
+            condition_set.add_condition(ConsecutiveMomentumCondition(threshold=1.0))  
             condition_set.add_condition(VolumeSpike10sCondition())  
             
             self.monitors[symbol] = RealtimeSymbolMonitor(symbol, condition_set)
