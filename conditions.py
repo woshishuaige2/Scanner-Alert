@@ -74,6 +74,12 @@ class PriceAboveVWAPCondition(AlertCondition):
         super().__init__("Price Above VWAP")
     
     def check(self, data: MarketData) -> bool:
+        # If VWAP is 0, we treat it as "not available" and allow the trade
+        # to avoid blocking trades when TWS doesn't provide VWAP
+        if data.vwap <= 0:
+            self.triggered_reason = "VWAP N/A (0.0)"
+            return True
+            
         if data.price > data.vwap:
             self.triggered_reason = f"Price ${data.price:.2f} > VWAP ${data.vwap:.2f}"
             return True
@@ -96,7 +102,7 @@ class TwoStepMomentumCondition(AlertCondition):
         self.window = window
     
     def check(self, data: MarketData) -> bool:
-        if not data.price_history or len(data.price_history) < 3:
+        if not data.price_history or len(data.price_history) < 2:
             return False
             
         now = data.timestamp
@@ -108,23 +114,42 @@ class TwoStepMomentumCondition(AlertCondition):
         w2_end = now
         
         # Get prices for each window
-        p_w1 = [p for ts, p in data.price_history.items() if w1_start <= ts <= w1_end]
-        p_w2 = [p for ts, p in data.price_history.items() if w2_start <= ts <= w2_end]
-        p_10s = [p for ts, p in data.price_history.items() if w1_start <= ts <= now]
+        # Use a small buffer for timestamp comparison to handle floating point/sampling issues
+        buffer = timedelta(milliseconds=100)
+        p_w1 = [p for ts, p in data.price_history.items() if w1_start - buffer <= ts <= w1_end + buffer]
+        p_w2 = [p for ts, p in data.price_history.items() if w2_start - buffer <= ts <= w2_end + buffer]
+        
+        # Rolling 10s high (excluding current price)
+        # We look at prices strictly before 'now'
+        p_prev_10s = [p for ts, p in data.price_history.items() if w1_start - buffer <= ts < now - buffer]
+        high_10s = max(p_prev_10s) if p_prev_10s else 0
         
         if not p_w1 or not p_w2:
-            return False
-            
-        # r1 = return from (t-10s -> t-5s)
-        r1 = ((p_w1[-1] - p_w1[0]) / p_w1[0]) * 100
-        # r2 = return from (t-5s -> t)
-        r2 = ((data.price - p_w2[0]) / p_w2[0]) * 100
-        
-        # Rolling 10s high (excluding current price for comparison)
-        high_10s = max(p_10s) if p_10s else 0
+            # If we don't have enough granular data (e.g. 10s bars in backtest),
+            # we fallback to comparing current price vs 10s ago
+            p_10s_ago = [p for ts, p in data.price_history.items() if w1_start - buffer <= ts <= w1_start + buffer]
+            if p_10s_ago:
+                total_return = ((data.price - p_10s_ago[0]) / p_10s_ago[0]) * 100
+                # If total return is > sum of thresholds, we consider it a potential trigger
+                if total_return >= (self.t1 + self.t2) and data.price >= high_10s:
+                    r1 = self.t1 # Mock values for logging
+                    r2 = total_return - self.t1
+                else: return False
+            else: return False
+        else:
+            # r1 = return from (t-10s -> t-5s)
+            r1 = ((p_w1[-1] - p_w1[0]) / p_w1[0]) * 100 if len(p_w1) >= 1 else 0
+            # r2 = return from (t-5s -> t)
+            r2 = ((data.price - p_w2[0]) / p_w2[0]) * 100 if len(p_w2) >= 1 else 0
         
         # Check conditions
-        if r1 >= self.t1 and r2 >= self.t2 and data.price >= high_10s:
+        is_triggered = r1 >= self.t1 and r2 >= self.t2 and data.price >= high_10s
+        
+        # Debug logging for potential triggers
+        if r1 > 0.5 or r2 > 0.5:
+            print(f"[DEBUG] {data.symbol} @ {data.timestamp.strftime('%H:%M:%S')} | r1: {r1:.2f}% (req: {self.t1}%), r2: {r2:.2f}% (req: {self.t2}%), Price: {data.price:.2f}, High10s: {high_10s:.2f}, Triggered: {is_triggered}")
+
+        if is_triggered:
             # Calculate volume in last 10s if available
             vol_10s = sum(v for ts, v in data.volume_history.items() if w1_start <= ts <= now) if data.volume_history else 0
             
@@ -269,10 +294,12 @@ class AlertConditionSet:
         # MANDATORY: Price must be above VWAP for any alert to trigger
         vwap_cond = PriceAboveVWAPCondition()
         if not vwap_cond.check(data):
+            # print(f"[DEBUG] {data.symbol} failed VWAP: Price {data.price} <= VWAP {data.vwap}")
             return False
             
         # MANDATORY: Spread filter
         if not passes_spread_filter(data.bid, data.ask, data.price):
+            # print(f"[DEBUG] {data.symbol} failed Spread: Bid {data.bid}, Ask {data.ask}, Price {data.price}")
             return False
             
         # Check all other conditions in the set
