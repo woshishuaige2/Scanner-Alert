@@ -440,10 +440,10 @@ def display_status_table(scanner: RealtimeAlertScanner, alerts_list: deque = Non
     
     print("-"*105)
     
-    # Show last 5 alerts if present
+    # Show last 7 alerts if present
     if alerts_list and len(alerts_list) > 0:
         print("\n" + "!"*105)
-        print("🚨 RECENT ALERTS (most recent first) 🚨")
+        print(f"🚨 RECENT ALERTS (Last {len(alerts_list)} triggers, most recent first) 🚨")
         print("!"*105)
         for alert in list(alerts_list):
             print(alert)
@@ -503,7 +503,7 @@ if __name__ == "__main__":
     last_alert_info = {'message': None, 'triggered': False}
     
     from collections import deque
-    last_alerts = deque(maxlen=5)  # Stores alert messages
+    last_alerts = deque(maxlen=7)  # Stores alert messages (increased to 7)
     last_alert_triggered = False
 
     tts_engine = pyttsx3.init()
