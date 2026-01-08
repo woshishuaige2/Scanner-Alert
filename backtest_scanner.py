@@ -127,7 +127,17 @@ class BacktestAlertScanner:
                 price_history[ts] = price
                 volume_history[ts] = volume
                 
-                md = MarketData(symbol, price, volume, current_vwap, ts, price_history, volume_history)
+                md = MarketData(
+                    symbol=symbol,
+                    price=price,
+                    volume=volume,
+                    vwap=current_vwap,
+                    timestamp=ts,
+                    bid=0.0,
+                    ask=0.0,
+                    price_history=price_history,
+                    volume_history=volume_history
+                )
                 cs = self.condition_sets[symbol]
                 if cs.check_all(md):
                     last = self.last_alert_time[symbol]
