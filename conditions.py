@@ -25,6 +25,7 @@ VOLUME_SURGE_THRESHOLD = 5.0
 WINDOW_SEC = 5
 THRESH_1 = 0.7  # 0.7% for first window
 THRESH_2 = 0.9  # 0.9% for second window (stronger)
+MAX_SPREAD_PCT = 0.5  # Maximum allowed spread as percentage of price
 
 
 @dataclass
@@ -35,6 +36,8 @@ class MarketData:
     volume: int
     vwap: float
     timestamp: datetime
+    bid: float = 0.0
+    ask: float = 0.0
     price_history: Dict[str, float] = None  # timestamp -> price
     volume_history: Dict[str, int] = None  # timestamp -> volume
 
@@ -134,12 +137,16 @@ class TwoStepMomentumCondition(AlertCondition):
             
         return False
 
-def passes_spread_filter(best_bid: float, best_ask: float, mid: float) -> bool:
+def passes_spread_filter(best_bid: float, best_ask: float, price: float) -> bool:
     """
-    Placeholder for spread filter logic.
-    To be implemented later.
+    Checks if the spread is within the allowed percentage.
+    Spread % = ((Ask - Bid) / Price) * 100
     """
-    return True
+    if best_bid <= 0 or best_ask <= 0 or price <= 0:
+        return True  # Default to True if data is missing to avoid blocking
+        
+    spread_pct = ((best_ask - best_bid) / price) * 100
+    return spread_pct <= MAX_SPREAD_PCT
 
 
 class VolumeSpike10sCondition(AlertCondition):
@@ -264,10 +271,8 @@ class AlertConditionSet:
         if not vwap_cond.check(data):
             return False
             
-        # MANDATORY: Spread filter (placeholder)
-        # In a real scenario, bid/ask would be in MarketData
-        # For now, we use price as a proxy for mid and pass dummy bid/ask
-        if not passes_spread_filter(data.price * 0.999, data.price * 1.001, data.price):
+        # MANDATORY: Spread filter
+        if not passes_spread_filter(data.bid, data.ask, data.price):
             return False
             
         # Check all other conditions in the set
