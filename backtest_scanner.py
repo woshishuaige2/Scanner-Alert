@@ -78,8 +78,8 @@ class BacktestAlertScanner:
             cs = AlertConditionSet(f"{symbol}_backtest")
             # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
             cs.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
-            cs.add_condition(VolumeSpike10sCondition())
-            cs.add_condition(VolumeConfirmationCondition())
+            # cs.add_condition(VolumeSpike10sCondition())
+            # cs.add_condition(VolumeConfirmationCondition())
             self.condition_sets[symbol] = cs
 
     def add_candle(self, symbol, ts, o, h, l, c, v, vwap):

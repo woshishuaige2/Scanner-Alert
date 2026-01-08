@@ -294,12 +294,14 @@ class AlertConditionSet:
         # MANDATORY: Price must be above VWAP for any alert to trigger
         vwap_cond = PriceAboveVWAPCondition()
         if not vwap_cond.check(data):
-            # print(f"[DEBUG] {data.symbol} failed VWAP: Price {data.price} <= VWAP {data.vwap}")
+            if data.symbol.lower() == "cgtl":
+                print(f"[DEBUG] {data.symbol} @ {data.timestamp.strftime('%H:%M:%S')} failed VWAP: Price {data.price} <= VWAP {data.vwap}")
             return False
             
         # MANDATORY: Spread filter
         if not passes_spread_filter(data.bid, data.ask, data.price):
-            # print(f"[DEBUG] {data.symbol} failed Spread: Bid {data.bid}, Ask {data.ask}, Price {data.price}")
+            if data.symbol.lower() == "cgtl":
+                print(f"[DEBUG] {data.symbol} @ {data.timestamp.strftime('%H:%M:%S')} failed Spread: Bid {data.bid}, Ask {data.ask}, Price {data.price}")
             return False
             
         # Check all other conditions in the set
