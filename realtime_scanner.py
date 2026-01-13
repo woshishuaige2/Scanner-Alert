@@ -621,6 +621,7 @@ if __name__ == "__main__":
         if (current_time - last_table_update >= table_update_interval) or state['last_alert_triggered']:
             if should_exit:
                 break
+            # Ensure we pass the latest last_alerts to the display function
             display_status_table(scanner, last_alerts)
             last_table_update = current_time
             

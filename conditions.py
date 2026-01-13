@@ -242,14 +242,14 @@ def passes_spread_filter(bid: float, ask: float, price: float) -> bool:
 
 class TwoStepMomentumCondition(AlertCondition):
     """
-    Condition: Two-step momentum confirmation.
-    r1 (t-10s to t-5s) >= t1
-    r2 (t-5s to t) >= t2
-    Current Price >= High of last 10s
+    Condition: Two-step 10s momentum confirmation.
+    r1 (t-20s to t-10s) >= t1 (0.7%)
+    r2 (t-10s to t) >= t2 (0.9%)
+    Current Price >= High of last 20s
     """
     
-    def __init__(self, t1: float = THRESH_1, t2: float = THRESH_2, window: int = WINDOW_SEC):
-        super().__init__("Two-Step Momentum")
+    def __init__(self, t1: float = THRESH_1, t2: float = THRESH_2, window: int = 10):
+        super().__init__("Two-Step 10s Momentum")
         self.t1 = t1
         self.t2 = t2
         self.window = window
@@ -260,8 +260,8 @@ class TwoStepMomentumCondition(AlertCondition):
             return False
             
         now = data.timestamp
-        t_minus_5 = now - timedelta(seconds=self.window)
-        t_minus_10 = now - timedelta(seconds=self.window * 2)
+        t_minus_10 = now - timedelta(seconds=self.window)
+        t_minus_20 = now - timedelta(seconds=self.window * 2)
         
         # Get prices at key intervals
         prices = sorted(data.price_history.items())
@@ -279,11 +279,9 @@ class TwoStepMomentumCondition(AlertCondition):
 
         p_now = data.price
         
-        # Aggression Filter: max return between consecutive data points in last 10s >= 0.5%
-        # This targets actual aggressive buying rather than slow grinds.
-        # In backtest (10s bars), this looks at the 10s return directly.
+        # Aggression Filter: max return between consecutive data points in last 20s >= 0.5%
         max_spike_ret = 0.0
-        recent_prices = [p for ts, p in prices if ts >= t_minus_10]
+        recent_prices = [p for ts, p in prices if ts >= t_minus_20]
         
         for i in range(1, len(recent_prices)):
             ret = ((recent_prices[i] - recent_prices[i-1]) / recent_prices[i-1]) * 100
@@ -299,31 +297,21 @@ class TwoStepMomentumCondition(AlertCondition):
         # For logging
         self.max_spike_ret = max_spike_ret
 
-        # Try to find exact 5s and 10s marks for high-resolution data (Real-time)
-        p_5_exact = get_price_at(t_minus_5, exact_match_only=True)
-        p_10_exact = get_price_at(t_minus_10, exact_match_only=True)
-        
-        # Rolling 10s High (excluding current price)
-        prev_prices = [p for ts, p in prices if ts < now and ts >= t_minus_10]
-        high_10s = max(prev_prices) if prev_prices else p_now
+        # Rolling 20s High (excluding current price)
+        prev_prices = [p for ts, p in prices if ts < now and ts >= t_minus_20]
+        high_20s = max(prev_prices) if prev_prices else p_now
 
-        if p_5_exact is not None and p_10_exact is not None:
-            r1 = ((p_5_exact - p_10_exact) / p_10_exact) * 100
-            r2 = ((p_now - p_5_exact) / p_5_exact) * 100
+        # Try to find prices at 10s and 20s marks
+        p_10 = get_price_at(t_minus_10, exact_match_only=False)
+        p_20 = get_price_at(t_minus_20, exact_match_only=False)
+
+        if p_10 is not None and p_20 is not None:
+            r1 = ((p_10 - p_20) / p_20) * 100
+            r2 = ((p_now - p_10) / p_10) * 100
             
-            if r1 >= self.t1 and r2 >= self.t2 and p_now >= high_10s:
-                self.logic_used = "5s+5s"
-                self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High10s: ${high_10s:.2f} | Aggression: {self.max_spike_ret:.2f}%"
-                return True
-        
-        # Fallback for lower resolution data (Backtest 10s bars)
-        p_10_any = get_price_at(t_minus_10, exact_match_only=False)
-        if p_10_any is not None:
-            total_r = ((p_now - p_10_any) / p_10_any) * 100
-            # Combined threshold (0.7 + 0.9 = 1.6%)
-            if total_r >= (self.t1 + self.t2) and p_now >= high_10s:
-                self.logic_used = "10s Fallback"
-                self.triggered_reason = f"10s Momentum: {total_r:.2f}% (Combined) | Aggression: {self.max_spike_ret:.2f}%"
+            if r1 >= self.t1 and r2 >= self.t2 and p_now >= high_20s:
+                self.logic_used = "10s+10s"
+                self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High20s: ${high_20s:.2f} | Aggression: {self.max_spike_ret:.2f}%"
                 return True
             
         return False
