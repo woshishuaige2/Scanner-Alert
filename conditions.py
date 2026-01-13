@@ -279,6 +279,21 @@ class TwoStepMomentumCondition(AlertCondition):
 
         p_now = data.price
         
+        # Aggression Filter: max 1s return in last 10s >= 0.5%
+        # This targets actual aggressive buying rather than slow grinds.
+        # Note: In backtest with 10s bars, we skip this to avoid data resolution issues.
+        max_1s_ret = 0.0
+        recent_prices = [p for ts, p in prices if ts >= t_minus_10]
+        is_backtest = len(recent_prices) < 5 # Real-time has ~10 points in 10s
+        
+        if not is_backtest:
+            for i in range(1, len(recent_prices)):
+                ret = ((recent_prices[i] - recent_prices[i-1]) / recent_prices[i-1]) * 100
+                max_1s_ret = max(max_1s_ret, ret)
+            
+            if max_1s_ret < 0.5:
+                return False
+
         # Try to find exact 5s and 10s marks for high-resolution data (Real-time)
         p_5_exact = get_price_at(t_minus_5, exact_match_only=True)
         p_10_exact = get_price_at(t_minus_10, exact_match_only=True)
@@ -293,7 +308,7 @@ class TwoStepMomentumCondition(AlertCondition):
             
             if r1 >= self.t1 and r2 >= self.t2 and p_now >= high_10s:
                 self.logic_used = "5s+5s"
-                self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High10s: ${high_10s:.2f}"
+                self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High10s: ${high_10s:.2f} | Aggression: {max_1s_ret:.2f}%"
                 return True
         
         # Fallback for lower resolution data (Backtest 10s bars)
@@ -303,7 +318,7 @@ class TwoStepMomentumCondition(AlertCondition):
             # Combined threshold (0.7 + 0.9 = 1.6%)
             if total_r >= (self.t1 + self.t2) and p_now >= high_10s:
                 self.logic_used = "10s Fallback"
-                self.triggered_reason = f"10s Momentum: {total_r:.2f}% (Combined)"
+                self.triggered_reason = f"10s Momentum: {total_r:.2f}% (Combined) | Aggression: {max_1s_ret:.2f}%"
                 return True
             
         return False
