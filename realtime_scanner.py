@@ -19,7 +19,11 @@ from conditions import (
     MarketData,
     PriceAboveVWAPCondition,
     PriceSurgeCondition,
-    VolumeSpike10sCondition
+    VolumeSpike10sCondition,
+    TwoStepMomentumCondition,
+    THRESH_1,
+    THRESH_2,
+    WINDOW_SEC
 )
 
 # Import TWS integration - REQUIRED
@@ -270,7 +274,7 @@ class RealtimeAlertScanner:
             # Create default condition set
             condition_set = AlertConditionSet(f"{symbol}_default")
             condition_set.add_condition(PriceAboveVWAPCondition())
-            condition_set.add_condition(PriceSurgeCondition())  
+            condition_set.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
             # condition_set.add_condition(VolumeSpike10sCondition())  
             
             self.monitors[symbol] = RealtimeSymbolMonitor(symbol, condition_set)
@@ -504,7 +508,9 @@ if __name__ == "__main__":
     
     from collections import deque
     last_alerts = deque(maxlen=7)  # Stores alert messages (increased to 7)
-    last_alert_triggered = False
+    
+    # Use a dictionary for shared state in the alert handler
+    state = {'last_alert_triggered': False}
 
     tts_engine = pyttsx3.init()
 
@@ -524,8 +530,7 @@ if __name__ == "__main__":
             f"Conditions: {reasons}"
         )
         last_alerts.appendleft(alert_msg)
-        global last_alert_triggered
-        last_alert_triggered = True
+        state['last_alert_triggered'] = True
 
     scanner.on_alert(alert_handler)
     
@@ -605,15 +610,15 @@ if __name__ == "__main__":
         current_time = time.time()
         
         # Update table if: 1) interval passed, or 2) alert was triggered
-        if (current_time - last_table_update >= table_update_interval) or last_alert_triggered:
+        if (current_time - last_table_update >= table_update_interval) or state['last_alert_triggered']:
             if should_exit:
                 break
             display_status_table(scanner, last_alerts)
             last_table_update = current_time
             
             # Reset alert flag after displaying
-            if last_alert_triggered:
-                last_alert_triggered = False
+            if state['last_alert_triggered']:
+                state['last_alert_triggered'] = False
                 # Keep message for a bit longer
                 time.sleep(2)
     

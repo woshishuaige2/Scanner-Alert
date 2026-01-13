@@ -11,24 +11,24 @@ from backtest_scanner import BacktestAlertScanner
 from tws_data_fetcher import create_tws_data_app
 
 # NGROK CONFIGURATION (Change to 127.0.0.1 for local use)
-NGROK_HOST = "8.tcp.ngrok.io"
-NGROK_PORT = 18060
-SYMBOLS = ["YCBD"]
-BACKTEST_DATE = "2025-12-12"
+NGROK_HOST = "2.tcp.ngrok.io"
+NGROK_PORT = 10176
+SYMBOLS = ["EVTV"]
+BACKTEST_DATE = "2026-01-12"
 
 # Scenarios: (Take Profit %, Stop Loss %)
 SCENARIOS = [(2.0, 1.0), (4.0, 2.0), (10.0, 5.0), (20.0, 10.0), (1.0, 10.0)]
 
 def run():
     print(f"\n[INFO] Connecting to TWS at {NGROK_HOST}:{NGROK_PORT}...", flush=True)
-    tws_app = create_tws_data_app(host=NGROK_HOST, port=NGROK_PORT, client_id=997)
+    tws_app = create_tws_data_app(host=NGROK_HOST, port=NGROK_PORT, client_id=998)
     if not tws_app:
         print("[ERROR] Could not connect to TWS.", flush=True)
         return
     
     scanner = BacktestAlertScanner(symbols=SYMBOLS, date=BACKTEST_DATE)
     print(f"[INFO] Fetching data for {', '.join(SYMBOLS)}...", flush=True)
-    if not scanner.load_data_from_tws(tws_app):
+    if not scanner.load_data_from_tws(tws_app, bar_size="1 min"):
         print("[ERROR] Failed to load data.", flush=True)
         tws_app.disconnect()
         return
