@@ -196,7 +196,9 @@ class TWSDataApp(EClient, EWrapper):
                     self.realtime_data[symbol]['vwap'] = vwap
                     
                     # Call callback with updated data
-                    callback(symbol, price, current_daily_volume, vwap, datetime.now())
+                    bid = self.realtime_data[symbol].get('bid', 0.0)
+                    ask = self.realtime_data[symbol].get('ask', 0.0)
+                    callback(symbol, price, current_daily_volume, vwap, datetime.now(), bid, ask)
     
     def get_next_req_id(self):
         """Get next request ID"""
@@ -281,13 +283,13 @@ class TWSDataApp(EClient, EWrapper):
         
         return bars
     
-    def subscribe_realtime_data(self, symbol: str, callback: Callable):
+    def subscribe_market_data(self, symbol: str, callback: Callable):
         """
         Subscribe to real-time market data.
         
         Args:
             symbol: Stock symbol
-            callback: Function with signature (symbol, price, volume, vwap, timestamp)
+            callback: Function with signature (symbol, price, volume, vwap, timestamp, bid, ask)
         """
         # Create contract
         contract = Contract()

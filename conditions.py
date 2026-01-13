@@ -265,39 +265,43 @@ class TwoStepMomentumCondition(AlertCondition):
         # Get prices at key intervals
         prices = sorted(data.price_history.items())
         
-        def get_price_at(target_ts):
+        def get_price_at(target_ts, exact_match_only=False):
             # Find closest price at or before target_ts
-            best_price = None
             for ts, p in reversed(prices):
-                if ts <= target_ts:
-                    return p
-            return prices[0][1] if prices else None
+                if exact_match_only:
+                    if abs((ts - target_ts).total_seconds()) < 1.0:
+                        return p
+                else:
+                    if ts <= target_ts:
+                        return p
+            return None
 
         p_now = data.price
-        p_5 = get_price_at(t_minus_5)
-        p_10 = get_price_at(t_minus_10)
         
-        if p_5 is None or p_10 is None:
-            return False
-            
-        r1 = ((p_5 - p_10) / p_10) * 100
-        r2 = ((p_now - p_5) / p_5) * 100
+        # Try to find exact 5s and 10s marks for high-resolution data (Real-time)
+        p_5_exact = get_price_at(t_minus_5, exact_match_only=True)
+        p_10_exact = get_price_at(t_minus_10, exact_match_only=True)
         
         # Rolling 10s High (excluding current price)
         prev_prices = [p for ts, p in prices if ts < now and ts >= t_minus_10]
         high_10s = max(prev_prices) if prev_prices else p_now
-        
-        # Fallback for 10s bars (if 5s windows are identical)
-        if p_5 == p_10 or p_5 == p_now:
-            total_r = ((p_now - p_10) / p_10) * 100
-            if total_r >= (self.t1 + self.t2) and p_now >= high_10s:
-                self.triggered_reason = f"10s Momentum: {total_r:.2f}% (Fallback)"
-                return True
-            return False
 
-        if r1 >= self.t1 and r2 >= self.t2 and p_now >= high_10s:
-            self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High10s: ${high_10s:.2f}"
-            return True
+        if p_5_exact is not None and p_10_exact is not None:
+            r1 = ((p_5_exact - p_10_exact) / p_10_exact) * 100
+            r2 = ((p_now - p_5_exact) / p_5_exact) * 100
+            
+            if r1 >= self.t1 and r2 >= self.t2 and p_now >= high_10s:
+                self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High10s: ${high_10s:.2f}"
+                return True
+        
+        # Fallback for lower resolution data (Backtest 10s bars)
+        p_10_any = get_price_at(t_minus_10, exact_match_only=False)
+        if p_10_any is not None:
+            total_r = ((p_now - p_10_any) / p_10_any) * 100
+            # Combined threshold (0.7 + 0.9 = 1.6%)
+            if total_r >= (self.t1 + self.t2) and p_now >= high_10s:
+                self.triggered_reason = f"10s Momentum: {total_r:.2f}% (Combined)"
+                return True
             
         return False
 

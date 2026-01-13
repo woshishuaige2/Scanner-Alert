@@ -68,7 +68,7 @@ class RealtimeSymbolMonitor:
         # Alert tracking
         self.last_alert_time = None
     
-    def update_market_data(self, price: float, volume: int, vwap: float = None):
+    def update_market_data(self, price: float, volume: int, vwap: float = None, bid: float = 0.0, ask: float = 0.0):
         """Update market data for this symbol"""
         with self.lock:
             timestamp = datetime.now()
@@ -76,6 +76,8 @@ class RealtimeSymbolMonitor:
             # Convert to float (TWS returns Decimal types)
             price = float(price)
             volume = float(volume)
+            bid = float(bid)
+            ask = float(ask)
             
             # For tick-by-tick updates, volume is cumulative daily volume
             # Calculate incremental volume for this update
@@ -95,6 +97,8 @@ class RealtimeSymbolMonitor:
             self.volume_history.append((timestamp, volume_increment))
             
             self.last_price = price
+            self.last_bid = bid
+            self.last_ask = ask
             self.last_volume = volume  # Store cumulative volume
             self.last_bar_volume = volume_increment  # Store this bar's volume
             self.last_update = timestamp
@@ -155,6 +159,8 @@ class RealtimeSymbolMonitor:
             return MarketData(
                 symbol=self.symbol,
                 price=self.last_price,
+                bid=getattr(self, 'last_bid', 0.0),
+                ask=getattr(self, 'last_ask', 0.0),
                 volume=self.last_volume,
                 vwap=self.last_vwap,
                 timestamp=self.last_update,
@@ -325,7 +331,7 @@ class RealtimeAlertScanner:
         """Register callback for alerts. Callback receives (symbol, timestamp, reasons)"""
         self.alert_callbacks.append(callback)
     
-    def update(self, symbol: str, price: float, volume: int, vwap: float):
+    def update(self, symbol: str, price: float, volume: int, vwap: float, bid: float = 0.0, ask: float = 0.0):
         """
         Update market data for a symbol and check conditions.
         
@@ -334,12 +340,14 @@ class RealtimeAlertScanner:
             price: Current price
             volume: Current volume
             vwap: Volume-weighted average price
+            bid: Current bid price
+            ask: Current ask price
         """
         if symbol not in self.monitors:
             raise ValueError(f"Symbol {symbol} not in monitored list")
         
         monitor = self.monitors[symbol]
-        monitor.update_market_data(price, volume, vwap)
+        monitor.update_market_data(price, volume, vwap, bid, ask)
         
         # Increment update counter
         with self.lock:
@@ -569,12 +577,12 @@ if __name__ == "__main__":
     
     # Create callback for each symbol
     def create_tws_callback(scanner_obj, symbol):
-        def callback(sym, price, volume, vwap, timestamp):
-            """Callback receives: symbol, price, volume, vwap, timestamp"""
+        def callback(sym, price, volume, vwap, timestamp, bid, ask):
+            """Callback receives: symbol, price, volume, vwap, timestamp, bid, ask"""
             # Debug: Print first few updates to confirm data is being received
             if scanner_obj.update_count < 10:
                 print(f"[DEBUG {scanner_obj.update_count + 1}] {sym} | Price: ${price:.2f} | Vol: {volume:,} | VWAP: ${vwap:.2f}")
-            scanner_obj.update(sym, price=price, volume=volume, vwap=vwap)
+            scanner_obj.update(sym, price=price, volume=volume, vwap=vwap, bid=bid, ask=ask)
         
         return callback
     
@@ -582,7 +590,7 @@ if __name__ == "__main__":
     print("[INFO] Subscribing to live market data...")
     for symbol in symbols:
         callback = create_tws_callback(scanner, symbol)
-        tws_app.subscribe_realtime_data(symbol, callback)
+        tws_app.subscribe_market_data(symbol, callback)
         print(f"[OK] Subscribed to {symbol}")
     
     print(f"\n[OK] All symbols subscribed: {', '.join(symbols)}")
