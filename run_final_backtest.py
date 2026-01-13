@@ -48,16 +48,22 @@ def run():
             print("    No alerts triggered.", flush=True)
         else:
             for i, alert in enumerate(symbol_alerts):
-                print(f"    [{i+1}] {alert.timestamp.strftime('%H:%M:%S')} | Price: ${alert.price:.2f} | VWAP: ${alert.vwap:.2f}", flush=True)
+                # Find logic used in conditions
+                logic = "Unknown"
+                for reason in alert.conditions_triggered:
+                    if "Logic:" in reason:
+                        logic = reason.split("Logic: ")[1]
+                        break
+                print(f"    [{i+1}] {alert.timestamp.strftime('%H:%M:%S')} | Price: ${alert.price:.2f} | VWAP: ${alert.vwap:.2f} | Logic: {logic}", flush=True)
     
     # 2. WIN RATE SUMMARY
     print("\n" + "="*80, flush=True)
     print(f"{'WIN RATE SUMMARY (2:1 Reward-to-Risk)':^80}", flush=True)
     print("="*80, flush=True)
     
-    header = f"{'SCENARIO':<20} | {'SYMBOL':<10} | {'ALERTS':<8} | {'WINS':<6} | {'LOSSES':<8} | {'WIN RATE':<10} | {'FINAL ASSET':<12}"
+    header = f"{'SCENARIO':<20} | {'SYMBOL':<10} | {'ALERTS':<8} | {'WINS':<6} | {'LOSSES':<8} | {'WIN RATE':<10} | {'COMMISSION':<12} | {'FINAL ASSET':<12}"
     print(header, flush=True)
-    print("-" * 100, flush=True)
+    print("-" * 120, flush=True)
     
     for tp, sl in SCENARIOS:
         # Reset assets for each scenario to start fresh with $10000
@@ -67,15 +73,16 @@ def run():
             res = pl_results.get(symbol, [])
             wins = len([r for r in res if r['outcome'] == "WIN"])
             losses = len([r for r in res if r['outcome'] == "LOSS"])
+            total_comm = sum([r['commission'] for r in res])
             total = wins + losses
             wr = (wins / total * 100) if total > 0 else 0
             
             # Get final asset for this symbol in this scenario
             final_asset = scanner.current_assets[symbol]
             
-            row = f"TP:{tp:>4.1f}% / SL:{sl:>4.1f}% | {symbol:<10} | {len(res):<8} | {wins:<6} | {losses:<8} | {wr:>8.1f}% | ${final_asset:>10.2f}"
+            row = f"TP:{tp:>4.1f}% / SL:{sl:>4.1f}% | {symbol:<10} | {len(res):<8} | {wins:<6} | {losses:<8} | {wr:>8.1f}% | ${total_comm:>10.2f} | ${final_asset:>10.2f}"
             print(row, flush=True)
-        print("-" * 100, flush=True)
+        print("-" * 120, flush=True)
     
     print("\n[INFO] Backtest complete. Disconnecting...", flush=True)
     tws_app.disconnect()

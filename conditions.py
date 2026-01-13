@@ -253,6 +253,7 @@ class TwoStepMomentumCondition(AlertCondition):
         self.t1 = t1
         self.t2 = t2
         self.window = window
+        self.logic_used = "None"
         
     def check(self, data: MarketData) -> bool:
         if not data.price_history or len(data.price_history) < 2:
@@ -291,6 +292,7 @@ class TwoStepMomentumCondition(AlertCondition):
             r2 = ((p_now - p_5_exact) / p_5_exact) * 100
             
             if r1 >= self.t1 and r2 >= self.t2 and p_now >= high_10s:
+                self.logic_used = "5s+5s"
                 self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High10s: ${high_10s:.2f}"
                 return True
         
@@ -300,6 +302,7 @@ class TwoStepMomentumCondition(AlertCondition):
             total_r = ((p_now - p_10_any) / p_10_any) * 100
             # Combined threshold (0.7 + 0.9 = 1.6%)
             if total_r >= (self.t1 + self.t2) and p_now >= high_10s:
+                self.logic_used = "10s Fallback"
                 self.triggered_reason = f"10s Momentum: {total_r:.2f}% (Combined)"
                 return True
             

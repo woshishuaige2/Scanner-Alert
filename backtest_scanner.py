@@ -149,7 +149,17 @@ class BacktestAlertScanner:
                 if cs.check_all(md):
                     last = self.last_alert_time[symbol]
                     if last is None or (ts - last) >= self.alert_cooldown:
-                        alert = BacktestAlert(symbol, ts, price, volume, current_vwap, cs.triggered_reasons[:])
+                        # Capture logic used from TwoStepMomentumCondition
+                        logic_used = "Unknown"
+                        for cond in cs.conditions:
+                            if isinstance(cond, TwoStepMomentumCondition):
+                                logic_used = cond.logic_used
+                                break
+                        
+                        reasons = cs.triggered_reasons[:]
+                        reasons.append(f"Logic: {logic_used}")
+                        
+                        alert = BacktestAlert(symbol, ts, price, volume, current_vwap, reasons)
                         self.alerts[symbol].append(alert)
                         self.last_alert_time[symbol] = ts
         return self.alerts
@@ -183,9 +193,15 @@ class BacktestAlertScanner:
                 shares = self.trade_investment / entry_price
                 gross_pl = (exit_price - entry_price) * shares
                 
-                # Commission: $0.005 per share, $1 minimum per trade
-                entry_commission = max(1.0, shares * 0.005)
-                exit_commission = max(1.0, shares * 0.005)
+                # Tiered Commission: $0.005 per share, $1 minimum, max 1% of trade value
+                def calculate_commission(shares, price):
+                    comm = shares * 0.005
+                    trade_value = shares * price
+                    max_comm = trade_value * 0.01
+                    return min(max_comm, max(1.0, comm))
+
+                entry_commission = calculate_commission(shares, entry_price)
+                exit_commission = calculate_commission(shares, exit_price)
                 total_commission = entry_commission + exit_commission
                 net_pl = gross_pl - total_commission
                 
@@ -199,6 +215,7 @@ class BacktestAlertScanner:
                     'exit': exit_price, 
                     'time': exit_time,
                     'net_pl': net_pl,
+                    'commission': total_commission,
                     'final_asset': self.current_assets[symbol]
                 })
         return results
