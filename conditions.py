@@ -18,13 +18,13 @@ from datetime import datetime, timedelta
 # Configure these values to adjust alert sensitivity across all scanners
 # =============================================================================
 
-PRICE_SURGE_THRESHOLD = 2.0  # Percentage (e.g., 3.0 = 3% price increase)
+PRICE_SURGE_THRESHOLD = 0.2  # Percentage (e.g., 3.0 = 3% price increase)
 VOLUME_SURGE_THRESHOLD = 5.0
 
 # Two-Step Momentum Configuration
 WINDOW_SEC = 5
-THRESH_1 = 0.7
-THRESH_2 = 0.9
+THRESH_1 = 0.1
+THRESH_2 = 0.1
 MAX_SPREAD_PCT = 0.5
 
 @dataclass
@@ -291,7 +291,8 @@ class TwoStepMomentumCondition(AlertCondition):
         # Note: In backtest (10s bars), we skip this to avoid data resolution issues.
         is_backtest = len(recent_prices) < 5
         if not is_backtest:
-            if max_spike_ret < 0.5:
+            # RELAXED FOR TESTING: Reduced from 0.5 to 0.05
+            if max_spike_ret < 0.05:
                 return False
         
         # For logging

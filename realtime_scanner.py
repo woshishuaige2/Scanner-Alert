@@ -48,7 +48,7 @@ class RealtimeSymbolMonitor:
         self.condition_set = condition_set
         self.history_window_seconds = history_window_seconds
         self.max_history_size = max_history_size
-        self.alert_cooldown_seconds = 60  # 60s cooldown for alerts on this symbol
+        self.alert_cooldown_seconds = 5  # 5s cooldown for alerts on this symbol (reduced for better responsiveness)
         
         # Data tracking
         self.price_history = deque(maxlen=max_history_size)
@@ -281,6 +281,7 @@ class RealtimeAlertScanner:
             condition_set = AlertConditionSet(f"{symbol}_default")
             condition_set.add_condition(PriceAboveVWAPCondition())
             condition_set.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
+            condition_set.add_condition(PriceSurgeCondition())
             # condition_set.add_condition(VolumeSpike10sCondition())  
             
             self.monitors[symbol] = RealtimeSymbolMonitor(symbol, condition_set)
@@ -520,17 +521,23 @@ if __name__ == "__main__":
     # Use a dictionary for shared state in the alert handler
     state = {'last_alert_triggered': False}
 
-    tts_engine = pyttsx3.init()
+    # Initialize TTS in a way that can be used across threads
+    def voice_announce(text):
+        def _speak():
+            try:
+                engine = pyttsx3.init()
+                engine.say(text)
+                engine.runAndWait()
+                # Clean up engine to avoid issues with multiple initializations
+                del engine
+            except Exception as e:
+                # Silent error for voice to avoid cluttering console
+                pass
+        
+        threading.Thread(target=_speak, daemon=True).start()
 
     def alert_handler(symbol, timestamp, reasons, data):
-        # 1. Voice announce the symbol name
-        try:
-            tts_engine.say(symbol)
-            tts_engine.runAndWait()
-        except Exception as e:
-            print(f"[Voice Error] {e}")
-        # 2. Display in console (handled by table update)
-        # 3. Add to last_alerts
+        # 1. Add to last_alerts and trigger display update FIRST
         alert_msg = (
             f"Symbol: {symbol}\n"
             f"Time: {timestamp}\n"
@@ -539,6 +546,9 @@ if __name__ == "__main__":
         )
         last_alerts.appendleft(alert_msg)
         state['last_alert_triggered'] = True
+        
+        # 2. Voice announce in background thread so it doesn't block display
+        voice_announce(symbol)
 
     scanner.on_alert(alert_handler)
     
