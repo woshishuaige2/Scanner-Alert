@@ -362,13 +362,13 @@ class RealtimeAlertScanner:
         """Trigger an alert"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         
-        # Console log message
-        alert_message = (
-            f"[{timestamp}] ALERT: {symbol}\n"
-            f"  Price: ${data.price:.2f} | Volume: {data.volume:,}\n"
-            f"  Conditions: {reasons}"
-        )
-        print(alert_message)
+        # Console log message (removed direct print to avoid breaking table display)
+        # alert_message = (
+        #     f"[{timestamp}] ALERT: {symbol}\n"
+        #     f"  Price: ${data.price:.2f} | Volume: {data.volume:,}\n"
+        #     f"  Conditions: {reasons}"
+        # )
+        # print(alert_message)
         
         # Call registered callbacks
         for callback in self.alert_callbacks:
@@ -613,23 +613,26 @@ if __name__ == "__main__":
     
     # Keep running continuously
     while not should_exit:
-        time.sleep(0.5)  # Check frequently
-        
         current_time = time.time()
         
         # Update table if: 1) interval passed, or 2) alert was triggered
         if (current_time - last_table_update >= table_update_interval) or state['last_alert_triggered']:
             if should_exit:
                 break
+            
+            # Reset alert flag BEFORE displaying to avoid race conditions
+            alert_was_triggered = state['last_alert_triggered']
+            if alert_was_triggered:
+                state['last_alert_triggered'] = False
+            
             # Ensure we pass the latest last_alerts to the display function
             display_status_table(scanner, last_alerts)
             last_table_update = current_time
             
-            # Reset alert flag after displaying
-            if state['last_alert_triggered']:
-                state['last_alert_triggered'] = False
-                # Keep message for a bit longer
-                time.sleep(2)
+            # If an alert was triggered, we already updated the table. 
+            # We don't need to sleep here as the loop will continue.
+        
+        time.sleep(0.1)  # Check frequently but don't hog CPU
     
     # Cleanup on exit
     if tws_app:
