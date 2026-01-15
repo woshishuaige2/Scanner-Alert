@@ -333,26 +333,29 @@ class AlertConditionSet:
     
     def check_all(self, data: MarketData) -> bool:
         """
-        Check if ALL conditions are met.
+        Check if conditions are met.
+        Uses AND logic for mandatory filters (VWAP, Spread) 
+        and OR logic for the specific alert conditions (Momentum, Surge, etc.)
         
         Args:
             data: MarketData object
             
         Returns:
-            bool: True only if all conditions are triggered
+            bool: True if mandatory filters pass AND at least one alert condition triggers
         """
         self.triggered_reasons = []
         
-        # MANDATORY: Price must be above VWAP for any alert to trigger
+        # MANDATORY FILTER 1: Price must be above VWAP for any alert to trigger
         vwap_cond = PriceAboveVWAPCondition()
         if not vwap_cond.check(data):
             return False
             
-        # MANDATORY: Spread filter
+        # MANDATORY FILTER 2: Spread filter
         if not passes_spread_filter(data.bid, data.ask, data.price):
             return False
             
-        # Check all other conditions in the set
+        # Check alert conditions (OR logic: trigger if ANY of these are met)
+        any_triggered = False
         for condition in self.conditions:
             # Skip if it's already the VWAP condition (to avoid double checking)
             if isinstance(condition, PriceAboveVWAPCondition):
@@ -360,12 +363,10 @@ class AlertConditionSet:
                 
             if condition.check(data):
                 self.triggered_reasons.append(condition.get_trigger_reason())
-            else:
-                # print(f"[DEBUG] {data.symbol} @ {data.timestamp.strftime('%H:%M:%S')} failed {condition.name}")
-                return False
+                any_triggered = True
         
-        # Add VWAP reason at the beginning if other conditions also met
-        if self.triggered_reasons:
+        # If at least one condition triggered, add VWAP reason and return True
+        if any_triggered:
             self.triggered_reasons.insert(0, vwap_cond.get_trigger_reason())
             return True
             

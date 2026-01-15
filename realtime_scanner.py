@@ -48,7 +48,7 @@ class RealtimeSymbolMonitor:
         self.condition_set = condition_set
         self.history_window_seconds = history_window_seconds
         self.max_history_size = max_history_size
-        self.alert_cooldown_seconds = 5  # 5s cooldown for alerts on this symbol (reduced for better responsiveness)
+        self.alert_cooldown_seconds = 1  # 1s cooldown for alerts on this symbol (reduced for high-frequency testing)
         
         # Data tracking
         self.price_history = deque(maxlen=max_history_size)
@@ -625,22 +625,19 @@ if __name__ == "__main__":
     while not should_exit:
         current_time = time.time()
         
-        # Update table if: 1) interval passed, or 2) alert was triggered
-        if (current_time - last_table_update >= table_update_interval) or state['last_alert_triggered']:
-            if should_exit:
-                break
+        # Check if an alert was triggered
+        if state['last_alert_triggered']:
+            # Reset alert flag BEFORE displaying
+            state['last_alert_triggered'] = False
             
-            # Reset alert flag BEFORE displaying to avoid race conditions
-            alert_was_triggered = state['last_alert_triggered']
-            if alert_was_triggered:
-                state['last_alert_triggered'] = False
-            
-            # Ensure we pass the latest last_alerts to the display function
+            # Update display immediately on alert
             display_status_table(scanner, last_alerts)
             last_table_update = current_time
             
-            # If an alert was triggered, we already updated the table. 
-            # We don't need to sleep here as the loop will continue.
+        # Regular interval update
+        elif (current_time - last_table_update >= table_update_interval):
+            display_status_table(scanner, last_alerts)
+            last_table_update = current_time
         
         time.sleep(0.1)  # Check frequently but don't hog CPU
     
