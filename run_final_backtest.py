@@ -28,7 +28,7 @@ def run():
     
     scanner = BacktestAlertScanner(symbols=SYMBOLS, date=BACKTEST_DATE)
     print(f"[INFO] Fetching data for {', '.join(SYMBOLS)}...", flush=True)
-    # Using 10 secs for higher resolution backtest
+    # Using 10 secs for reliable high-resolution backtest
     if not scanner.load_data_from_tws(tws_app, bar_size="10 secs"):
         print("[ERROR] Failed to load data.", flush=True)
         tws_app.disconnect()
