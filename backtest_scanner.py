@@ -147,11 +147,14 @@ class BacktestAlertScanner:
                 if cs.check_all(md):
                     last = self.last_alert_time[symbol]
                     if last is None or (ts - last) >= self.alert_cooldown:
-                        # Capture logic used from TwoStepMomentumCondition
+                        # Capture logic used from conditions
                         logic_used = "Unknown"
                         for cond in cs.conditions:
-                            if isinstance(cond, TwoStepMomentumCondition):
-                                logic_used = cond.logic_used
+                            if cond.check(md):
+                                if isinstance(cond, TwoStepMomentumCondition):
+                                    logic_used = cond.logic_used
+                                elif isinstance(cond, PriceSurgeCondition):
+                                    logic_used = "Price Surge"
                                 break
                         
                         reasons = cs.triggered_reasons[:]
