@@ -78,6 +78,8 @@ class BacktestAlertScanner:
             cs = AlertConditionSet(f"{symbol}_backtest")
             # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
             cs.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
+            from conditions import PriceSurgeCondition
+            cs.add_condition(PriceSurgeCondition())
             # cs.add_condition(VolumeSpike10sCondition())
             # cs.add_condition(VolumeConfirmationCondition())
             self.condition_sets[symbol] = cs
@@ -127,7 +129,18 @@ class BacktestAlertScanner:
                 price_history[ts] = price
                 volume_history[ts] = volume
                 
-                md = MarketData(symbol, price, volume, current_vwap, ts, price_history, volume_history)
+                # Mock bid/ask for backtest spread filter
+                md = MarketData(
+                    symbol=symbol, 
+                    price=price, 
+                    volume=volume, 
+                    vwap=current_vwap, 
+                    timestamp=ts, 
+                    bid=price-0.01, 
+                    ask=price+0.01,
+                    price_history=price_history, 
+                    volume_history=volume_history
+                )
                 cs = self.condition_sets[symbol]
                 if cs.check_all(md):
                     last = self.last_alert_time[symbol]

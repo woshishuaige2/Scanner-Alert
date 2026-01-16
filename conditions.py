@@ -288,8 +288,14 @@ class TwoStepMomentumCondition(AlertCondition):
             max_spike_ret = max(max_spike_ret, ret)
         
         # Apply filter: at least one jump must be >= 0.5%
-        # Note: In backtest (10s bars), we skip this to avoid data resolution issues.
-        is_backtest = len(recent_prices) < 5
+        # Note: In backtest (1-min bars), we skip this to avoid data resolution issues.
+        # We check the time difference between the last two data points to detect backtest mode
+        is_backtest = False
+        if len(prices) >= 2:
+            time_diff = (prices[-1][0] - prices[-2][0]).total_seconds()
+            if time_diff >= 60:  # 1-minute bars or higher
+                is_backtest = True
+
         if not is_backtest:
             # RELAXED FOR TESTING: Reduced from 0.5 to 0.05
             if max_spike_ret < 0.05:
@@ -306,13 +312,22 @@ class TwoStepMomentumCondition(AlertCondition):
         p_10 = get_price_at(t_minus_10, exact_match_only=False)
         p_20 = get_price_at(t_minus_20, exact_match_only=False)
 
-        if p_10 is not None and p_20 is not None:
+        if p_10 is not None and p_20 is not None and p_10 != p_now:
             r1 = ((p_10 - p_20) / p_20) * 100
             r2 = ((p_now - p_10) / p_10) * 100
             
             if r1 >= self.t1 and r2 >= self.t2 and p_now >= high_20s:
                 self.logic_used = "10s+10s"
                 self.triggered_reason = f"Momentum: r1={r1:.2f}%, r2={r2:.2f}% | High20s: ${high_20s:.2f} | Aggression: {self.max_spike_ret:.2f}%"
+                return True
+        
+        # Fallback for backtest (1-min bars): Check return from previous bar
+        if is_backtest and len(prices) >= 2:
+            p_prev = prices[-2][1]
+            ret = ((p_now - p_prev) / p_prev) * 100
+            if ret >= (self.t1 + self.t2): # Combined threshold for 1-min bar
+                self.logic_used = "1-min fallback"
+                self.triggered_reason = f"Momentum (1m): ret={ret:.2f}%"
                 return True
             
         return False
