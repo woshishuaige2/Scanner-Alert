@@ -19,7 +19,6 @@ from conditions import (
     MarketData,
     PriceAboveVWAPCondition,
     PriceSurgeCondition,
-    VolumeSpike10sCondition,
     TwoStepMomentumCondition,
     THRESH_1,
     THRESH_2,

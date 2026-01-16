@@ -10,8 +10,6 @@ from conditions import (
     PriceAboveVWAPCondition,
     TwoStepMomentumCondition,
     PriceSurgeCondition,
-    VolumeSpike10sCondition,
-    VolumeConfirmationCondition,
     PRICE_SURGE_THRESHOLD,
     THRESH_1,
     THRESH_2,
