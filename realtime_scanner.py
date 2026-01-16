@@ -279,7 +279,7 @@ class RealtimeAlertScanner:
             # Create default condition set
             condition_set = AlertConditionSet(f"{symbol}_default")
             # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
-            condition_set.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
+            condition_set.add_condition(TwoStepMomentumCondition(ret5_thresh=THRESH_1, ret10_thresh=THRESH_2))
             condition_set.add_condition(PriceSurgeCondition())
             # condition_set.add_condition(VolumeSpike10sCondition())  
             

@@ -76,7 +76,7 @@ class BacktestAlertScanner:
         for symbol in self.symbols:
             cs = AlertConditionSet(f"{symbol}_backtest")
             # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
-            cs.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
+            cs.add_condition(TwoStepMomentumCondition(ret5_thresh=THRESH_1, ret10_thresh=THRESH_2))
             cs.add_condition(PriceSurgeCondition())
             # cs.add_condition(VolumeSpike10sCondition())
             # cs.add_condition(VolumeConfirmationCondition())
