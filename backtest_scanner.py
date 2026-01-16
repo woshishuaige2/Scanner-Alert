@@ -9,6 +9,7 @@ from conditions import (
     MarketData,
     PriceAboveVWAPCondition,
     TwoStepMomentumCondition,
+    PriceSurgeCondition,
     VolumeSpike10sCondition,
     VolumeConfirmationCondition,
     PRICE_SURGE_THRESHOLD,
@@ -78,7 +79,6 @@ class BacktestAlertScanner:
             cs = AlertConditionSet(f"{symbol}_backtest")
             # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
             cs.add_condition(TwoStepMomentumCondition(t1=THRESH_1, t2=THRESH_2, window=WINDOW_SEC))
-            from conditions import PriceSurgeCondition
             cs.add_condition(PriceSurgeCondition())
             # cs.add_condition(VolumeSpike10sCondition())
             # cs.add_condition(VolumeConfirmationCondition())
