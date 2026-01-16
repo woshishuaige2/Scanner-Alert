@@ -48,7 +48,7 @@ class RealtimeSymbolMonitor:
         self.condition_set = condition_set
         self.history_window_seconds = history_window_seconds
         self.max_history_size = max_history_size
-        self.alert_cooldown_seconds = 1  # 1s cooldown for alerts on this symbol (reduced for high-frequency testing)
+        self.alert_cooldown_seconds = 60  # 60s cooldown for alerts on this symbol
         
         # Data tracking
         self.price_history = deque(maxlen=max_history_size)

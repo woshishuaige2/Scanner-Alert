@@ -8,10 +8,9 @@ from conditions import (
     AlertConditionSet,
     MarketData,
     PriceAboveVWAPCondition,
-    PriceSurgeCondition,
+    TwoStepMomentumCondition,
     VolumeSpike10sCondition,
     VolumeConfirmationCondition,
-    TwoStepMomentumCondition,
     PRICE_SURGE_THRESHOLD,
     THRESH_1,
     THRESH_2,
@@ -117,12 +116,6 @@ class BacktestAlertScanner:
             
             for candle in candles:
                 ts = candle['timestamp']
-                
-                # Reset VWAP at market open (9:30 AM EST)
-                if ts.hour == 9 and ts.minute == 30 and ts.second == 0:
-                    cumulative_pv = 0.0
-                    cumulative_volume = 0.0
-                
                 price = candle['close']
                 volume = candle['volume']
                 
@@ -134,17 +127,7 @@ class BacktestAlertScanner:
                 price_history[ts] = price
                 volume_history[ts] = volume
                 
-                md = MarketData(
-                    symbol=symbol, 
-                    price=price, 
-                    volume=volume, 
-                    vwap=current_vwap, 
-                    timestamp=ts, 
-                    bid=price,  # Use price as fallback for bid/ask in backtest
-                    ask=price, 
-                    price_history=price_history, 
-                    volume_history=volume_history
-                )
+                md = MarketData(symbol, price, volume, current_vwap, ts, price_history, volume_history)
                 cs = self.condition_sets[symbol]
                 if cs.check_all(md):
                     last = self.last_alert_time[symbol]

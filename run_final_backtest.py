@@ -11,10 +11,10 @@ from backtest_scanner import BacktestAlertScanner
 from tws_data_fetcher import create_tws_data_app
 
 # NGROK CONFIGURATION (Change to 127.0.0.1 for local use)
-NGROK_HOST = "2.tcp.ngrok.io"
-NGROK_PORT = 10176
-SYMBOLS = ["EVTV"]
-BACKTEST_DATE = "2026-01-12"
+NGROK_HOST = "0.tcp.ngrok.io"
+NGROK_PORT = 14317
+SYMBOLS = ["SPHL"]
+BACKTEST_DATE = "2026-01-15"
 
 # Scenarios: (Take Profit %, Stop Loss %)
 SCENARIOS = [(2.0, 1.0), (4.0, 2.0), (10.0, 5.0), (20.0, 10.0), (1.0, 10.0)]
