@@ -8,12 +8,7 @@ from conditions import (
     AlertConditionSet,
     MarketData,
     PriceAboveVWAPCondition,
-    TwoStepMomentumCondition,
-    PriceSurgeCondition,
-    PRICE_SURGE_THRESHOLD,
-    THRESH_1,
-    THRESH_2,
-    WINDOW_SEC
+    UnifiedMomentumCondition
 )
 
 # Import TWS integration - REQUIRED
@@ -75,11 +70,8 @@ class BacktestAlertScanner:
     def _initialize_condition_sets(self):
         for symbol in self.symbols:
             cs = AlertConditionSet(f"{symbol}_backtest")
-            # PriceAboveVWAPCondition is now mandatory in AlertConditionSet.check_all
-            cs.add_condition(TwoStepMomentumCondition(ret5_thresh=THRESH_1, ret10_thresh=THRESH_2))
-            cs.add_condition(PriceSurgeCondition())
-            # cs.add_condition(VolumeSpike10sCondition())
-            # cs.add_condition(VolumeConfirmationCondition())
+            # Unified Strict Momentum Logic
+            cs.add_condition(UnifiedMomentumCondition())
             self.condition_sets[symbol] = cs
 
     def add_candle(self, symbol, ts, o, h, l, c, v, vwap):
@@ -148,11 +140,8 @@ class BacktestAlertScanner:
                         # Capture logic used from conditions
                         logic_used = "Unknown"
                         for cond in cs.conditions:
-                            if cond.check(md):
-                                if isinstance(cond, TwoStepMomentumCondition):
-                                    logic_used = cond.logic_used
-                                elif isinstance(cond, PriceSurgeCondition):
-                                    logic_used = "Price Surge"
+                            if isinstance(cond, UnifiedMomentumCondition):
+                                logic_used = cond.logic_used
                                 break
                         
                         reasons = cs.triggered_reasons[:]
