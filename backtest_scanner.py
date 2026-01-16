@@ -87,10 +87,12 @@ class BacktestAlertScanner:
     def add_candle(self, symbol, ts, o, h, l, c, v, vwap):
         self.symbol_data[symbol].add_candle(ts, o, h, l, c, v, vwap)
 
-    def load_data_from_tws(self, tws_app, bar_size="10 secs", duration="1 D"):
+    def load_data_from_tws(self, tws_app, bar_size="1 min", duration="1 D"):
+        # TWS expects US/Eastern for historical data
         end_dt = datetime.combine(self.date.date(), datetime.strptime("16:00:00", "%H:%M:%S").time())
         success = True
         for symbol in self.symbols:
+            print(f"[INFO] Requesting {bar_size} bars for {symbol}...")
             bars = tws_app.fetch_historical_bars(symbol, end_dt, duration, bar_size, "TRADES")
             if not bars:
                 success = False; continue

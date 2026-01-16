@@ -105,6 +105,18 @@ class PriceSurgeCondition(AlertCondition):
         }
         
         if len(recent_prices) < 2:
+            # Fallback for backtest (1-min bars)
+            prices = sorted(data.price_history.items())
+            if len(prices) >= 2:
+                time_diff = (prices[-1][0] - prices[-2][0]).total_seconds()
+                if time_diff >= 60:
+                    p_now = data.price
+                    p_prev = prices[-2][1]
+                    pct_change = ((p_now - p_prev) / p_prev) * 100
+                    if pct_change >= self.surge_threshold:
+                        self.triggered_reason = f"Price surged {pct_change:.2f}% (1m fallback)"
+                        return True
+            
             self.triggered_reason = ""
             return False
         
@@ -312,7 +324,8 @@ class TwoStepMomentumCondition(AlertCondition):
         p_10 = get_price_at(t_minus_10, exact_match_only=False)
         p_20 = get_price_at(t_minus_20, exact_match_only=False)
 
-        if p_10 is not None and p_20 is not None and p_10 != p_now:
+        # High-resolution logic (5s/10s)
+        if p_10 is not None and p_20 is not None and p_10 != p_now and p_20 != p_10:
             r1 = ((p_10 - p_20) / p_20) * 100
             r2 = ((p_now - p_10) / p_10) * 100
             
@@ -322,6 +335,7 @@ class TwoStepMomentumCondition(AlertCondition):
                 return True
         
         # Fallback for backtest (1-min bars): Check return from previous bar
+        # Only use fallback if high-resolution logic didn't trigger
         if is_backtest and len(prices) >= 2:
             p_prev = prices[-2][1]
             ret = ((p_now - p_prev) / p_prev) * 100
