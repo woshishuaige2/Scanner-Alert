@@ -150,24 +150,33 @@ def display_aggregated_results(all_results):
     scenario_totals = defaultdict(lambda: {'alerts': 0, 'wins': 0, 'losses': 0, 'profit': 0.0, 'count': 0})
 
     for task in all_results:
+        print(f"\n[ DATE: {task['date']} ]")
+        print("┌" + "─"*22 + "┬" + "─"*10 + "┬" + "─"*8 + "┬" + "─"*6 + "┬" + "─"*6 + "┬" + "─"*10 + "┬" + "─"*14 + "┐")
+        print(f"│ {'SCENARIO':<20} │ {'SYMBOL':<8} │ {'ALERTS':<6} │ {'W':<4} │ {'L':<4} │ {'WIN %':<8} │ {'FINAL ASSET':<12} │")
+        print("├" + "─"*22 + "┼" + "─"*10 + "┼" + "─"*8 + "┼" + "─"*6 + "┼" + "─"*6 + "┼" + "─"*10 + "┼" + "─"*14 + "┤")
+
         for scenario in task['scenarios']:
             s_key = f"TP:{scenario['tp']:>4.1f}% / SL:{scenario['sl']:>4.1f}%"
             for stats in scenario['symbol_stats']:
                 if stats['alerts'] > 0:
+                    print(f"│ {s_key:<20} │ {stats['symbol']:<8} │ {stats['alerts']:<6} │ {stats['wins']:<4} │ {stats['losses']:<4} │ {stats['win_rate']:>6.1f}% │ ${stats['final_asset']:>11.2f} │")
+                    
+                    # Aggregate for final summary
                     scenario_totals[s_key]['alerts'] += stats['alerts']
                     scenario_totals[s_key]['wins'] += stats['wins']
                     scenario_totals[s_key]['losses'] += stats['losses']
                     scenario_totals[s_key]['profit'] += (stats['final_asset'] - 10000)
                     scenario_totals[s_key]['count'] += 1
+        print("└" + "─"*22 + "┴" + "─"*10 + "┴" + "─"*8 + "┴" + "─"*6 + "┴" + "─"*6 + "┴" + "─"*10 + "┴" + "─"*14 + "┘")
 
-    print("\n" + "█"*100)
-    print(f"█ {'FINAL AGGREGATED PERFORMANCE & RELIABILITY RANKING':^96} █")
-    print("█"*100)
+    print("\n" + "█"*106)
+    print(f"█ {'FINAL AGGREGATED PERFORMANCE & RELIABILITY RANKING':^102} █")
+    print("█"*106)
 
-    print("\n" + "╔" + "═"*98 + "╗")
-    header = f"║ {'SCENARIO':<20} ║ {'ALERTS':<8} ║ {'WIN %':<8} ║ {'TOT PROFIT':<12} ║ {'RELIABILITY':<12} ║ {'VERDICT':<16} ║"
+    print("\n" + "╔" + "═"*104 + "╗")
+    header = f"║ {'SCENARIO':<22} ║ {'ALERTS':<8} ║ {'WIN %':<8} ║ {'TOT PROFIT':<14} ║ {'RELIABILITY':<14} ║ {'VERDICT':<18} ║"
     print(header)
-    print("╠" + "═"*22 + "╬" + "═"*10 + "╬" + "═"*10 + "╬" + "═"*14 + "╬" + "═"*14 + "╬" + "═"*18 + "╣")
+    print("╠" + "═"*24 + "╬" + "═"*10 + "╬" + "═"*10 + "╬" + "═"*16 + "╬" + "═"*16 + "╬" + "═"*20 + "╣")
 
     sorted_scenarios = sorted(scenario_totals.items(), key=lambda x: x[1]['profit'], reverse=True)
 
@@ -176,12 +185,12 @@ def display_aggregated_results(all_results):
         wr = (data['wins'] / total_alerts * 100) if total_alerts > 0 else 0
         score, verdict = calculate_reliability_score(data)
         
-        profit_str = f"${data['profit']:>10.2f}"
+        profit_str = f"${data['profit']:>12.2f}"
         score_str = f"{score:>3}/100"
         
-        print(f"║ {s_key:<20} ║ {total_alerts:<8} ║ {wr:>6.1f}% ║ {profit_str:<12} ║ {score_str:<12} ║ {verdict:<16} ║")
+        print(f"║ {s_key:<22} ║ {total_alerts:<8} ║ {wr:>6.1f}% ║ {profit_str:<14} ║ {score_str:<14} ║ {verdict:<18} ║")
 
-    print("╚" + "═"*22 + "╩" + "═"*10 + "╩" + "═"*10 + "╩" + "═"*14 + "╩" + "═"*14 + "╩" + "═"*18 + "╝")
+    print("╚" + "═"*24 + "╩" + "═"*10 + "╩" + "═"*10 + "╩" + "═"*16 + "╩" + "═"*16 + "╩" + "═"*20 + "╝")
     
     print("\n" + "═"*30)
     print("RELIABILITY INDEX CALCULATION:")
