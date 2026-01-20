@@ -81,9 +81,10 @@ def unified_visualization(scanner, filtered_alerts, trade_log, executor):
     # Increased RVOL column width for better alignment
     print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<15} | {'SCREENING ALERTS'}")
     print("-"*100)
-    for symbol in SYMBOLS: # Use the global SYMBOLS list for display
-        # Ensure the monitor exists before trying to access it
+    for symbol in scanner.symbols: # Use the list of symbols actually initialized in the scanner
+        # The scanner.monitors dictionary should contain all symbols in scanner.symbols
         if symbol not in scanner.monitors:
+            # This should not happen if initialization was successful, but keep as a safeguard
             print(f"{symbol:<8} | {'N/A':<10} | {'N/A':<12} | {'N/A':<15} | {'Monitor not initialized'}")
             continue
             
