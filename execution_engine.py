@@ -89,6 +89,10 @@ class ExecutionEngine:
             parent.orderType = "MKT"
             parent.totalQuantity = shares
             parent.transmit = False
+            # Fix for TWS Error Code 10268: "The 'EtradeOnly' order attribute is not supported."
+            # This attribute is sometimes automatically set by ib_insync or older ibapi versions
+            # Explicitly setting it to False ensures compatibility.
+            parent.eTradeOnly = False
             
             # 2. Take Profit Limit Order
             tp_order = Order()

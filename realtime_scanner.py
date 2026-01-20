@@ -93,7 +93,7 @@ class RealtimeBroadScanner:
                 try:
                     root = ET.fromstring(xml_data)
                     for ratio in root.findall(".//Ratio"):
-                        field = ratio.get('FieldName')
+                        field = ratio.get("FieldName")
                         if field == 'FLOAT':
                             monitor.float_shares = float(ratio.text)
                         elif field == 'VOL10DAVG':

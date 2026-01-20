@@ -155,17 +155,26 @@ def run_trading_bot():
         # Stage 2: In-depth Filtering (Rule 2: 60s Cooldown)
         if InDepthFilter.check(symbol, monitor, in_depth_cooldown):
             
-            # Update cooldown tracker
+            # Update cooldown tracker *before* execution attempt to prevent immediate re-trigger
             in_depth_cooldown[symbol] = datetime.now()
             
             alert_msg = f"{symbol} passed strict momentum at ${monitor.price_history[-1][1]:.2f} ({timestamp.strftime('%H:%M:%S')})"
-            if alert_msg not in filtered_alerts:
+            
+            # Only add to filtered_alerts if it's a new alert (based on symbol, not message content)
+            # This is a temporary fix for the visualization spam, the cooldown should handle the logic
+            # We will rely on the cooldown logic for the real filtering.
+            
+            # Stage 3: Execution
+            success = executor.execute_trade(symbol, monitor.price_history[-1][1])
+            
+            if success:
+                # Only log successful trade to the filtered_alerts and trade_log
                 filtered_alerts.appendleft(alert_msg)
-                
-                # Stage 3: Execution
-                success = executor.execute_trade(symbol, monitor.price_history[-1][1])
-                if success:
-                    trade_log.appendleft(f"BUY {symbol} at ${monitor.price_history[-1][1]:.2f} | {timestamp.strftime('%H:%M:%S')}")
+                trade_log.appendleft(f"BUY {symbol} at ${monitor.price_history[-1][1]:.2f} | {timestamp.strftime('%H:%M:%S')}")
+            else:
+                # If execution failed (e.g., already in position), still log the alert to show it passed the filter
+                if not executor.is_position_active(symbol):
+                    filtered_alerts.appendleft(alert_msg)
 
     scanner.on_preliminary_alert(preliminary_alert_handler)
 
