@@ -81,7 +81,12 @@ def unified_visualization(scanner, filtered_alerts, trade_log, executor):
     # Increased RVOL column width for better alignment
     print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<15} | {'SCREENING ALERTS'}")
     print("-"*100)
-    for symbol in scanner.symbols:
+    for symbol in SYMBOLS: # Use the global SYMBOLS list for display
+        # Ensure the monitor exists before trying to access it
+        if symbol not in scanner.monitors:
+            print(f"{symbol:<8} | {'N/A':<10} | {'N/A':<12} | {'N/A':<15} | {'Monitor not initialized'}")
+            continue
+            
         m = scanner.monitors[symbol]
         price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
         float_str = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
@@ -116,6 +121,9 @@ def unified_visualization(scanner, filtered_alerts, trade_log, executor):
 def run_trading_bot():
     global tws_app
     
+    # Ensure all symbols are unique and valid before proceeding
+    unique_symbols = list(set(SYMBOLS))
+    
     print("[INIT] Connecting to TWS...")
     tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=888)
     if not tws_app:
@@ -123,7 +131,7 @@ def run_trading_bot():
         return
 
     # Initialize Components
-    scanner = RealtimeBroadScanner(symbols=SYMBOLS)
+    scanner = RealtimeBroadScanner(symbols=unique_symbols)
     executor = ExecutionEngine(
         tws_app=tws_app,
         tp_pct=TP_PCT,
@@ -165,7 +173,7 @@ def run_trading_bot():
     def create_callback(sym):
         return lambda s, p, v, vw, ts, b, a: scanner.update(s, price=p, volume=v, vwap=vw, bid=b, ask=a)
 
-    for symbol in SYMBOLS:
+    for symbol in unique_symbols:
         tws_app.subscribe_market_data(symbol, create_callback(symbol))
     
     print("[INIT] Starting Unified Trading Interface...")
