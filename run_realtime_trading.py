@@ -1,27 +1,33 @@
 """
-Real-Time Trading Bot
-Integrates RealtimeAlertScanner with ExecutionEngine for automated paper trading.
+Real-Time Trading Bot - Two-Stage Architecture
+Stage 1: Preliminary Screening (via realtime_scanner.py)
+Stage 2: In-depth Filtering & Execution (this module)
 """
 import time
 import sys
 import signal
 import threading
+import os
 from datetime import datetime
 from collections import deque
+from typing import List, Dict
 
-from realtime_scanner import RealtimeAlertScanner, display_status_table
+from realtime_scanner import RealtimeBroadScanner, display_broad_screening
 from execution_engine import ExecutionEngine
 from tws_data_fetcher import create_tws_data_app
+import scanner_config as config
 
 # CONFIGURATION
-SYMBOLS = ["SPHL", "CJMB", "MLEC", "AUID", "AHMA"]
-INVESTMENT_PER_TRADE = 1000.0
+SYMBOLS = ["IVF", "SHPH", "POLA", "CRVS", "CCHH"]
+INVESTMENT_PER_TRADE = 100.0
 TP_PCT = 1.0
 SL_PCT = 10.0
 
 # Global state
 should_exit = False
 tws_app = None
+filtered_alerts = deque(maxlen=10)
+trade_log = deque(maxlen=10)
 
 def signal_handler(sig, frame):
     global should_exit
@@ -30,25 +36,85 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
+class InDepthFilter:
+    """Performs strict momentum filtering on symbols that passed preliminary screening"""
+    @staticmethod
+    def check(symbol, monitor) -> bool:
+        if not config.STRICT_MOMENTUM_REQUIRED:
+            return True
+            
+        # 1. Price Surge Check (e.g., 1.5% in 10s)
+        if len(monitor.price_history) < 10:
+            return False
+            
+        current_price = monitor.price_history[-1][1]
+        price_10s_ago = monitor.price_history[-10][1]
+        surge = (current_price - price_10s_ago) / price_10s_ago * 100
+        
+        if surge < config.MIN_PRICE_SURGE_10S:
+            return False
+            
+        # 2. Drawdown Check (no more than 0.5% drop in last 10s)
+        prices_10s = [p for ts, p in list(monitor.price_history)[-10:]]
+        max_p = max(prices_10s)
+        drawdown = (max_p - current_price) / max_p * 100
+        
+        if drawdown > config.MAX_DRAWDOWN_10S:
+            return False
+            
+        return True
+
+def unified_visualization(scanner, filtered_alerts, trade_log, executor):
+    """Unified console display showing all three stages"""
+    os.system('cls' if os.name == 'nt' else 'clear')
+    
+    # 1. Preliminary Screening Section
+    print("="*100)
+    print(f" STAGE 1: PRELIMINARY SCREENING (ROSS CAMERON STYLE) | {datetime.now().strftime('%H:%M:%S')} ")
+    print("="*100)
+    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'FLOAT':<10} | {'RVOL':<6} | {'SCREENING ALERTS'}")
+    print("-"*100)
+    for symbol in scanner.symbols:
+        m = scanner.monitors[symbol]
+        price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
+        float_str = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
+        rvol = f"{m.relative_volume:.2f}x"
+        alerts = ", ".join(m.triggered_conditions) if m.triggered_conditions else "--"
+        print(f"{symbol:<8} | {price:<8} | {float_str:<10} | {rvol:<6} | {alerts}")
+    
+    # 2. In-Depth Filtered Alerts Section
+    print("\n" + "="*100)
+    print(" STAGE 2: IN-DEPTH FILTERED ALERTS (STRICT MOMENTUM)")
+    print("="*100)
+    if not filtered_alerts:
+        print("  No symbols passed in-depth filtering yet...")
+    for alert in filtered_alerts:
+        print(f"  [FILTERED] {alert}")
+        
+    # 3. Trade Log Section
+    print("\n" + "="*100)
+    print(" STAGE 3: TRADE EXECUTION LOG & POSITIONS")
+    print("="*100)
+    active_pos = executor.get_active_positions()
+    print(f"  ACTIVE POSITIONS: {', '.join(active_pos) if active_pos else 'None'}")
+    print("-" * 100)
+    if not trade_log:
+        print("  No trades executed in this session.")
+    for log in trade_log:
+        print(f"  [TRADE] {log}")
+    print("="*100)
+
 def run_trading_bot():
     global tws_app
     
-    print("="*80)
-    print("      REAL-TIME TRADING BOT (PAPER TRADING)      ")
-    print("="*80)
-    print(f"✓ Symbols: {', '.join(SYMBOLS)}")
-    print(f"✓ Strategy: TP {TP_PCT}% / SL {SL_PCT}%")
-    print(f"✓ Investment: ${INVESTMENT_PER_TRADE} per trade")
-    
-    # 1. Connect to TWS
-    print("\n[1] Connecting to TWS (Port 7497)...")
-    tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=999)
+    print("[INIT] Connecting to TWS...")
+    tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=888)
     if not tws_app:
-        print("[ERROR] Could not connect to TWS. Ensure TWS is running and API is enabled.")
+        print("[ERROR] Could not connect to TWS.")
         return
 
-    # 2. Initialize Components
-    scanner = RealtimeAlertScanner(symbols=SYMBOLS)
+    # Initialize Components
+    scanner = RealtimeBroadScanner(symbols=SYMBOLS)
     executor = ExecutionEngine(
         tws_app=tws_app,
         tp_pct=TP_PCT,
@@ -56,63 +122,39 @@ def run_trading_bot():
         investment_per_trade=INVESTMENT_PER_TRADE
     )
     
-    last_alerts = deque(maxlen=10)
-    state = {'last_alert_triggered': False}
+    # Load Fundamentals for Stage 1
+    scanner.load_fundamentals(tws_app)
 
-    # 3. Define Alert Handler (Execution Trigger)
-    def trading_alert_handler(symbol, timestamp, reasons, data):
-        # Log the alert
-        alert_msg = (
-            f"TRADE ALERT: {symbol} at ${data.price:.2f}\n"
-            f"Time: {timestamp.strftime('%H:%M:%S')}\n"
-            f"Reasons: {reasons}"
-        )
-        last_alerts.appendleft(alert_msg)
-        state['last_alert_triggered'] = True
-        
-        # EXECUTE TRADE
-        executor.execute_trade(symbol, data.price)
+    # Define Alert Handler for Stage 1 -> Stage 2 transition
+    def preliminary_alert_handler(symbol, timestamp, reasons, monitor):
+        # Stage 2: In-depth Filtering
+        if InDepthFilter.check(symbol, monitor):
+            alert_msg = f"{symbol} passed strict momentum at ${monitor.price_history[-1][1]:.2f} ({timestamp.strftime('%H:%M:%S')})"
+            if alert_msg not in filtered_alerts:
+                filtered_alerts.appendleft(alert_msg)
+                
+                # Stage 3: Execution
+                success = executor.execute_trade(symbol, monitor.price_history[-1][1])
+                if success:
+                    trade_log.appendleft(f"BUY {symbol} at ${monitor.price_history[-1][1]:.2f} | {timestamp.strftime('%H:%M:%S')}")
 
-    scanner.on_alert(trading_alert_handler)
+    scanner.on_preliminary_alert(preliminary_alert_handler)
 
-    # 4. Load Baseline Data
-    print("\n[2] Loading baseline historical data...")
-    scanner.load_today_historical_bars(tws_app, bar_size="5 mins")
-
-    # 5. Subscribe to Live Data
-    print("\n[3] Subscribing to live market data...")
+    # Subscribe to Live Data
+    print("[INIT] Subscribing to live market data...")
     def create_callback(sym):
         return lambda s, p, v, vw, ts, b, a: scanner.update(s, price=p, volume=v, vwap=vw, bid=b, ask=a)
 
     for symbol in SYMBOLS:
         tws_app.subscribe_market_data(symbol, create_callback(symbol))
     
-    print("\n[4] Starting Trading Loop...")
-    time.sleep(5) # Wait for initial data
-    
-    last_display_time = time.time()
+    print("[INIT] Starting Unified Trading Interface...")
+    time.sleep(2)
     
     while not should_exit:
-        current_time = time.time()
-        
-        # Update display if alert triggered or interval reached
-        if state['last_alert_triggered'] or (current_time - last_display_time >= 5):
-            state['last_alert_triggered'] = False
-            display_status_table(scanner, last_alerts)
-            
-            # Show active positions below the table
-            active_pos = executor.get_active_positions()
-            if active_pos:
-                print("\n" + "="*30)
-                print(f" ACTIVE POSITIONS: {', '.join(active_pos)}")
-                print("="*30)
-            
-            last_display_time = current_time
-            
-        time.sleep(0.1)
+        unified_visualization(scanner, filtered_alerts, trade_log, executor)
+        time.sleep(1)
 
-    # Cleanup
-    print("\n[INFO] Disconnecting from TWS...")
     tws_app.disconnect()
     print("[INFO] Bot stopped.")
 

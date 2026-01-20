@@ -56,6 +56,10 @@ class TWSDataApp(EClient, EWrapper):
         # Order tracking
         self.order_status_callbacks = [] # List of callbacks for order updates
         
+        # Fundamental data storage
+        self.fundamental_data = {} # symbol -> XML string
+        self.fundamental_events = {} # symbol -> threading.Event
+        
     def nextValidId(self, orderId: int):
         """Called when connection is established"""
         self.next_order_id = orderId
@@ -74,6 +78,15 @@ class TWSDataApp(EClient, EWrapper):
     def execDetails(self, reqId, contract, execution):
         """Handle execution details"""
         pass
+
+    def fundamentalData(self, reqId: int, data: str):
+        """Receive fundamental data XML"""
+        with self.lock:
+            # We need to find which symbol this reqId belongs to
+            # For simplicity, we'll store it by reqId and let the caller handle it
+            self.fundamental_data[reqId] = data
+            if reqId in self.fundamental_events:
+                self.fundamental_events[reqId].set()
         
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson="", *args):
         """Error handler - accepts variable arguments for compatibility across ibapi versions"""
@@ -361,6 +374,37 @@ class TWSDataApp(EClient, EWrapper):
                 if symbol in self.realtime_data:
                     del self.realtime_data[symbol]
             print(f"[TWS] Unsubscribed from {symbol}")
+
+    def fetch_fundamental_data(self, symbol: str, report_type: str = "ReportSnapshot") -> Optional[str]:
+        """Fetch fundamental data XML for a symbol"""
+        contract = Contract()
+        contract.symbol = symbol
+        contract.secType = "STK"
+        contract.exchange = "SMART"
+        contract.currency = "USD"
+        
+        req_id = self.get_next_req_id()
+        event = threading.Event()
+        
+        with self.lock:
+            self.fundamental_events[req_id] = event
+            
+        self.reqFundamentalData(req_id, contract, report_type, [])
+        
+        # Wait for data (timeout 10s)
+        if event.wait(timeout=10.0):
+            with self.lock:
+                data = self.fundamental_data.get(req_id)
+                # Clean up
+                del self.fundamental_data[req_id]
+                del self.fundamental_events[req_id]
+                return data
+        else:
+            print(f"[TWS] Timeout fetching fundamental data for {symbol}")
+            with self.lock:
+                if req_id in self.fundamental_events:
+                    del self.fundamental_events[req_id]
+            return None
 
 
 def create_tws_data_app(host="127.0.0.1", port=7497, client_id=0) -> Optional[TWSDataApp]:
