@@ -5,6 +5,7 @@ from datetime import datetime
 import time
 import json
 import ast
+from collections import defaultdict
 
 # Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -12,9 +13,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from backtest_scanner import BacktestAlertScanner
 from tws_data_fetcher import create_tws_data_app
 
-# NGROK CONFIGURATION (Change to 127.0.0.1 for local use)
-NGROK_HOST = "0.tcp.ngrok.io"
-NGROK_PORT = 14317
+# NGROK CONFIGURATION
+NGROK_HOST = "6.tcp.ngrok.io"
+NGROK_PORT = 16386
 
 # INPUT FILE CONFIGURATION
 INPUT_FILE = "days_with_more_than_2_symbols.txt"
@@ -29,7 +30,6 @@ SCENARIOS = [(2.0, 1.0), (4.0, 2.0), (10.0, 5.0), (20.0, 10.0), (1.0, 10.0)]
 def parse_input_file(file_path):
     """Parses the input file for dates and symbols."""
     batch_tasks = []
-    # Ensure we look in the same directory as the script
     script_dir = os.path.dirname(os.path.abspath(__file__))
     abs_path = os.path.join(script_dir, file_path)
     
@@ -46,7 +46,6 @@ def parse_input_file(file_path):
                 date_str, symbols_str = line.split(':', 1)
                 date_str = date_str.strip()
                 try:
-                    # Use ast.literal_eval to safely parse the list string
                     symbols = ast.literal_eval(symbols_str.strip())
                     if isinstance(symbols, list) and symbols:
                         batch_tasks.append((date_str, symbols))
@@ -58,53 +57,44 @@ def parse_input_file(file_path):
     return batch_tasks
 
 def run_backtest_for_task(tws_app, date_str, symbols):
-    """Runs a backtest for a specific date and set of symbols."""
-    print(f"\n" + "="*80)
-    print(f" BACKTESTING: {date_str} | SYMBOLS: {', '.join(symbols)}")
-    print("="*80)
+    """Runs a backtest for a specific date and set of symbols and returns results."""
+    print(f"\n" + "╔" + "═"*78 + "╗")
+    print(f"║ {'BACKTESTING SESSION':^76} ║")
+    print(f"║ DATE: {date_str:<10} | SYMBOLS: {', '.join(symbols):<51} ║")
+    print("╚" + "═"*78 + "╝")
     
     scanner = BacktestAlertScanner(symbols=symbols, date=date_str)
-    print(f"[INFO] Fetching data for {', '.join(symbols)}...", flush=True)
+    print(f"[INFO] Fetching data for {len(symbols)} symbols...", flush=True)
     
-    # Using 10 secs for reliable high-resolution backtest
     if not scanner.load_data_from_tws(tws_app, bar_size="10 secs"):
         print(f"[ERROR] Failed to load data for {date_str}.", flush=True)
-        return
+        return None
     
-    print(f"[INFO] Running backtest for {date_str}...", flush=True)
+    print(f"[INFO] Running simulation...", flush=True)
     alerts = scanner.run_backtest()
     
-    # 1. DETAILED ALERT LOG
-    print("\n" + "-"*40)
-    print(f"{'DETAILED ALERT LOG':^40}")
-    print("-"*40)
-    
-    for symbol in symbols:
-        symbol_alerts = alerts.get(symbol, [])
-        if not symbol_alerts:
-            continue
-            
-        print(f"\n>>> {symbol}", flush=True)
-        for i, alert in enumerate(symbol_alerts):
-            logic = "Unknown"
-            for reason in alert.conditions_triggered:
-                if "Logic:" in reason:
-                    logic = reason.split("Logic: ")[1]
-                    break
-            print(f"    [{i+1}] {alert.timestamp.strftime('%H:%M:%S')} | Price: ${alert.price:.2f} | VWAP: ${alert.vwap:.2f} | Logic: {logic}", flush=True)
-    
-    # 2. WIN RATE SUMMARY
-    print("\n" + "-"*40)
-    print(f"{'WIN RATE SUMMARY':^40}")
-    print("-"*40)
-    
-    header = f"{'SCENARIO':<20} | {'SYMBOL':<10} | {'ALERTS':<8} | {'WINS':<6} | {'LOSSES':<8} | {'WIN RATE':<10} | {'FINAL ASSET':<12}"
-    print(header, flush=True)
-    
+    # Check if any alerts were triggered at all
+    total_alerts = sum(len(a) for a in alerts.values())
+    if total_alerts == 0:
+        print(f"[INFO] No alerts triggered for any symbol on {date_str}.")
+        return None
+
+    # Store results for this task
+    task_results = {
+        'date': date_str,
+        'scenarios': []
+    }
+
     for tp, sl in SCENARIOS:
-        # Reset assets for each scenario
         scanner.current_assets = {s: scanner.initial_asset for s in symbols}
         pl_results = scanner.calculate_pl(tp, sl)
+        
+        scenario_data = {
+            'tp': tp,
+            'sl': sl,
+            'symbol_stats': []
+        }
+        
         for symbol in symbols:
             res = pl_results.get(symbol, [])
             wins = len([r for r in res if r['outcome'] == "WIN"])
@@ -113,11 +103,75 @@ def run_backtest_for_task(tws_app, date_str, symbols):
             wr = (wins / total * 100) if total > 0 else 0
             final_asset = scanner.current_assets[symbol]
             
-            row = f"TP:{tp:>4.1f}% / SL:{sl:>4.1f}% | {symbol:<10} | {len(res):<8} | {wins:<6} | {losses:<8} | {wr:>8.1f}% | ${final_asset:>10.2f}"
-            print(row, flush=True)
+            scenario_data['symbol_stats'].append({
+                'symbol': symbol,
+                'alerts': len(res),
+                'wins': wins,
+                'losses': losses,
+                'win_rate': wr,
+                'final_asset': final_asset
+            })
+        
+        task_results['scenarios'].append(scenario_data)
+    
+    return task_results
+
+def display_aggregated_results(all_results):
+    """Displays a clean, aggregated visualization of all backtest results."""
+    if not all_results:
+        print("\n[INFO] No results to display.")
+        return
+
+    print("\n" + "█"*80)
+    print(f"█ {'FINAL AGGREGATED PERFORMANCE SUMMARY':^76} █")
+    print("█"*80)
+
+    # Group by Scenario to find the best ratio across all days/symbols
+    scenario_totals = defaultdict(lambda: {'alerts': 0, 'wins': 0, 'losses': 0, 'profit': 0.0, 'count': 0})
+
+    for task in all_results:
+        print(f"\n[ DATE: {task['date']} ]")
+        print("┌" + "─"*19 + "┬" + "─"*10 + "┬" + "─"*8 + "┬" + "─"*6 + "┬" + "─"*8 + "┬" + "─"*10 + "┬" + "─"*12 + "┐")
+        print(f"│ {'SCENARIO':<17} │ {'SYMBOL':<8} │ {'ALERTS':<6} │ {'W':<4} │ {'L':<6} │ {'WIN %':<8} │ {'FINAL ASSET':<10} │")
+        print("├" + "─"*19 + "┼" + "─"*10 + "┼" + "─"*8 + "┼" + "─"*6 + "┼" + "─"*8 + "┼" + "─"*10 + "┼" + "─"*12 + "┤")
+
+        for scenario in task['scenarios']:
+            tp, sl = scenario['tp'], scenario['sl']
+            s_key = f"TP:{tp:>4.1f}% / SL:{sl:>4.1f}%"
+            
+            for stats in scenario['symbol_stats']:
+                # Only show symbols that actually had alerts to reduce noise
+                if stats['alerts'] > 0:
+                    print(f"│ {s_key:<17} │ {stats['symbol']:<8} │ {stats['alerts']:<6} │ {stats['wins']:<4} │ {stats['losses']:<6} │ {stats['win_rate']:>6.1f}% │ ${stats['final_asset']:>9.2f} │")
+                    
+                    # Aggregate for final summary
+                    scenario_totals[s_key]['alerts'] += stats['alerts']
+                    scenario_totals[s_key]['wins'] += stats['wins']
+                    scenario_totals[s_key]['losses'] += stats['losses']
+                    scenario_totals[s_key]['profit'] += (stats['final_asset'] - 10000)
+                    scenario_totals[s_key]['count'] += 1
+
+        print("└" + "─"*19 + "┴" + "─"*10 + "┴" + "─"*8 + "┴" + "─"*6 + "┴" + "─"*8 + "┴" + "─"*10 + "┴" + "─"*12 + "┘")
+
+    # Final Comparison Table
+    print("\n" + "╔" + "═"*78 + "╗")
+    print(f"║ {'RANKING BY SCENARIO (TOTAL PROFIT ACROSS ALL SAMPLES)':^76} ║")
+    print("╠" + "═"*22 + "╦" + "═"*10 + "╦" + "═"*10 + "╦" + "═"*10 + "╦" + "═"*10 + "╦" + "═"*12 + "╣")
+    print(f"║ {'SCENARIO':<20} ║ {'SAMPLES':<8} ║ {'ALERTS':<8} ║ {'WIN %':<8} ║ {'AVG P/L':<8} ║ {'TOT PROFIT':<10} ║")
+    print("╠" + "═"*22 + "╬" + "═"*10 + "╬" + "═"*10 + "╬" + "═"*10 + "╬" + "═"*10 + "╬" + "═"*12 + "╣")
+
+    # Sort by total profit
+    sorted_scenarios = sorted(scenario_totals.items(), key=lambda x: x[1]['profit'], reverse=True)
+
+    for s_key, data in sorted_scenarios:
+        total_alerts = data['alerts']
+        wr = (data['wins'] / total_alerts * 100) if total_alerts > 0 else 0
+        avg_pl = (data['profit'] / data['count']) if data['count'] > 0 else 0
+        print(f"║ {s_key:<20} ║ {data['count']:<8} ║ {total_alerts:<8} ║ {wr:>6.1f}% ║ ${avg_pl:>7.2f} ║ ${data['profit']:>9.2f} ║")
+
+    print("╚" + "═"*22 + "╩" + "═"*10 + "╩" + "═"*10 + "╩" + "═"*10 + "╩" + "═"*10 + "╩" + "═"*12 + "╝")
 
 def run():
-    # Try to parse input file
     batch_tasks = parse_input_file(INPUT_FILE)
     
     if not batch_tasks:
@@ -132,12 +186,16 @@ def run():
         print("[ERROR] Could not connect to TWS.", flush=True)
         return
     
+    all_results = []
     try:
         for date_str, symbols in batch_tasks:
-            run_backtest_for_task(tws_app, date_str, symbols)
+            res = run_backtest_for_task(tws_app, date_str, symbols)
+            if res:
+                all_results.append(res)
     finally:
-        print("\n[INFO] All backtests complete. Disconnecting...", flush=True)
         tws_app.disconnect()
+        print("\n[INFO] Data fetching complete. Generating visualization...", flush=True)
+        display_aggregated_results(all_results)
 
 if __name__ == "__main__":
     run()
