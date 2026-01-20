@@ -122,7 +122,8 @@ def run_backtest_for_task(tws_app, date_str, symbols):
     task_results = {'date': date_str, 'scenarios': []}
     for tp, sl in SCENARIOS:
         scanner.current_assets = {s: scanner.initial_asset for s in symbols}
-        pl_results = scanner.calculate_pl(tp, sl)
+        # Apply 0.2% slippage simulation (0.1% on entry, 0.1% on exit)
+        pl_results = scanner.calculate_pl(tp, sl, slippage_pct=0.2)
         
         scenario_data = {'tp': tp, 'sl': sl, 'symbol_stats': []}
         for symbol in symbols:

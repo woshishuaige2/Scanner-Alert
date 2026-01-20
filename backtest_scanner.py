@@ -152,13 +152,18 @@ class BacktestAlertScanner:
                         self.last_alert_time[symbol] = ts
         return self.alerts
 
-    def calculate_pl(self, tp_pct: float, sl_pct: float):
-        """Calculate P/L for each alert based on subsequent candles and update assets"""
+    def calculate_pl(self, tp_pct: float, sl_pct: float, slippage_pct: float = 0.2):
+        """
+        Calculate P/L for each alert based on subsequent candles and update assets.
+        Includes commission and simulated slippage.
+        """
         results = {s: [] for s in self.symbols}
         for symbol in self.symbols:
             candles = sorted(self.symbol_data[symbol].data, key=lambda x: x['timestamp'])
             for alert in self.alerts[symbol]:
-                entry_price = alert.price
+                # Apply entry slippage (buying higher than alert price)
+                entry_price = alert.price * (1 + slippage_pct / 100)
+                
                 tp_price = entry_price * (1 + tp_pct / 100)
                 sl_price = entry_price * (1 - sl_pct / 100)
                 
@@ -171,13 +176,20 @@ class BacktestAlertScanner:
                     if candle['timestamp'] <= alert.timestamp: continue
                     
                     if candle['high'] >= tp_price:
-                        outcome = "WIN"; exit_price = tp_price; exit_time = candle['timestamp']; break
+                        outcome = "WIN"
+                        # Apply exit slippage for WIN (selling lower than TP price)
+                        exit_price = tp_price * (1 - slippage_pct / 100)
+                        exit_time = candle['timestamp']
+                        break
                     elif candle['low'] <= sl_price:
-                        outcome = "LOSS"; exit_price = sl_price; exit_time = candle['timestamp']; break
+                        outcome = "LOSS"
+                        # Apply exit slippage for LOSS (selling lower than SL price)
+                        exit_price = sl_price * (1 - slippage_pct / 100)
+                        exit_time = candle['timestamp']
+                        break
                 
                 # Calculate Mock Trading Result
                 # Investment: $1000
-                # Shares = 1000 / entry_price
                 shares = self.trade_investment / entry_price
                 gross_pl = (exit_price - entry_price) * shares
                 
