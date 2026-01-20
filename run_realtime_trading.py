@@ -39,9 +39,15 @@ signal.signal(signal.SIGINT, signal_handler)
 class InDepthFilter:
     """Performs strict momentum filtering on symbols that passed preliminary screening"""
     @staticmethod
-    def check(symbol, monitor) -> bool:
+    def check(symbol, monitor, cooldown_tracker: Dict[str, datetime]) -> bool:
         if not config.STRICT_MOMENTUM_REQUIRED:
             return True
+            
+        # Cooldown Check (60 seconds)
+        now = datetime.now()
+        if symbol in cooldown_tracker:
+            if (now - cooldown_tracker[symbol]).total_seconds() < 60:
+                return False # Still in cooldown period
             
         # 1. Price Surge Check (e.g., 1.5% in 10s)
         if len(monitor.price_history) < 10:
@@ -72,15 +78,18 @@ def unified_visualization(scanner, filtered_alerts, trade_log, executor):
     print("="*100)
     print(f" STAGE 1: PRELIMINARY SCREENING (ROSS CAMERON STYLE) | {datetime.now().strftime('%H:%M:%S')} ")
     print("="*100)
-    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'FLOAT':<10} | {'RVOL':<6} | {'SCREENING ALERTS'}")
+    # Increased RVOL column width for better alignment
+    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<15} | {'SCREENING ALERTS'}")
     print("-"*100)
     for symbol in scanner.symbols:
         m = scanner.monitors[symbol]
         price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
         float_str = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
+        # Format RVOL to handle large numbers and align with new width
         rvol = f"{m.relative_volume:.2f}x"
         alerts = ", ".join(m.triggered_conditions) if m.triggered_conditions else "--"
-        print(f"{symbol:<8} | {price:<8} | {float_str:<10} | {rvol:<6} | {alerts}")
+        
+        print(f"{symbol:<8} | {price:<10} | {float_str:<12} | {rvol:<15} | {alerts}")
     
     # 2. In-Depth Filtered Alerts Section
     print("\n" + "="*100)
@@ -122,13 +131,24 @@ def run_trading_bot():
         investment_per_trade=INVESTMENT_PER_TRADE
     )
     
+    # Cooldown tracker for in-depth filter (symbol -> datetime)
+    in_depth_cooldown: Dict[str, datetime] = {}
+    
     # Load Fundamentals for Stage 1
     scanner.load_fundamentals(tws_app)
 
     # Define Alert Handler for Stage 1 -> Stage 2 transition
     def preliminary_alert_handler(symbol, timestamp, reasons, monitor):
-        # Stage 2: In-depth Filtering
-        if InDepthFilter.check(symbol, monitor):
+        # Check if symbol is already in an active position (Rule 3)
+        if executor.is_position_active(symbol):
+            return # Skip in-depth check and execution if already trading this symbol
+
+        # Stage 2: In-depth Filtering (Rule 2: 60s Cooldown)
+        if InDepthFilter.check(symbol, monitor, in_depth_cooldown):
+            
+            # Update cooldown tracker
+            in_depth_cooldown[symbol] = datetime.now()
+            
             alert_msg = f"{symbol} passed strict momentum at ${monitor.price_history[-1][1]:.2f} ({timestamp.strftime('%H:%M:%S')})"
             if alert_msg not in filtered_alerts:
                 filtered_alerts.appendleft(alert_msg)

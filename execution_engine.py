@@ -128,11 +128,20 @@ class ExecutionEngine:
             
             # Place orders
             self.tws_app.placeOrder(parent.orderId, contract, parent)
+            print(f"[EXEC] Submitted Parent Order {parent.orderId} for {symbol}")
             self.tws_app.placeOrder(tp_order.orderId, contract, tp_order)
+            print(f"[EXEC] Submitted TP Order {tp_order.orderId} for {symbol}")
             self.tws_app.placeOrder(sl_order.orderId, contract, sl_order)
+            print(f"[EXEC] Submitted SL Order {sl_order.orderId} for {symbol}")
             
             print(f"[EXEC] Bracket Order Submitted for {symbol}: {shares} shares")
             print(f"       Target Entry: ~${entry_price:.2f} | TP: ${tp_price:.2f} | SL: ${sl_price:.2f}")
+
+    def is_position_active(self, symbol: str) -> bool:
+        """Check if a position is currently active or pending for a symbol"""
+        with self.lock:
+            # A position is active if it's in the positions dictionary
+            return symbol in self.positions
 
     def get_active_positions(self):
         with self.lock:

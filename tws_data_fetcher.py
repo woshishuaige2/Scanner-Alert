@@ -90,6 +90,11 @@ class TWSDataApp(EClient, EWrapper):
         
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson="", *args):
         """Error handler - accepts variable arguments for compatibility across ibapi versions"""
+        
+        # Log all errors and warnings to a file for debugging
+        with open("tws_errors.log", "a") as f:
+            f.write(f"{datetime.now()}: ReqId={reqId}, Code={errorCode}, Msg={errorString}\n")
+
         # Suppress common info/warning messages that don't affect functionality
         suppressed_codes = [
             2104, 2106, 2107, 2119, 2158,  # Market data farm connection messages
