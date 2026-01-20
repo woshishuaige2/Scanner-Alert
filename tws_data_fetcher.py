@@ -53,11 +53,27 @@ class TWSDataApp(EClient, EWrapper):
         self.realtime_data = {}  # symbol -> {price, bid, ask, last_size, bid_size, ask_size, volume, vwap}
         self.contracts = {}  # symbol -> Contract
         
+        # Order tracking
+        self.order_status_callbacks = [] # List of callbacks for order updates
+        
     def nextValidId(self, orderId: int):
         """Called when connection is established"""
         self.next_order_id = orderId
         self.connected = True
         print(f"[TWS] Connected. Next valid order ID: {orderId}")
+
+    def orderStatus(self, orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice):
+        """Handle order status updates"""
+        for callback in self.order_status_callbacks:
+            callback(orderId, status, filled, remaining, avgFillPrice, parentId)
+
+    def openOrder(self, orderId, contract, order, orderState):
+        """Handle open order updates"""
+        pass
+
+    def execDetails(self, reqId, contract, execution):
+        """Handle execution details"""
+        pass
         
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson="", *args):
         """Error handler - accepts variable arguments for compatibility across ibapi versions"""
