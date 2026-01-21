@@ -14,11 +14,12 @@ from typing import List, Dict
 
 from realtime_scanner import RealtimeBroadScanner, display_broad_screening
 from execution_engine import ExecutionEngine
-from tws_data_fetcher import create_tws_data_app
+# from tws_data_fetcher import create_tws_data_app
+from mock_tws import create_tws_data_app
 import scanner_config as config
 
 # CONFIGURATION
-SYMBOLS = ["IVF", "SHPH", "POLA", "CRVS", "CCHH"]
+SYMBOLS = ["IVF", "SHPH", "POLA", "CRVS", "CCHH", "SEGG"]
 INVESTMENT_PER_TRADE = 100.0
 TP_PCT = 1.0
 SL_PCT = 10.0
@@ -67,6 +68,23 @@ class InDepthFilter:
         drawdown = (max_p - current_price) / max_p * 100
         
         if drawdown > config.MAX_DRAWDOWN_10S:
+            return False
+            
+        # 3. Trend Check (e.g., 1.0% trend in 30s)
+        # Check if we have enough data points (30 seconds)
+        if len(monitor.price_history) < 30:
+            return False
+            
+        # Access the price 30 seconds ago (index -30)
+        price_30s_ago = monitor.price_history[-30][1]
+        
+        # Avoid division by zero
+        if price_30s_ago == 0:
+            return False
+            
+        trend = (current_price - price_30s_ago) / price_30s_ago * 100
+        
+        if trend < config.MIN_TREND_30S:
             return False
             
         return True
