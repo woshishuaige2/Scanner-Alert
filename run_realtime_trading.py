@@ -22,6 +22,7 @@ SYMBOLS = ["IVF", "SHPH", "POLA", "CRVS", "CCHH"]
 INVESTMENT_PER_TRADE = 100.0
 TP_PCT = 1.0
 SL_PCT = 10.0
+ACCOUNT_NUMBER = "DUXXXXXX" # !!! IMPORTANT: REPLACE WITH YOUR IBKR PAPER TRADING ACCOUNT NUMBER !!!
 
 # Global state
 should_exit = False
@@ -135,6 +136,7 @@ def run_trading_bot():
     scanner = RealtimeBroadScanner(symbols=unique_symbols)
     executor = ExecutionEngine(
         tws_app=tws_app,
+        account=ACCOUNT_NUMBER,
         tp_pct=TP_PCT,
         sl_pct=SL_PCT,
         investment_per_trade=INVESTMENT_PER_TRADE

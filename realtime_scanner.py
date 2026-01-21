@@ -120,3 +120,56 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
         print(f"{symbol:<8} | {price:<8} | {float_str:<10} | {rvol:<6} | {alerts}")
     print("="*90)
     print("[INFO] Preliminary screening active. Waiting for triggers...")
+
+def run_standalone_scanner():
+    from tws_data_fetcher import create_tws_data_app
+    
+    # Use a default symbol list for standalone mode
+    SYMBOLS = ["IVF", "SHPH", "POLA", "CRVS", "CCHH", "SEGG"] 
+    unique_symbols = list(set(SYMBOLS))
+    
+    print("[INIT] Connecting to TWS for standalone scanner...")
+    tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=999)
+    if not tws_app:
+        print("[ERROR] Could not connect to TWS. Exiting.")
+        return
+
+    scanner = RealtimeBroadScanner(symbols=unique_symbols)
+    
+    # Voice Announcement Handler
+    def alert_handler(symbol, timestamp, reasons, monitor):
+        alert_msg = f"Alert! {symbol} triggered: {', '.join(reasons)}"
+        print(f"[ALERT] {alert_msg}")
+        # Use a simple text-to-speech command for voice announcement
+        # This command may need to be adjusted based on the user's OS (e.g., 'say' on macOS, 'espeak' on Linux)
+        os.system(f'espeak "{alert_msg}" 2>/dev/null')
+
+    scanner.on_preliminary_alert(alert_handler)
+    
+    # Load Fundamentals
+    # Note: This requires the tws_data_fetcher to have the fetch_fundamental_data method
+    # scanner.load_fundamentals(tws_app)
+
+    # Subscribe to Live Data
+    print("[INIT] Subscribing to live market data...")
+    def create_callback(sym):
+        return lambda s, p, v, vw, ts, b, a: scanner.update(s, price=p, volume=v, vwap=vw, bid=b, ask=a)
+
+    for symbol in unique_symbols:
+        tws_app.subscribe_market_data(symbol, create_callback(symbol))
+    
+    print("[INIT] Starting Standalone Scanner Interface...")
+    time.sleep(2)
+    
+    try:
+        while True:
+            display_broad_screening(scanner)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n[INFO] Scanner stopped.")
+    finally:
+        tws_app.disconnect()
+
+if __name__ == "__main__":
+    # If run directly, run the standalone scanner
+    run_standalone_scanner()

@@ -10,8 +10,9 @@ from ibapi.contract import Contract
 from ibapi.order import Order
 
 class ExecutionEngine:
-    def __init__(self, tws_app, tp_pct: float = 1.0, sl_pct: float = 10.0, investment_per_trade: float = 1000.0):
+    def __init__(self, tws_app, account: str, tp_pct: float = 1.0, sl_pct: float = 10.0, investment_per_trade: float = 1000.0):
         self.tws_app = tws_app
+        self.account = account
         self.tp_pct = tp_pct
         self.sl_pct = sl_pct
         self.investment_per_trade = investment_per_trade
@@ -89,6 +90,7 @@ class ExecutionEngine:
             parent.orderType = "MKT"
             parent.totalQuantity = shares
             parent.transmit = False
+            parent.account = self.account
             # Fix for TWS Error Code 10268: "The 'EtradeOnly' order attribute is not supported."
             # This attribute is sometimes automatically set by ib_insync or older ibapi versions
             # Explicitly setting it to False ensures compatibility.
