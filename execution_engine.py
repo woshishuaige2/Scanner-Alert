@@ -90,6 +90,7 @@ class ExecutionEngine:
             parent.orderType = "MKT"
             parent.totalQuantity = shares
             parent.transmit = False
+            parent.tif = "DAY" # Ensure Time in Force is set (e.g., DAY)
             parent.account = self.account
             # Fix for TWS Error Code 10268: "The 'EtradeOnly' order attribute is not supported."
             # This attribute is sometimes automatically set by ib_insync or older ibapi versions
@@ -104,6 +105,8 @@ class ExecutionEngine:
             tp_order.totalQuantity = shares
             tp_order.lmtPrice = tp_price
             tp_order.parentId = parent_id
+            tp_order.ocaGroup = f"OCA_{parent_id}"
+            tp_order.ocaType = 1 # Cancel all remaining orders in group
             tp_order.transmit = False
             
             # 3. Stop Loss Order
@@ -114,6 +117,8 @@ class ExecutionEngine:
             sl_order.totalQuantity = shares
             sl_order.auxPrice = sl_price
             sl_order.parentId = parent_id
+            sl_order.ocaGroup = f"OCA_{parent_id}"
+            sl_order.ocaType = 1 # Cancel all remaining orders in group
             sl_order.transmit = True
             
             # Track position and orders

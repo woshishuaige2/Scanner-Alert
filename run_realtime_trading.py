@@ -14,8 +14,7 @@ from typing import List, Dict
 
 from realtime_scanner import RealtimeBroadScanner, display_broad_screening
 from execution_engine import ExecutionEngine
-# from tws_data_fetcher import create_tws_data_app
-from mock_tws import create_tws_data_app
+from tws_data_fetcher import create_tws_data_app
 import scanner_config as config
 
 # CONFIGURATION
