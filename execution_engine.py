@@ -4,8 +4,9 @@ Handles order placement, position tracking, and risk management (TP/SL).
 """
 import threading
 import time
+import sys
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from ibapi.contract import Contract
 from ibapi.order import Order
 
@@ -17,10 +18,12 @@ class ExecutionEngine:
         self.sl_pct = sl_pct
         self.investment_per_trade = investment_per_trade
         
-        # Position tracking: symbol -> {entry_price, shares, tp_price, sl_price, order_ids}
+        # Position tracking: symbol -> {entry_price, shares, tp_price, sl_price, order_ids, status, time}
         self.positions: Dict[str, Dict] = {}
         # Order ID tracking: order_id -> symbol
         self.order_to_symbol: Dict[int, str] = {}
+        # Trade History: List of completed or failed trade records
+        self.trade_history: List[Dict] = []
         self.lock = threading.Lock()
         
         # Register order status callback
@@ -53,26 +56,59 @@ class ExecutionEngine:
                     pos['actual_entry_price'] = avgFillPrice
                     print(f"[EXEC] >>> POSITION OPEN: {symbol} at ${avgFillPrice:.2f} <<<")
             
+            # If any order is rejected or cancelled
+            if status in ['Inactive', 'Cancelled', 'ApiCancelled']:
+                if pos['status'] == 'SUBMITTED':
+                    # Trade failed before opening
+                    self.trade_history.append({
+                        'symbol': symbol,
+                        'type': 'FAILED',
+                        'reason': status,
+                        'entry_price': pos['entry_price'],
+                        'time': datetime.now()
+                    })
+                    print(f"[EXEC] Order {orderId} for {symbol} FAILED ({status}).")
+                    self._cleanup_position(symbol)
+                elif pos['status'] == 'OPEN':
+                    # This might happen if an exit order is cancelled manually
+                    print(f"[EXEC] Warning: Exit order {orderId} for {symbol} was {status}.")
+
             # If any of the exit orders (TP or SL) are filled, position is CLOSED
             if orderId in [pos['tp_id'], pos['sl_id']] and status == 'Filled':
-                print(f"[EXEC] >>> POSITION CLOSED: {symbol} at ${avgFillPrice:.2f} ({status}) <<<")
-                del self.positions[symbol]
-                # Clean up order mapping
-                to_del = [oid for oid, sym in self.order_to_symbol.items() if sym == symbol]
-                for oid in to_del:
-                    del self.order_to_symbol[oid]
+                exit_type = 'TP' if orderId == pos['tp_id'] else 'SL'
+                print(f"[EXEC] >>> POSITION CLOSED: {symbol} via {exit_type} at ${avgFillPrice:.2f} <<<")
+                
+                self.trade_history.append({
+                    'symbol': symbol,
+                    'type': 'CLOSED',
+                    'exit_type': exit_type,
+                    'entry_price': pos.get('actual_entry_price', pos['entry_price']),
+                    'exit_price': avgFillPrice,
+                    'shares': pos['shares'],
+                    'time': datetime.now()
+                })
+                self._cleanup_position(symbol)
+
+    def _cleanup_position(self, symbol: str):
+        """Internal helper to clean up position tracking"""
+        if symbol in self.positions:
+            del self.positions[symbol]
+            # Clean up order mapping
+            to_del = [oid for oid, sym in self.order_to_symbol.items() if sym == symbol]
+            for oid in to_del:
+                del self.order_to_symbol[oid]
 
     def execute_trade(self, symbol: str, entry_price: float):
         """Execute a new trade with bracket orders (TP and SL)"""
         with self.lock:
             if symbol in self.positions:
-                return
+                return True
 
             # Calculate shares and bracket prices
             shares = int(self.investment_per_trade / entry_price)
             if shares <= 0:
                 print(f"[EXEC] Investment too low for {symbol}. Skipping.")
-                return
+                return False
                 
             tp_price = round(entry_price * (1 + self.tp_pct / 100), 2)
             sl_price = round(entry_price * (1 - self.sl_pct / 100), 2)
@@ -90,12 +126,9 @@ class ExecutionEngine:
             parent.orderType = "MKT"
             parent.totalQuantity = shares
             parent.transmit = False
-            parent.tif = "DAY" # Ensure Time in Force is set (e.g., DAY)
+            parent.tif = "DAY"
             parent.account = self.account
-            # Fix for TWS Error Code 10268: "The 'EtradeOnly' order attribute is not supported."
-            # This attribute is sometimes automatically set by ib_insync or older ibapi versions
-            # Explicitly setting it to False ensures compatibility.
-            parent.eTradeOnly = False
+            parent.outsideRth = True
             
             # 2. Take Profit Limit Order
             tp_order = Order()
@@ -106,8 +139,9 @@ class ExecutionEngine:
             tp_order.lmtPrice = tp_price
             tp_order.parentId = parent_id
             tp_order.ocaGroup = f"OCA_{parent_id}"
-            tp_order.ocaType = 1 # Cancel all remaining orders in group
+            tp_order.ocaType = 1
             tp_order.transmit = False
+            tp_order.outsideRth = True
             
             # 3. Stop Loss Order
             sl_order = Order()
@@ -118,8 +152,14 @@ class ExecutionEngine:
             sl_order.auxPrice = sl_price
             sl_order.parentId = parent_id
             sl_order.ocaGroup = f"OCA_{parent_id}"
-            sl_order.ocaType = 1 # Cancel all remaining orders in group
+            sl_order.ocaType = 1
             sl_order.transmit = True
+            sl_order.outsideRth = True
+
+            # Fix for TWS Error Codes 10268 & 10269
+            for o in [parent, tp_order, sl_order]:
+                o.eTradeOnly = False
+                o.firmQuoteOnly = False
             
             # Track position and orders
             self.positions[symbol] = {
@@ -146,14 +186,31 @@ class ExecutionEngine:
             print(f"[EXEC] Submitted SL Order {sl_order.orderId} for {symbol}")
             
             print(f"[EXEC] Bracket Order Submitted for {symbol}: {shares} shares")
-            print(f"       Target Entry: ~${entry_price:.2f} | TP: ${tp_price:.2f} | SL: ${sl_price:.2f}")
+            return True
 
     def is_position_active(self, symbol: str) -> bool:
         """Check if a position is currently active or pending for a symbol"""
         with self.lock:
-            # A position is active if it's in the positions dictionary
             return symbol in self.positions
 
-    def get_active_positions(self):
+    def get_active_positions_detailed(self) -> List[Dict]:
+        """Returns detailed list of active positions for visualization"""
         with self.lock:
-            return [f"{s} ({p['status']})" for s, p in self.positions.items()]
+            details = []
+            for symbol, pos in self.positions.items():
+                details.append({
+                    'symbol': symbol,
+                    'status': pos['status'],
+                    'entry': pos['entry_price'],
+                    'actual_entry': pos.get('actual_entry_price'),
+                    'tp': pos['tp_price'],
+                    'sl': pos['sl_price'],
+                    'shares': pos['shares'],
+                    'time': pos['time']
+                })
+            return details
+
+    def get_trade_history(self) -> List[Dict]:
+        """Returns the history of closed or failed trades"""
+        with self.lock:
+            return list(self.trade_history)

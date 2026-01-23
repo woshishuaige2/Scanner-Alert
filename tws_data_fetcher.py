@@ -107,8 +107,13 @@ class TWSDataApp(EClient, EWrapper):
             print(f"[TWS] Using delayed market data (live subscription may be needed)")
             return
         # Only show actual errors (code >= 500) or important warnings
-        if errorCode >= 500 or errorCode in [1100, 1101, 1102, 1300]:
-            print(f"[TWS Error] ReqId: {reqId}, Code: {errorCode}, Msg: {errorString}")
+        if errorCode >= 500 or errorCode in [1100, 1101, 1102, 1300, 201]:
+            # Try to find the symbol associated with this reqId
+            symbol_info = ""
+            with self.lock:
+                if reqId in self.realtime_callbacks:
+                    symbol_info = f" ({self.realtime_callbacks[reqId][0]})"
+            print(f"[TWS Error] ReqId: {reqId}{symbol_info}, Code: {errorCode}, Msg: {errorString}")
         
     def historicalData(self, reqId: int, bar: BarData):
         """Receive historical bar data"""

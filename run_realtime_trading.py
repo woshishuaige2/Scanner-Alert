@@ -18,17 +18,16 @@ from tws_data_fetcher import create_tws_data_app
 import scanner_config as config
 
 # CONFIGURATION
-SYMBOLS = ["IVF", "SHPH", "POLA", "CRVS", "CCHH", "SEGG"]
+SYMBOLS = ["MOVE", "BNAI", "DRCT", "THH", "REVB", "MAXN"]
 INVESTMENT_PER_TRADE = 100.0
 TP_PCT = 1.0
 SL_PCT = 10.0
-ACCOUNT_NUMBER = "DUXXXXXX" # !!! IMPORTANT: REPLACE WITH YOUR IBKR PAPER TRADING ACCOUNT NUMBER !!!
+ACCOUNT_NUMBER = "DUO200259" # !!! IMPORTANT: REPLACE WITH YOUR IBKR PAPER TRADING ACCOUNT NUMBER !!!
 
 # Global state
 should_exit = False
 tws_app = None
-filtered_alerts = deque(maxlen=10)
-trade_log = deque(maxlen=10)
+filtered_alerts = deque(maxlen=5)
 
 def signal_handler(sig, frame):
     global should_exit
@@ -70,77 +69,88 @@ class InDepthFilter:
             return False
             
         # 3. Trend Check (e.g., 1.0% trend in 30s)
-        # Check if we have enough data points (30 seconds)
         if len(monitor.price_history) < 30:
             return False
             
-        # Access the price 30 seconds ago (index -30)
         price_30s_ago = monitor.price_history[-30][1]
-        
-        # Avoid division by zero
         if price_30s_ago == 0:
             return False
             
         trend = (current_price - price_30s_ago) / price_30s_ago * 100
-        
         if trend < config.MIN_TREND_30S:
             return False
             
         return True
 
-def unified_visualization(scanner, filtered_alerts, trade_log, executor):
-    """Unified console display showing all three stages"""
+def unified_visualization(scanner, filtered_alerts, executor):
+    """Unified console display showing all three stages with enhanced Stage 3"""
     os.system('cls' if os.name == 'nt' else 'clear')
     
     # 1. Preliminary Screening Section
-    print("="*100)
+    print("="*110)
     print(f" STAGE 1: PRELIMINARY SCREENING (ROSS CAMERON STYLE) | {datetime.now().strftime('%H:%M:%S')} ")
-    print("="*100)
-    # Increased RVOL column width for better alignment
-    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<15} | {'SCREENING ALERTS'}")
-    print("-"*100)
-    for symbol in scanner.symbols: # Use the list of symbols actually initialized in the scanner
-        # The scanner.monitors dictionary should contain all symbols in scanner.symbols
+    print("="*110)
+    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<12} | {'SCREENING ALERTS'}")
+    print("-"*110)
+    for symbol in scanner.symbols:
         if symbol not in scanner.monitors:
-            # This should not happen if initialization was successful, but keep as a safeguard
-            print(f"{symbol:<8} | {'N/A':<10} | {'N/A':<12} | {'N/A':<15} | {'Monitor not initialized'}")
             continue
             
         m = scanner.monitors[symbol]
         price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
-        float_str = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
-        # Format RVOL to handle large numbers and align with new width
+        float_shares = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
         rvol = f"{m.relative_volume:.2f}x"
         alerts = ", ".join(m.triggered_conditions) if m.triggered_conditions else "--"
-        
-        print(f"{symbol:<8} | {price:<10} | {float_str:<12} | {rvol:<15} | {alerts}")
+        print(f"{symbol:<8} | {price:<10} | {float_shares:<12} | {rvol:<12} | {alerts}")
     
     # 2. In-Depth Filtered Alerts Section
-    print("\n" + "="*100)
+    print("\n" + "="*110)
     print(" STAGE 2: IN-DEPTH FILTERED ALERTS (STRICT MOMENTUM)")
-    print("="*100)
+    print("="*110)
     if not filtered_alerts:
         print("  No symbols passed in-depth filtering yet...")
     for alert in filtered_alerts:
         print(f"  [FILTERED] {alert}")
         
-    # 3. Trade Log Section
-    print("\n" + "="*100)
-    print(" STAGE 3: TRADE EXECUTION LOG & POSITIONS")
-    print("="*100)
-    active_pos = executor.get_active_positions()
-    print(f"  ACTIVE POSITIONS: {', '.join(active_pos) if active_pos else 'None'}")
-    print("-" * 100)
-    if not trade_log:
-        print("  No trades executed in this session.")
-    for log in trade_log:
-        print(f"  [TRADE] {log}")
-    print("="*100)
+    # 3. Trade Execution Log & Positions
+    print("\n" + "="*110)
+    print(" STAGE 3: TRADE EXECUTION & POSITION TRACKING")
+    print("="*110)
+    
+    # Active Positions Sub-section
+    active_pos = executor.get_active_positions_detailed()
+    print(f"{'ACTIVE POSITIONS':<110}")
+    print(f"{'SYMBOL':<8} | {'STATUS':<12} | {'ENTRY':<10} | {'TP':<10} | {'SL':<10} | {'SHARES':<8} | {'TIME'}")
+    print("-" * 110)
+    if not active_pos:
+        print("  None")
+    for pos in active_pos:
+        entry_disp = f"${pos['actual_entry']:.2f}" if pos['actual_entry'] else f"~${pos['entry']:.2f}"
+        time_disp = pos['time'].strftime('%H:%M:%S')
+        print(f"{pos['symbol']:<8} | {pos['status']:<12} | {entry_disp:<10} | ${pos['tp']:<10.2f} | ${pos['sl']:<10.2f} | {pos['shares']:<8} | {time_disp}")
+    
+    # Trade History Sub-section
+    print("\n" + f"{'TRADE HISTORY (CLOSED / FAILED)':<110}")
+    print(f"{'SYMBOL':<8} | {'RESULT':<12} | {'DETAILS':<60} | {'TIME'}")
+    print("-" * 110)
+    history = executor.get_trade_history()
+    if not history:
+        print("  No completed trades in this session.")
+    for trade in reversed(history[-10:]): # Show last 10 history items
+        time_disp = trade['time'].strftime('%H:%M:%S')
+        if trade['type'] == 'CLOSED':
+            pnl = (trade['exit_price'] - trade['entry_price']) * trade['shares']
+            pnl_pct = (trade['exit_price'] - trade['entry_price']) / trade['entry_price'] * 100
+            details = f"{trade['exit_type']} Exit at ${trade['exit_price']:.2f} (P&L: ${pnl:.2f}, {pnl_pct:+.2f}%)"
+            print(f"{trade['symbol']:<8} | {'CLOSED':<12} | {details:<60} | {time_disp}")
+        else:
+            details = f"Order {trade['reason']} at ~${trade['entry_price']:.2f}"
+            print(f"{trade['symbol']:<8} | {'FAILED':<12} | {details:<60} | {time_disp}")
+    print("="*110)
 
 def run_trading_bot():
     global tws_app
     
-    # Ensure all symbols are unique and valid before proceeding
     unique_symbols = list(set(SYMBOLS))
     
     print("[INIT] Connecting to TWS...")
@@ -159,45 +169,24 @@ def run_trading_bot():
         investment_per_trade=INVESTMENT_PER_TRADE
     )
     
-    # Cooldown tracker for in-depth filter (symbol -> datetime)
     in_depth_cooldown: Dict[str, datetime] = {}
-    
-    # Load Fundamentals for Stage 1
     scanner.load_fundamentals(tws_app)
 
-    # Define Alert Handler for Stage 1 -> Stage 2 transition
     def preliminary_alert_handler(symbol, timestamp, reasons, monitor):
-        # Check if symbol is already in an active position (Rule 3)
         if executor.is_position_active(symbol):
-            return # Skip in-depth check and execution if already trading this symbol
+            return 
 
-        # Stage 2: In-depth Filtering (Rule 2: 60s Cooldown)
         if InDepthFilter.check(symbol, monitor, in_depth_cooldown):
-            
-            # Update cooldown tracker *before* execution attempt to prevent immediate re-trigger
             in_depth_cooldown[symbol] = datetime.now()
-            
             alert_msg = f"{symbol} passed strict momentum at ${monitor.price_history[-1][1]:.2f} ({timestamp.strftime('%H:%M:%S')})"
-            
-            # Only add to filtered_alerts if it's a new alert (based on symbol, not message content)
-            # This is a temporary fix for the visualization spam, the cooldown should handle the logic
-            # We will rely on the cooldown logic for the real filtering.
             
             # Stage 3: Execution
             success = executor.execute_trade(symbol, monitor.price_history[-1][1])
-            
             if success:
-                # Only log successful trade to the filtered_alerts and trade_log
                 filtered_alerts.appendleft(alert_msg)
-                trade_log.appendleft(f"BUY {symbol} at ${monitor.price_history[-1][1]:.2f} | {timestamp.strftime('%H:%M:%S')}")
-            else:
-                # If execution failed (e.g., already in position), still log the alert to show it passed the filter
-                if not executor.is_position_active(symbol):
-                    filtered_alerts.appendleft(alert_msg)
 
     scanner.on_preliminary_alert(preliminary_alert_handler)
 
-    # Subscribe to Live Data
     print("[INIT] Subscribing to live market data...")
     def create_callback(sym):
         return lambda s, p, v, vw, ts, b, a: scanner.update(s, price=p, volume=v, vwap=vw, bid=b, ask=a)
@@ -209,7 +198,7 @@ def run_trading_bot():
     time.sleep(2)
     
     while not should_exit:
-        unified_visualization(scanner, filtered_alerts, trade_log, executor)
+        unified_visualization(scanner, filtered_alerts, executor)
         time.sleep(1)
 
     tws_app.disconnect()
