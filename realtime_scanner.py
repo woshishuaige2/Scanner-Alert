@@ -9,6 +9,7 @@ from typing import List, Dict, Callable, Optional
 from collections import deque
 import scanner_config as config
 import xml.etree.ElementTree as ET
+from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition
 
 class RealtimeSymbolMonitor:
     def __init__(self, symbol: str):
@@ -16,6 +17,9 @@ class RealtimeSymbolMonitor:
         self.price_history = deque(maxlen=600)  # 10 mins of data at 1s intervals
         self.volume_history = deque(maxlen=600)
         self.last_update = None
+        self.bid = 0.0
+        self.ask = 0.0
+        self.vwap = 0.0
         
         # Fundamental data
         self.float_shares = None
@@ -24,48 +28,47 @@ class RealtimeSymbolMonitor:
         
         # Screening results
         self.triggered_conditions = []
+        
+        # Initialize Preliminary Condition Set
+        self.condition_set = AlertConditionSet("Preliminary")
+        self.condition_set.add_condition(PriceAboveVWAPCondition())
+        self.condition_set.add_condition(SqueezeCondition(pct_threshold=10.0, minutes=5))
 
-    def update_market_data(self, price: float, volume: float, vwap: float):
+    def update_market_data(self, price: float, volume: float, vwap: float, bid: float = 0, ask: float = 0):
         now = datetime.now()
         self.price_history.append((now, price))
         self.volume_history.append((now, volume))
         self.last_update = now
+        self.bid = bid
+        self.ask = ask
+        self.vwap = vwap
         
         # Calculate Relative Volume if we have avg daily volume
         if self.avg_daily_volume and self.avg_daily_volume > 0:
             self.relative_volume = volume / self.avg_daily_volume
 
     def check_screening_conditions(self) -> List[str]:
-        triggered = []
-        price = self.price_history[-1][1] if self.price_history else 0
+        if not self.price_history:
+            return []
+            
+        # Create MarketData object for the condition set
+        data = MarketData(
+            symbol=self.symbol,
+            price=self.price_history[-1][1],
+            volume=self.volume_history[-1][1] if self.volume_history else 0,
+            vwap=self.vwap,
+            timestamp=self.last_update,
+            bid=self.bid,
+            ask=self.ask,
+            price_history=list(self.price_history)
+        )
         
-        # 1. Low Float - Med Rel Vol
-        if config.ENABLE_LOW_FLOAT_MED_RVOL:
-            if self.float_shares and self.float_shares <= config.LOW_FLOAT_MAX:
-                if self.relative_volume >= config.MED_RVOL_MIN:
-                    triggered.append("Low Float - Med Rel Vol")
-
-        # 2. Low Float - High Rel Vol - Price $20+
-        if config.ENABLE_LOW_FLOAT_HIGH_RVOL_PRICE_20PLUS:
-            if self.float_shares and self.float_shares <= config.LOW_FLOAT_MAX:
-                if self.relative_volume >= config.HIGH_RVOL_MIN and price >= 20.0:
-                    triggered.append("Low Float - High Rel Vol - Price $20+")
-
-        # 3. Low Float - High Rel Vol
-        if config.ENABLE_LOW_FLOAT_HIGH_RVOL:
-            if self.float_shares and self.float_shares <= config.LOW_FLOAT_MAX:
-                if self.relative_volume >= config.HIGH_RVOL_MIN:
-                    triggered.append("Low Float - High Rel Vol")
-
-        # 4. Squeeze Alert - Up 10% in 10min
-        if config.ENABLE_SQUEEZE_ALERT_10PCT_10MIN:
-            if len(self.price_history) > 60:
-                old_price = self.price_history[0][1]
-                if price >= old_price * 1.10:
-                    triggered.append("Squeeze Alert - Up 10% in 10min")
-
-        self.triggered_conditions = triggered
-        return triggered
+        if self.condition_set.check_all(data):
+            self.triggered_conditions = [self.condition_set.get_trigger_summary()]
+            return self.triggered_conditions
+        else:
+            self.triggered_conditions = []
+            return []
 
 class RealtimeBroadScanner:
     def __init__(self, symbols: List[str]):
@@ -79,7 +82,7 @@ class RealtimeBroadScanner:
     def update(self, symbol: str, price: float, volume: float, vwap: float, bid: float = 0, ask: float = 0):
         if symbol in self.monitors:
             monitor = self.monitors[symbol]
-            monitor.update_market_data(price, volume, vwap)
+            monitor.update_market_data(price, volume, vwap, bid, ask)
             
             triggered = monitor.check_screening_conditions()
             if triggered and self.alert_callback:
@@ -104,11 +107,11 @@ class RealtimeBroadScanner:
 
 def display_broad_screening(scanner: RealtimeBroadScanner):
     os.system('cls' if os.name == 'nt' else 'clear')
-    print("="*90)
+    print("="*110)
     print(f"                ROSS CAMERON STYLE PRELIMINARY SCANNER | {datetime.now().strftime('%H:%M:%S')} ")
-    print("="*90)
-    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'FLOAT':<10} | {'RVOL':<6} | {'SCREENING ALERTS'}")
-    print("-"*90)
+    print("="*110)
+    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<12} | {'SCREENING ALERTS'}")
+    print("-"*110)
     
     for symbol in scanner.symbols:
         m = scanner.monitors[symbol]
@@ -117,15 +120,15 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
         rvol = f"{m.relative_volume:.2f}x"
         alerts = ", ".join(m.triggered_conditions) if m.triggered_conditions else "--"
         
-        print(f"{symbol:<8} | {price:<8} | {float_str:<10} | {rvol:<6} | {alerts}")
-    print("="*90)
+        print(f"{symbol:<8} | {price:<10} | {float_str:<12} | {rvol:<12} | {alerts}")
+    print("="*110)
     print("[INFO] Preliminary screening active. Waiting for triggers...")
 
 def run_standalone_scanner():
     from tws_data_fetcher import create_tws_data_app
     
     # Use a default symbol list for standalone mode
-    SYMBOLS = ["IVF", "SHPH", "POLA", "CRVS", "CCHH", "SEGG"] 
+    SYMBOLS = ["MOVE", "BNAI", "DRCT", "THH", "REVB", "MAXN"] 
     unique_symbols = list(set(SYMBOLS))
     
     print("[INIT] Connecting to TWS for standalone scanner...")
@@ -138,17 +141,17 @@ def run_standalone_scanner():
     
     # Voice Announcement Handler
     def alert_handler(symbol, timestamp, reasons, monitor):
-        alert_msg = f"Alert! {symbol} triggered: {', '.join(reasons)}"
+        # We only want the core reason for voice, not the detailed price strings
+        voice_reason = "Squeeze detected" if "Squeeze" in str(reasons) else "Momentum alert"
+        alert_msg = f"Alert! {symbol} triggered {voice_reason}"
         print(f"[ALERT] {alert_msg}")
-        # Use a simple text-to-speech command for voice announcement
-        # This command may need to be adjusted based on the user's OS (e.g., 'say' on macOS, 'espeak' on Linux)
+        # espeak is pre-installed in the sandbox
         os.system(f'espeak "{alert_msg}" 2>/dev/null')
 
     scanner.on_preliminary_alert(alert_handler)
     
     # Load Fundamentals
-    # Note: This requires the tws_data_fetcher to have the fetch_fundamental_data method
-    # scanner.load_fundamentals(tws_app)
+    scanner.load_fundamentals(tws_app)
 
     # Subscribe to Live Data
     print("[INIT] Subscribing to live market data...")
@@ -171,5 +174,4 @@ def run_standalone_scanner():
         tws_app.disconnect()
 
 if __name__ == "__main__":
-    # If run directly, run the standalone scanner
     run_standalone_scanner()

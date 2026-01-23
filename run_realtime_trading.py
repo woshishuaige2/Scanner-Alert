@@ -1,6 +1,6 @@
 """
 Real-Time Trading Bot - Two-Stage Architecture
-Stage 1: Preliminary Screening (via realtime_scanner.py)
+Stage 1: Preliminary Screening (via realtime_scanner.py using conditions.py)
 Stage 2: In-depth Filtering & Execution (this module)
 """
 import time
@@ -12,7 +12,7 @@ from datetime import datetime
 from collections import deque
 from typing import List, Dict
 
-from realtime_scanner import RealtimeBroadScanner, display_broad_screening
+from realtime_scanner import RealtimeBroadScanner
 from execution_engine import ExecutionEngine
 from tws_data_fetcher import create_tws_data_app
 import scanner_config as config
@@ -47,9 +47,9 @@ class InDepthFilter:
         now = datetime.now()
         if symbol in cooldown_tracker:
             if (now - cooldown_tracker[symbol]).total_seconds() < 60:
-                return False # Still in cooldown period
+                return False 
             
-        # 1. Price Surge Check (e.g., 1.5% in 10s)
+        # Current Stage 2 Logic (can be updated in conditions.py later)
         if len(monitor.price_history) < 10:
             return False
             
@@ -60,7 +60,6 @@ class InDepthFilter:
         if surge < config.MIN_PRICE_SURGE_10S:
             return False
             
-        # 2. Drawdown Check (no more than 0.5% drop in last 10s)
         prices_10s = [p for ts, p in list(monitor.price_history)[-10:]]
         max_p = max(prices_10s)
         drawdown = (max_p - current_price) / max_p * 100
@@ -68,34 +67,21 @@ class InDepthFilter:
         if drawdown > config.MAX_DRAWDOWN_10S:
             return False
             
-        # 3. Trend Check (e.g., 1.0% trend in 30s)
-        if len(monitor.price_history) < 30:
-            return False
-            
-        price_30s_ago = monitor.price_history[-30][1]
-        if price_30s_ago == 0:
-            return False
-            
-        trend = (current_price - price_30s_ago) / price_30s_ago * 100
-        if trend < config.MIN_TREND_30S:
-            return False
-            
         return True
 
 def unified_visualization(scanner, filtered_alerts, executor):
-    """Unified console display showing all three stages with enhanced Stage 3"""
+    """Unified console display showing all three stages with enhanced separation"""
     os.system('cls' if os.name == 'nt' else 'clear')
     
     # 1. Preliminary Screening Section
-    print("="*110)
-    print(f" STAGE 1: PRELIMINARY SCREENING (ROSS CAMERON STYLE) | {datetime.now().strftime('%H:%M:%S')} ")
-    print("="*110)
+    print("="*115)
+    print(f" STAGE 1: PRELIMINARY SCREENING (SQUEEZE + VWAP + SPREAD) | {datetime.now().strftime('%H:%M:%S')} ")
+    print("="*115)
     print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<12} | {'SCREENING ALERTS'}")
-    print("-"*110)
+    print("-"*115)
     for symbol in scanner.symbols:
         if symbol not in scanner.monitors:
             continue
-            
         m = scanner.monitors[symbol]
         price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
         float_shares = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
@@ -104,24 +90,24 @@ def unified_visualization(scanner, filtered_alerts, executor):
         print(f"{symbol:<8} | {price:<10} | {float_shares:<12} | {rvol:<12} | {alerts}")
     
     # 2. In-Depth Filtered Alerts Section
-    print("\n" + "="*110)
+    print("\n" + "="*115)
     print(" STAGE 2: IN-DEPTH FILTERED ALERTS (STRICT MOMENTUM)")
-    print("="*110)
+    print("="*115)
     if not filtered_alerts:
         print("  No symbols passed in-depth filtering yet...")
     for alert in filtered_alerts:
         print(f"  [FILTERED] {alert}")
         
     # 3. Trade Execution Log & Positions
-    print("\n" + "="*110)
+    print("\n" + "="*115)
     print(" STAGE 3: TRADE EXECUTION & POSITION TRACKING")
-    print("="*110)
+    print("="*115)
     
     # Active Positions Sub-section
     active_pos = executor.get_active_positions_detailed()
-    print(f"{'ACTIVE POSITIONS':<110}")
+    print(f"{'ACTIVE POSITIONS':<115}")
     print(f"{'SYMBOL':<8} | {'STATUS':<12} | {'ENTRY':<10} | {'TP':<10} | {'SL':<10} | {'SHARES':<8} | {'TIME'}")
-    print("-" * 110)
+    print("-" * 115)
     if not active_pos:
         print("  None")
     for pos in active_pos:
@@ -129,24 +115,27 @@ def unified_visualization(scanner, filtered_alerts, executor):
         time_disp = pos['time'].strftime('%H:%M:%S')
         print(f"{pos['symbol']:<8} | {pos['status']:<12} | {entry_disp:<10} | ${pos['tp']:<10.2f} | ${pos['sl']:<10.2f} | {pos['shares']:<8} | {time_disp}")
     
+    # SEPARATOR LINE
+    print("\n" + "-" * 115)
+    
     # Trade History Sub-section
-    print("\n" + f"{'TRADE HISTORY (CLOSED / FAILED)':<110}")
-    print(f"{'SYMBOL':<8} | {'RESULT':<12} | {'DETAILS':<60} | {'TIME'}")
-    print("-" * 110)
+    print(f"{'TRADE HISTORY (CLOSED / FAILED)':<115}")
+    print(f"{'SYMBOL':<8} | {'RESULT':<12} | {'DETAILS':<65} | {'TIME'}")
+    print("-" * 115)
     history = executor.get_trade_history()
     if not history:
         print("  No completed trades in this session.")
-    for trade in reversed(history[-10:]): # Show last 10 history items
+    for trade in reversed(history[-10:]):
         time_disp = trade['time'].strftime('%H:%M:%S')
         if trade['type'] == 'CLOSED':
             pnl = (trade['exit_price'] - trade['entry_price']) * trade['shares']
             pnl_pct = (trade['exit_price'] - trade['entry_price']) / trade['entry_price'] * 100
             details = f"{trade['exit_type']} Exit at ${trade['exit_price']:.2f} (P&L: ${pnl:.2f}, {pnl_pct:+.2f}%)"
-            print(f"{trade['symbol']:<8} | {'CLOSED':<12} | {details:<60} | {time_disp}")
+            print(f"{trade['symbol']:<8} | {'CLOSED':<12} | {details:<65} | {time_disp}")
         else:
             details = f"Order {trade['reason']} at ~${trade['entry_price']:.2f}"
-            print(f"{trade['symbol']:<8} | {'FAILED':<12} | {details:<60} | {time_disp}")
-    print("="*110)
+            print(f"{trade['symbol']:<8} | {'FAILED':<12} | {details:<65} | {time_disp}")
+    print("="*115)
 
 def run_trading_bot():
     global tws_app
@@ -159,7 +148,6 @@ def run_trading_bot():
         print("[ERROR] Could not connect to TWS.")
         return
 
-    # Initialize Components
     scanner = RealtimeBroadScanner(symbols=unique_symbols)
     executor = ExecutionEngine(
         tws_app=tws_app,
@@ -176,6 +164,7 @@ def run_trading_bot():
         if executor.is_position_active(symbol):
             return 
 
+        # Stage 2: In-depth Filtering
         if InDepthFilter.check(symbol, monitor, in_depth_cooldown):
             in_depth_cooldown[symbol] = datetime.now()
             alert_msg = f"{symbol} passed strict momentum at ${monitor.price_history[-1][1]:.2f} ({timestamp.strftime('%H:%M:%S')})"
