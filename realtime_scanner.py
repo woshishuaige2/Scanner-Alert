@@ -11,6 +11,9 @@ import scanner_config as config
 import xml.etree.ElementTree as ET
 from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition
 
+# STANDALONE SCANNER CONFIGURATION
+STANDALONE_SYMBOLS = ["QCLS", "BNAI", "DRCT", "THH", "REVB", "AUST"]
+
 class RealtimeSymbolMonitor:
     def __init__(self, symbol: str):
         self.symbol = symbol
@@ -29,10 +32,10 @@ class RealtimeSymbolMonitor:
         # Screening results
         self.triggered_conditions = []
         
-        # Initialize Preliminary Condition Set
+        # Initialize Preliminary Condition Set (Spread + Squeeze only, VWAP disabled)
         self.condition_set = AlertConditionSet("Preliminary")
-        self.condition_set.add_condition(PriceAboveVWAPCondition())
-        self.condition_set.add_condition(SqueezeCondition(pct_threshold=10.0, minutes=5))
+        # self.condition_set.add_condition(PriceAboveVWAPCondition())  # DISABLED: VWAP calculation issue
+        self.condition_set.add_condition(SqueezeCondition(pct_threshold=1.0, minutes=3))
 
     def update_market_data(self, price: float, volume: float, vwap: float, bid: float = 0, ask: float = 0):
         now = datetime.now()
@@ -105,31 +108,42 @@ class RealtimeBroadScanner:
                 except Exception as e:
                     print(f"[SCANNER] Error parsing fundamentals for {symbol}: {e}")
 
-def display_broad_screening(scanner: RealtimeBroadScanner):
+def display_broad_screening(scanner: RealtimeBroadScanner, recent_alerts=None):
     os.system('cls' if os.name == 'nt' else 'clear')
-    print("="*110)
+    print("="*120)
     print(f"                ROSS CAMERON STYLE PRELIMINARY SCANNER | {datetime.now().strftime('%H:%M:%S')} ")
-    print("="*110)
-    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<12} | {'SCREENING ALERTS'}")
-    print("-"*110)
+    print("="*120)
+    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'VWAP':<10} | {'FLOAT':<12} | {'RVOL':<12} | {'SCREENING ALERTS'}")
+    print("-"*120)
     
     for symbol in scanner.symbols:
         m = scanner.monitors[symbol]
         price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
+        vwap_str = f"${m.vwap:.2f}" if m.vwap > 0 else "N/A"
         float_str = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
         rvol = f"{m.relative_volume:.2f}x"
         alerts = ", ".join(m.triggered_conditions) if m.triggered_conditions else "--"
         
-        print(f"{symbol:<8} | {price:<10} | {float_str:<12} | {rvol:<12} | {alerts}")
-    print("="*110)
+        print(f"{symbol:<8} | {price:<10} | {vwap_str:<10} | {float_str:<12} | {rvol:<12} | {alerts}")
+    
+    # Recent Alerts Section
+    print("\n" + "="*120)
+    print(" RECENT TRIGGERED ALERTS (Last 5)")
+    print("="*120)
+    if recent_alerts and len(recent_alerts) > 0:
+        for symbol, timestamp, reasons in recent_alerts:
+            time_str = timestamp.strftime('%H:%M:%S')
+            reasons_str = ', '.join(reasons)
+            print(f"  [{time_str}] {symbol} - {reasons_str}")
+    else:
+        print("  No alerts triggered yet...")
+    print("="*120)
     print("[INFO] Preliminary screening active. Waiting for triggers...")
 
 def run_standalone_scanner():
     from tws_data_fetcher import create_tws_data_app
     
-    # Use a default symbol list for standalone mode
-    SYMBOLS = ["MOVE", "BNAI", "DRCT", "THH", "REVB", "MAXN"] 
-    unique_symbols = list(set(SYMBOLS))
+    unique_symbols = list(set(STANDALONE_SYMBOLS))
     
     print("[INIT] Connecting to TWS for standalone scanner...")
     tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=999)
@@ -139,14 +153,31 @@ def run_standalone_scanner():
 
     scanner = RealtimeBroadScanner(symbols=unique_symbols)
     
+    # Recent alerts tracker (symbol -> (timestamp, reasons))
+    recent_alerts = deque(maxlen=5)
+    
+    # Cooldown tracker (symbol -> last_trigger_time)
+    alert_cooldown = {}
+    
     # Voice Announcement Handler
     def alert_handler(symbol, timestamp, reasons, monitor):
-        # We only want the core reason for voice, not the detailed price strings
-        voice_reason = "Squeeze detected" if "Squeeze" in str(reasons) else "Momentum alert"
-        alert_msg = f"Alert! {symbol} triggered {voice_reason}"
+        # 60-second cooldown check
+        if symbol in alert_cooldown:
+            time_since_last = (timestamp - alert_cooldown[symbol]).total_seconds()
+            if time_since_last < 60:
+                return  # Skip this alert, still in cooldown
+        
+        # Update cooldown timestamp
+        alert_cooldown[symbol] = timestamp
+        
+        alert_msg = f"{symbol} at ${monitor.price_history[-1][1]:.2f} - {', '.join(reasons)}"
         print(f"[ALERT] {alert_msg}")
-        # espeak is pre-installed in the sandbox
-        os.system(f'espeak "{alert_msg}" 2>/dev/null')
+        recent_alerts.appendleft((symbol, timestamp, reasons))
+        # Windows text-to-speech - only say symbol name
+        if os.name == 'nt':  # Windows
+            os.system(f'powershell -c "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'{symbol}\')"')
+        else:  # Linux/Mac
+            os.system(f'say {symbol} 2>/dev/null || espeak "{symbol}" 2>/dev/null')
 
     scanner.on_preliminary_alert(alert_handler)
     
@@ -166,7 +197,7 @@ def run_standalone_scanner():
     
     try:
         while True:
-            display_broad_screening(scanner)
+            display_broad_screening(scanner, recent_alerts)
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n[INFO] Scanner stopped.")
