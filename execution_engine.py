@@ -193,6 +193,57 @@ class ExecutionEngine:
         with self.lock:
             return symbol in self.positions
 
+    def close_all_positions(self):
+        """Close all open positions and cancel pending orders (EOD cleanup)"""
+        with self.lock:
+            if not self.positions:
+                print("[EXEC] No active positions to close for EOD.")
+                return
+
+            print(f"[EXEC] EOD Cleanup: Closing {len(self.positions)} positions...")
+            # We need to iterate over a copy of keys because _cleanup_position deletes from self.positions
+            symbols = list(self.positions.keys())
+            
+            for symbol in symbols:
+                pos = self.positions[symbol]
+                contract = self._create_contract(symbol)
+                
+                # 1. Cancel all pending bracket orders
+                for oid in [pos['tp_id'], pos['sl_id']]:
+                    self.tws_app.cancelOrder(oid)
+                
+                # 2. If position is OPEN, submit a Market Order to close it
+                if pos['status'] == 'OPEN':
+                    close_order = Order()
+                    close_order.action = "SELL"
+                    close_order.orderType = "MKT"
+                    close_order.totalQuantity = pos['shares']
+                    close_order.account = self.account
+                    close_order.outsideRth = True # Ensure it can execute in after-hours if slightly late
+                    close_order.transmit = True
+                    
+                    # Fix for TWS Error Codes 10268 & 10269
+                    close_order.eTradeOnly = False
+                    close_order.firmQuoteOnly = False
+                    
+                    new_oid = self.tws_app.next_order_id
+                    self.tws_app.next_order_id += 1
+                    
+                    self.tws_app.placeOrder(new_oid, contract, close_order)
+                    print(f"[EXEC] EOD: Submitted Market Sell for {symbol} ({pos['shares']} shares)")
+                
+                # 3. Move to history and cleanup
+                self.trade_history.append({
+                    'symbol': symbol,
+                    'type': 'CLOSED',
+                    'exit_type': 'EOD',
+                    'entry_price': pos.get('actual_entry_price', pos['entry_price']),
+                    'exit_price': 0.0, # Will be updated by fill if we tracked it, but EOD is final
+                    'shares': pos['shares'],
+                    'time': datetime.now()
+                })
+                self._cleanup_position(symbol)
+
     def get_active_positions_detailed(self) -> List[Dict]:
         """Returns detailed list of active positions for visualization"""
         with self.lock:

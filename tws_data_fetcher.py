@@ -82,8 +82,6 @@ class TWSDataApp(EClient, EWrapper):
     def fundamentalData(self, reqId: int, data: str):
         """Receive fundamental data XML"""
         with self.lock:
-            # We need to find which symbol this reqId belongs to
-            # For simplicity, we'll store it by reqId and let the caller handle it
             self.fundamental_data[reqId] = data
             if reqId in self.fundamental_events:
                 self.fundamental_events[reqId].set()
@@ -173,8 +171,10 @@ class TWSDataApp(EClient, EWrapper):
         elif tt == 'ASK':
             with self.lock:
                 self.realtime_data[symbol]['ask'] = price
-        elif tt == 'OPEN':
-            pass  # Can store if needed
+        elif tt == 'RT_VWAP':
+            # This is the real-time VWAP provided directly by TWS
+            with self.lock:
+                self.realtime_data[symbol]['vwap'] = price
     
     def tickSize(self, reqId: TickerId, tickType: int, size: int):
         """Handle size ticks"""
@@ -203,41 +203,34 @@ class TWSDataApp(EClient, EWrapper):
                 self.realtime_data[symbol]['ask_size'] = size
         elif tt == 'VOLUME':
             with self.lock:
-                old_volume = self.realtime_data[symbol]['volume']
                 self.realtime_data[symbol]['volume'] = size
                 
                 # Trigger callback when we have price and volume update
                 price = self.realtime_data[symbol]['price']
                 if price > 0:
-                    # Initialize cumulative tracking if not present
-                    if 'cumulative_pv' not in self.realtime_data[symbol]:
-                        self.realtime_data[symbol]['cumulative_pv'] = 0.0
-                        self.realtime_data[symbol]['cumulative_volume'] = 0.0
+                    # If TWS hasn't provided RT_VWAP yet, calculate our own as fallback
+                    if self.realtime_data[symbol]['vwap'] == 0:
+                        # Initialize cumulative tracking if not present
+                        if 'cumulative_pv' not in self.realtime_data[symbol]:
+                            self.realtime_data[symbol]['cumulative_pv'] = 0.0
+                            self.realtime_data[symbol]['cumulative_volume'] = 0.0
+                        
+                        current_daily_volume = size
+                        last_daily_volume = self.realtime_data[symbol].get('last_daily_volume', 0)
+                        volume_increment = current_daily_volume - last_daily_volume
+                        
+                        if volume_increment > 0:
+                            self.realtime_data[symbol]['cumulative_pv'] += price * volume_increment
+                            self.realtime_data[symbol]['cumulative_volume'] += volume_increment
+                            self.realtime_data[symbol]['last_daily_volume'] = current_daily_volume
+                        
+                        if self.realtime_data[symbol]['cumulative_volume'] > 0:
+                            self.realtime_data[symbol]['vwap'] = self.realtime_data[symbol]['cumulative_pv'] / self.realtime_data[symbol]['cumulative_volume']
                     
-                    # Calculate incremental volume (size is cumulative daily volume in TWS for some tick types)
-                    # However, in tickSize for VOLUME, size is usually the daily volume.
-                    # We need to calculate the increment.
-                    current_daily_volume = size
-                    last_daily_volume = self.realtime_data[symbol].get('last_daily_volume', 0)
-                    volume_increment = current_daily_volume - last_daily_volume
-                    
-                    if volume_increment > 0:
-                        self.realtime_data[symbol]['cumulative_pv'] += price * volume_increment
-                        self.realtime_data[symbol]['cumulative_volume'] += volume_increment
-                        self.realtime_data[symbol]['last_daily_volume'] = current_daily_volume
-                    
-                    # Calculate accurate cumulative VWAP
-                    if self.realtime_data[symbol]['cumulative_volume'] > 0:
-                        vwap = self.realtime_data[symbol]['cumulative_pv'] / self.realtime_data[symbol]['cumulative_volume']
-                    else:
-                        vwap = price
-                    
-                    self.realtime_data[symbol]['vwap'] = vwap
-                    
-                    # Call callback with updated data
+                    vwap = self.realtime_data[symbol]['vwap']
                     bid = self.realtime_data[symbol].get('bid', 0.0)
                     ask = self.realtime_data[symbol].get('ask', 0.0)
-                    callback(symbol, price, current_daily_volume, vwap, datetime.now(), bid, ask)
+                    callback(symbol, price, size, vwap, datetime.now(), bid, ask)
     
     def get_next_req_id(self):
         """Get next request ID"""
@@ -254,39 +247,19 @@ class TWSDataApp(EClient, EWrapper):
         bar_size: str = "10 secs",
         what_to_show: str = "TRADES"
     ) -> List[Dict]:
-        """
-        Fetch historical bar data from TWS.
-        
-        Args:
-            symbol: Stock symbol
-            end_date: End date for historical data
-            duration: Duration string (e.g., "1 D", "1 W", "1 M")
-            bar_size: Bar size (e.g., "1 min", "5 mins", "10 secs")
-            what_to_show: Data type ("TRADES", "MIDPOINT", "BID", "ASK")
-        
-        Returns:
-            List of bar dictionaries with keys: date, open, high, low, close, volume, average (VWAP)
-        """
-        # Create contract
+        """Fetch historical bar data from TWS."""
         contract = Contract()
         contract.symbol = symbol
         contract.secType = "STK"
         contract.exchange = "SMART"
         contract.currency = "USD"
         
-        # Get request ID
         req_id = self.get_next_req_id()
-        
-        # Initialize storage
         with self.lock:
             self.historical_data[req_id] = []
             self.historical_complete[req_id] = False
         
-        # Format end date with explicit timezone
-        # TWS expects "YYYYMMDD HH:MM:SS TimeZone"
         end_date_str = end_date.strftime("%Y%m%d %H:%M:%S") + " US/Eastern"
-        
-        # Request historical data
         self.reqHistoricalData(
             reqId=req_id,
             contract=contract,
@@ -294,43 +267,29 @@ class TWSDataApp(EClient, EWrapper):
             durationStr=duration,
             barSizeSetting=bar_size,
             whatToShow=what_to_show,
-            useRTH=1,  # Only regular trading hours
-            formatDate=1,  # Date format as string
+            useRTH=1,
+            formatDate=1,
             keepUpToDate=False,
             chartOptions=[]
         )
         
-        # Wait for data to complete
         timeout = 30.0
         waited = 0.0
-        interval = 0.1
         while waited < timeout:
             with self.lock:
                 if self.historical_complete.get(req_id, False):
                     break
-            time.sleep(interval)
-            waited += interval
+            time.sleep(0.1)
+            waited += 0.1
         
-        # Get the data
         with self.lock:
             bars = self.historical_data.get(req_id, [])
-            # Clean up
-            if req_id in self.historical_data:
-                del self.historical_data[req_id]
-            if req_id in self.historical_complete:
-                del self.historical_complete[req_id]
-        
+            if req_id in self.historical_data: del self.historical_data[req_id]
+            if req_id in self.historical_complete: del self.historical_complete[req_id]
         return bars
     
     def subscribe_market_data(self, symbol: str, callback: Callable):
-        """
-        Subscribe to real-time market data.
-        
-        Args:
-            symbol: Stock symbol
-            callback: Function with signature (symbol, price, volume, vwap, timestamp, bid, ask)
-        """
-        # Create contract
+        """Subscribe to real-time market data."""
         contract = Contract()
         contract.symbol = symbol
         contract.secType = "STK"
@@ -340,9 +299,7 @@ class TWSDataApp(EClient, EWrapper):
         with self.lock:
             self.contracts[symbol] = contract
         
-        # Get request ID
         req_id = self.get_next_req_id()
-        
         with self.lock:
             self.realtime_callbacks[req_id] = (symbol, callback)
             self.realtime_data[symbol] = {
@@ -351,24 +308,20 @@ class TWSDataApp(EClient, EWrapper):
                 'volume': 0, 'vwap': 0.0
             }
         
-        # Request market data
-        # Use market data type 1 for live data (requires subscription)
-        # Use market data type 3 for delayed data (free)
-        self.reqMarketDataType(1)  # Live data
+        self.reqMarketDataType(1)
+        # genericTickList 233 is for RT_VWAP
         self.reqMktData(
             reqId=req_id,
             contract=contract,
-            genericTickList="",
+            genericTickList="233",
             snapshot=False,
             regulatorySnapshot=False,
             mktDataOptions=[]
         )
-        
         print(f"[TWS] Subscribed to real-time data for {symbol} (reqId: {req_id})")
     
     def unsubscribe_realtime_data(self, symbol: str):
         """Unsubscribe from real-time market data"""
-        # Find reqId for this symbol
         req_id_to_cancel = None
         with self.lock:
             for req_id, (sym, _) in self.realtime_callbacks.items():
@@ -379,10 +332,8 @@ class TWSDataApp(EClient, EWrapper):
         if req_id_to_cancel:
             self.cancelMktData(req_id_to_cancel)
             with self.lock:
-                if req_id_to_cancel in self.realtime_callbacks:
-                    del self.realtime_callbacks[req_id_to_cancel]
-                if symbol in self.realtime_data:
-                    del self.realtime_data[symbol]
+                if req_id_to_cancel in self.realtime_callbacks: del self.realtime_callbacks[req_id_to_cancel]
+                if symbol in self.realtime_data: del self.realtime_data[symbol]
             print(f"[TWS] Unsubscribed from {symbol}")
 
     def fetch_fundamental_data(self, symbol: str, report_type: str = "ReportSnapshot") -> Optional[str]:
@@ -395,129 +346,40 @@ class TWSDataApp(EClient, EWrapper):
         
         req_id = self.get_next_req_id()
         event = threading.Event()
-        
         with self.lock:
             self.fundamental_events[req_id] = event
             
         self.reqFundamentalData(req_id, contract, report_type, [])
-        
-        # Wait for data (timeout 10s)
         if event.wait(timeout=10.0):
             with self.lock:
                 data = self.fundamental_data.get(req_id)
-                # Clean up
                 del self.fundamental_data[req_id]
                 del self.fundamental_events[req_id]
                 return data
         else:
-            print(f"[TWS] Timeout fetching fundamental data for {symbol}")
             with self.lock:
-                if req_id in self.fundamental_events:
-                    del self.fundamental_events[req_id]
+                if req_id in self.fundamental_events: del self.fundamental_events[req_id]
             return None
 
 
 def create_tws_data_app(host="127.0.0.1", port=7497, client_id=0) -> Optional[TWSDataApp]:
-    """
-    Create and connect a TWS data application.
-    
-    Args:
-        host: TWS/IB Gateway host (default: localhost)
-        port: TWS port - 7497 for paper trading, 7496 for live trading
-        client_id: Unique client ID
-    
-    Returns:
-        Connected TWSDataApp instance or None if connection failed
-    """
+    """Create and connect a TWS data application."""
     app = TWSDataApp()
-    
     try:
         app.connect(host, port, client_id)
     except Exception as e:
         print(f"[TWS] Connection error: {e}")
         return None
     
-    # Start the socket loop in a background thread
     api_thread = threading.Thread(target=app.run, daemon=True)
     api_thread.start()
     
-    # Wait for connection
     timeout = 10.0
     waited = 0.0
-    interval = 0.1
     while not app.connected and waited < timeout:
-        time.sleep(interval)
-        waited += interval
+        time.sleep(0.1)
+        waited += 0.1
     
     if not app.connected:
-        print("[TWS] Failed to connect to TWS/IB Gateway")
-        print("[TWS] Make sure TWS or IB Gateway is running with:")
-        print("      - API enabled in settings")
-        print("      - Socket port matches (7497 for paper, 7496 for live)")
-        print("      - 'Read-Only API' unchecked")
         return None
-    
     return app
-
-
-# Test code
-if __name__ == "__main__":
-    print("\n" + "="*70)
-    print(" "*20 + "TWS DATA FETCHER TEST")
-    print("="*70 + "\n")
-    
-    # Connect to TWS (paper trading)
-    print("[TEST] Connecting to TWS paper trading account (port 7497)...")
-    app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=900)
-    
-    if not app:
-        print("\n[FAIL] Could not connect to TWS. Exiting.")
-        exit(1)
-    
-    print("[OK] Connected!\n")
-    
-    # Test 1: Fetch historical data
-    print("+-- TEST 1: Historical Data")
-    print("|   Fetching 1 day of 10-second bars for AAPL...")
-    
-    end_date = datetime.now()
-    bars = app.fetch_historical_bars(
-        symbol="AAPL",
-        end_date=end_date,
-        duration="1 D",
-        bar_size="10 secs"
-    )
-    
-    if bars:
-        print(f"|   [OK] Received {len(bars)} bars")
-        print("|   Sample (first 3 bars):")
-        for i, bar in enumerate(bars[:3], 1):
-            print(f"|     [{i}] {bar['date']} - Close: ${bar['close']:.2f}, Vol: {bar['volume']}, VWAP: ${bar['average']:.2f}")
-    else:
-        print("|   [WARN] No historical data received")
-    print("+" + "-"*68 + "\n")
-    
-    # Test 2: Real-time data
-    print("+-- TEST 2: Real-Time Data")
-    print("|   Subscribing to AAPL real-time data for 10 seconds...")
-    
-    tick_count = [0]
-    
-    def test_callback(symbol, price, volume, vwap, timestamp):
-        tick_count[0] += 1
-        if tick_count[0] <= 5:  # Print first 5 ticks
-            time_str = timestamp.strftime("%H:%M:%S.%f")[:-3]
-            print(f"|   [{time_str}] {symbol}: ${price:.2f} | Vol: {volume:,} | VWAP: ${vwap:.2f}")
-    
-    app.subscribe_realtime_data("AAPL", test_callback)
-    
-    time.sleep(10)
-    
-    print(f"|   [OK] Received {tick_count[0]} ticks in 10 seconds")
-    print("+" + "-"*68 + "\n")
-    
-    # Cleanup
-    app.disconnect()
-    print("="*70)
-    print(" "*24 + "TEST COMPLETE")
-    print("="*70 + "\n")

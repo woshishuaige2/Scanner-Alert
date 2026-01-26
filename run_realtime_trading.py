@@ -198,7 +198,21 @@ def run_trading_bot():
     print("[INIT] Starting Unified Trading Interface...")
     time.sleep(2)
     
+    eod_triggered = False
+    
     while not should_exit:
+        now = datetime.now()
+        
+        # EOD Cleanup Check (3:59 PM ET)
+        if now.hour == 15 and now.minute == 59 and not eod_triggered:
+            print("[EOD] 3:59 PM reached. Triggering final cleanup...")
+            executor.close_all_positions()
+            eod_triggered = True
+        
+        # Reset EOD trigger after market close
+        if now.hour == 16 and eod_triggered:
+            eod_triggered = False
+
         unified_visualization(scanner, filtered_alerts, executor)
         time.sleep(1)
 
