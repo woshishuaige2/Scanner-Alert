@@ -6,7 +6,7 @@ import threading
 import time
 import sys
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 from ibapi.contract import Contract
 from ibapi.order import Order
 
@@ -24,10 +24,16 @@ class ExecutionEngine:
         self.order_to_symbol: Dict[int, str] = {}
         # Trade History: List of completed or failed trade records
         self.trade_history: List[Dict] = []
+        # Blacklisted symbols: symbols rejected by TWS due to permissions/margin
+        self.blacklist: Set[str] = set()
+        
         self.lock = threading.Lock()
         
         # Register order status callback
         self.tws_app.order_status_callbacks.append(self._on_order_status)
+        # Register error callback to detect rejections
+        self.tws_app.error_callbacks = getattr(self.tws_app, 'error_callbacks', [])
+        self.tws_app.error_callbacks.append(self._on_tws_error)
         
     def _create_contract(self, symbol: str) -> Contract:
         contract = Contract()
@@ -36,6 +42,30 @@ class ExecutionEngine:
         contract.exchange = "SMART"
         contract.currency = "USD"
         return contract
+
+    def _on_tws_error(self, reqId: int, errorCode: int, errorString: str):
+        """Detect rejections and blacklist symbols"""
+        # Error 201: Order rejected
+        # Common reasons: No Trading Permission, Margin concern, etc.
+        if errorCode == 201:
+            with self.lock:
+                # Try to find the symbol for this reqId
+                symbol = self.order_to_symbol.get(reqId)
+                if symbol:
+                    print(f"[EXEC] CRITICAL: {symbol} rejected by TWS ({errorString}). Blacklisting for this session.")
+                    self.blacklist.add(symbol)
+                    
+                    # If we had a pending position, move it to history as FAILED
+                    if symbol in self.positions and self.positions[symbol]['status'] == 'SUBMITTED':
+                        pos = self.positions[symbol]
+                        self.trade_history.append({
+                            'symbol': symbol,
+                            'type': 'FAILED',
+                            'reason': f"REJECTED: {errorString[:30]}...",
+                            'entry_price': pos['entry_price'],
+                            'time': datetime.now()
+                        })
+                        self._cleanup_position(symbol)
 
     def _on_order_status(self, orderId, status, filled, remaining, avgFillPrice, parentId):
         """Callback for order status updates from TWS"""
@@ -103,6 +133,10 @@ class ExecutionEngine:
         with self.lock:
             if symbol in self.positions:
                 return True
+            
+            if symbol in self.blacklist:
+                print(f"[EXEC] Skipping {symbol} - symbol is blacklisted due to prior TWS rejection.")
+                return False
 
             # Calculate shares and bracket prices
             shares = int(self.investment_per_trade / entry_price)
@@ -265,3 +299,8 @@ class ExecutionEngine:
         """Returns the history of closed or failed trades"""
         with self.lock:
             return list(self.trade_history)
+    
+    def get_blacklist(self) -> Set[str]:
+        """Returns the set of blacklisted symbols"""
+        with self.lock:
+            return set(self.blacklist)

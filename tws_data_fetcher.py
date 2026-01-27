@@ -144,7 +144,7 @@ class TWSDataApp(EClient, EWrapper):
         """Called when historical data is complete"""
         with self.lock:
             self.historical_complete[reqId] = True
-        print(f"[TWS] Historical data complete for reqId {reqId} ({start} to {end})")
+        print(f"[TWS] Historical data complete for reqId {reqId}")
     
     def tickPrice(self, reqId: TickerId, tickType: int, price: float, attrib: TickAttrib):
         """Handle price ticks"""
@@ -157,7 +157,7 @@ class TWSDataApp(EClient, EWrapper):
                 self.realtime_data[symbol] = {
                     'price': 0.0, 'bid': 0.0, 'ask': 0.0,
                     'last_size': 0, 'bid_size': 0, 'ask_size': 0,
-                    'volume': 0, 'vwap': 0.0
+                    'volume': 0, 'vwap': 0.0, 'syncing': False
                 }
             
         tt = tick_type_str(tickType)
@@ -187,7 +187,7 @@ class TWSDataApp(EClient, EWrapper):
                 self.realtime_data[symbol] = {
                     'price': 0.0, 'bid': 0.0, 'ask': 0.0,
                     'last_size': 0, 'bid_size': 0, 'ask_size': 0,
-                    'volume': 0, 'vwap': 0.0
+                    'volume': 0, 'vwap': 0.0, 'syncing': False
                 }
         
         tt = tick_type_str(tickType)
@@ -244,7 +244,7 @@ class TWSDataApp(EClient, EWrapper):
         symbol: str,
         end_date: datetime,
         duration: str = "1 D",
-        bar_size: str = "10 secs",
+        bar_size: str = "1 min",
         what_to_show: str = "TRADES"
     ) -> List[Dict]:
         """Fetch historical bar data from TWS."""
@@ -267,7 +267,7 @@ class TWSDataApp(EClient, EWrapper):
             durationStr=duration,
             barSizeSetting=bar_size,
             whatToShow=what_to_show,
-            useRTH=1,
+            useRTH=0, # Use 0 to include pre-market for accurate VWAP
             formatDate=1,
             keepUpToDate=False,
             chartOptions=[]
@@ -287,9 +287,56 @@ class TWSDataApp(EClient, EWrapper):
             if req_id in self.historical_data: del self.historical_data[req_id]
             if req_id in self.historical_complete: del self.historical_complete[req_id]
         return bars
-    
+
+    def sync_vwap_from_start_of_day(self, symbol: str):
+        """
+        Synchronize VWAP by fetching all intraday bars since pre-market start.
+        This ensures our calculated VWAP matches charts like Webull.
+        """
+        print(f"[TWS] Synchronizing historical VWAP for {symbol}...")
+        with self.lock:
+            if symbol not in self.realtime_data:
+                self.realtime_data[symbol] = {'price': 0.0, 'vwap': 0.0, 'syncing': True}
+            else:
+                self.realtime_data[symbol]['syncing'] = True
+
+        # Fetch 1-minute bars for the current day
+        # We use a 1-day duration which will give us all bars for the current session including pre-market
+        bars = self.fetch_historical_bars(symbol, datetime.now(), duration="1 D", bar_size="1 min")
+        
+        if not bars:
+            print(f"[TWS] No historical bars found for {symbol}. VWAP will start from current price.")
+            with self.lock:
+                self.realtime_data[symbol]['syncing'] = False
+            return
+
+        total_pv = 0.0
+        total_volume = 0.0
+        
+        for bar in bars:
+            # bar['average'] is the WAP (Weighted Average Price) for that bar
+            # bar['volume'] is the volume for that bar
+            total_pv += bar['average'] * bar['volume']
+            total_volume += bar['volume']
+            
+        if total_volume > 0:
+            vwap = total_pv / total_volume
+            with self.lock:
+                self.realtime_data[symbol]['vwap'] = vwap
+                self.realtime_data[symbol]['cumulative_pv'] = total_pv
+                self.realtime_data[symbol]['cumulative_volume'] = total_volume
+                self.realtime_data[symbol]['last_daily_volume'] = total_volume # Approximation
+                self.realtime_data[symbol]['syncing'] = False
+            print(f"[TWS] {symbol} synced. Historical VWAP: ${vwap:.2f} (Volume: {total_volume:,.0f})")
+        else:
+            with self.lock:
+                self.realtime_data[symbol]['syncing'] = False
+
     def subscribe_market_data(self, symbol: str, callback: Callable):
         """Subscribe to real-time market data."""
+        # First, sync historical VWAP in a separate thread to not block
+        threading.Thread(target=self.sync_vwap_from_start_of_day, args=(symbol,), daemon=True).start()
+
         contract = Contract()
         contract.symbol = symbol
         contract.secType = "STK"
@@ -302,11 +349,12 @@ class TWSDataApp(EClient, EWrapper):
         req_id = self.get_next_req_id()
         with self.lock:
             self.realtime_callbacks[req_id] = (symbol, callback)
-            self.realtime_data[symbol] = {
-                'price': 0.0, 'bid': 0.0, 'ask': 0.0,
-                'last_size': 0, 'bid_size': 0, 'ask_size': 0,
-                'volume': 0, 'vwap': 0.0
-            }
+            if symbol not in self.realtime_data:
+                self.realtime_data[symbol] = {
+                    'price': 0.0, 'bid': 0.0, 'ask': 0.0,
+                    'last_size': 0, 'bid_size': 0, 'ask_size': 0,
+                    'volume': 0, 'vwap': 0.0, 'syncing': True
+                }
         
         self.reqMarketDataType(1)
         # genericTickList 233 is for RT_VWAP
