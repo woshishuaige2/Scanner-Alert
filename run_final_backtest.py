@@ -16,14 +16,14 @@ from tws_data_fetcher import create_tws_data_app
 
 # NGROK CONFIGURATION
 NGROK_HOST = "6.tcp.ngrok.io"
-NGROK_PORT = 16386
+NGROK_PORT = 18408
 
 # INPUT FILE CONFIGURATION
 INPUT_FILE = "days_with_more_than_2_symbols.txt"
 
 # FALLBACK CONFIGURATION (Used if INPUT_FILE is missing or empty)
-FALLBACK_SYMBOLS = ["SPHL"]
-FALLBACK_DATE = "2026-01-15"
+FALLBACK_SYMBOLS = ["TWNP","FAT"]
+FALLBACK_DATE = "2026-01-30"
 
 # Scenarios: (Take Profit %, Stop Loss %)
 SCENARIOS = [(2.0, 1.0), (4.0, 2.0), (10.0, 5.0), (20.0, 10.0), (1.0, 10.0)]

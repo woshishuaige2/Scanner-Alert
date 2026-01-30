@@ -1,0 +1,508 @@
+2026-01-27 10:39:37.834967: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-01-27 10:39:37.835968: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-27 10:39:37.835968: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:afarm
+2026-01-27 10:39:37.836970: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-27 10:39:37.836970: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-27 10:39:37.836970: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-27 10:39:37.836970: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-27 10:39:37.837966: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-27 10:39:37.837966: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-27 10:39:39.948131: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7.44 to 7
+2026-01-27 10:39:40.337434: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 30.34 to 30
+2026-01-27 10:39:40.551565: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.15 to 1
+2026-01-27 10:39:40.952713: ReqId=2013, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5.12 to 5
+2026-01-27 10:39:41.020601: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7.14 to 7
+2026-01-27 10:39:41.232650: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.71 to 4
+2026-01-27 10:40:54.392992: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-01-27 10:40:54.392992: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-27 10:40:54.392992: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:afarm
+2026-01-27 10:40:54.395993: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-27 10:40:54.396991: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-27 10:40:54.396991: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-27 10:40:54.396991: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-27 10:40:54.396991: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-27 10:40:54.396991: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-27 10:40:59.738539: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 10.36 to 10
+2026-01-27 10:40:59.890410: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 680.52 to 680
+2026-01-27 10:40:59.929528: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.27 to 3
+2026-01-27 10:41:00.031518: ReqId=2012, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2768.82 to 2768
+2026-01-27 10:41:00.112082: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1336.71 to 1336
+2026-01-27 10:41:00.330657: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 457.1 to 457
+2026-01-27 10:42:24.511623: ReqId=365, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 10:42:24.512624: ReqId=364, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 10:42:24.566182: ReqId=366, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 10:42:24.569182: ReqId=366, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 10:43:06.257406: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-27 10:43:33.116440: ReqId=365, Code=202, Msg=Order Canceled - reason:
+2026-01-27 10:44:23.645409: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-01-27 10:44:23.646407: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-27 10:44:23.646407: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-27 10:44:23.647410: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:afarm
+2026-01-27 10:44:23.647410: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-27 10:44:23.647410: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-27 10:44:23.648412: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-27 10:44:23.648412: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-27 10:44:23.648412: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-27 10:44:23.649414: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-27 10:44:26.533806: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 10.36 to 10
+2026-01-27 10:44:26.920040: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2768.82 to 2768
+2026-01-27 10:44:27.188351: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 457.1 to 457
+2026-01-27 10:44:27.417962: ReqId=2013, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1336.71 to 1336
+2026-01-27 10:44:27.472800: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 680.52 to 680
+2026-01-27 10:44:27.598542: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.27 to 3
+2026-01-27 10:46:19.736136: ReqId=367, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 10:46:19.823154: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-01-27 10:46:19.826153: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.afarm
+2026-01-27 10:46:19.828157: ReqId=368, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 10:46:19.831154: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-01-27 10:46:19.831154: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.afarm
+2026-01-27 10:46:19.923265: ReqId=369, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 10:46:19.924263: ReqId=369, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 10:48:23.319518: ReqId=368, Code=202, Msg=Order Canceled - reason:
+2026-01-27 10:48:33.316747: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:afarm
+2026-01-27 10:48:33.520114: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-01-27 10:52:26.385576: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarm
+2026-01-27 10:52:26.388554: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarm
+2026-01-27 10:52:26.392570: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usopt.nj
+2026-01-27 10:52:26.399109: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usopt.nj
+2026-01-27 10:54:04.102315: ReqId=370, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 10:54:04.196426: ReqId=371, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 10:54:04.295512: ReqId=372, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 10:54:04.296513: ReqId=372, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 10:54:04.812549: ReqId=370, Code=2161, Msg=BUY 828 SAFX NASDAQ.SCM  In accordance with our regulatory obligations as a broker, we will initially cap (or limit) the price of your Limit Order to 0.2424 or a more aggressive price still within your specified limit price.  If your order is not immediately executable, our systems may, depending on market conditions, cap your order to a limit price that is no more than the allowed amount away from the reference price at that time. If this happens, you will not receive a fill. This is a control designed to ensure that we comply with our regulatory obligations to avoid submitting disruptive orders to the marketplace. Please note that in some circumstances this may result in you receiving a less favorable fill or not receiving a fill.  In the future, please submit your order using a limit price that is closer to the current market price or submit an algorithmic Market Order (IBALGO).  If you would like to cancel your order, please use cancel order action.
+2026-01-27 10:54:05.418443: ReqId=370, Code=399, Msg=Order Message: BUY 828 SAFX NASDAQ.SCM Warning: Your order was repriced so as not to cross a related resting order.
+2026-01-27 10:55:00.189084: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-27 10:55:01.265244: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-27 10:56:00.556111: ReqId=371, Code=202, Msg=Order Canceled - reason:
+2026-01-27 10:58:26.403789: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-01-27 10:58:26.406776: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-01-27 10:58:26.410787: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.afarm
+2026-01-27 10:58:26.412780: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.afarm
+2026-01-27 10:58:26.414777: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usopt.nj
+2026-01-27 10:58:26.415777: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usopt.nj
+2026-01-27 11:13:37.134621: ReqId=373, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 11:13:37.199649: ReqId=374, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 11:13:37.302167: ReqId=375, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 11:13:37.303175: ReqId=375, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 11:13:37.376183: ReqId=373, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 11:13:37.473634: ReqId=374, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 11:13:37.475633: ReqId=375, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 11:54:29.463289: ReqId=376, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 11:54:29.556823: ReqId=377, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 11:54:29.656016: ReqId=378, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 11:54:29.661023: ReqId=378, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 11:54:29.910904: ReqId=376, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 11:54:29.914904: ReqId=377, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 11:54:29.919904: ReqId=378, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:11:28.971147: ReqId=379, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 12:11:29.070280: ReqId=380, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 12:11:29.173309: ReqId=381, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 12:11:29.176308: ReqId=381, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 12:11:29.308487: ReqId=379, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:11:29.312485: ReqId=380, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:11:29.321486: ReqId=381, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:13:20.112560: ReqId=383, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 12:13:20.119560: ReqId=382, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 12:13:20.195485: ReqId=384, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 12:13:20.196487: ReqId=384, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 12:13:20.363057: ReqId=382, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:13:20.366563: ReqId=383, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:13:20.376564: ReqId=384, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:57:38.012532: ReqId=385, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 12:57:38.109214: ReqId=386, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 12:57:38.205177: ReqId=387, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 12:57:38.206178: ReqId=387, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 12:57:38.259378: ReqId=385, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:57:38.264379: ReqId=386, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 12:57:38.269378: ReqId=387, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 13:32:14.848003: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-01-27 13:32:14.873511: ReqId=-1, Code=2105, Msg=HMDS data farm connection is broken:ushmds
+2026-01-27 13:32:14.884019: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usfarm.nj
+2026-01-27 13:32:14.895018: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usfarm
+2026-01-27 13:32:14.908530: ReqId=-1, Code=2105, Msg=HMDS data farm connection is broken:fundfarm
+2026-01-27 13:32:14.913530: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:eufarm
+2026-01-27 13:32:15.127868: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-27 13:32:15.140871: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-27 13:32:15.470666: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-27 13:32:15.629520: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-27 13:32:15.734170: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-27 13:32:16.095065: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-27 13:32:20.570748: ReqId=2016, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:20.573742: ReqId=2008, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:20.577740: ReqId=2010, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:20.580744: ReqId=2006, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:20.583744: ReqId=2012, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:20.586746: ReqId=2014, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:50.484212: ReqId=2006, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:50.486217: ReqId=2008, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:50.489216: ReqId=2016, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:50.491220: ReqId=2010, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:50.494223: ReqId=2014, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:32:50.497222: ReqId=2012, Code=10197, Msg=No market data during competing live session
+2026-01-27 13:39:11.146465: ReqId=388, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 13:39:11.244425: ReqId=389, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 13:39:11.342950: ReqId=390, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 13:39:11.344950: ReqId=390, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 13:41:23.329996: ReqId=390, Code=202, Msg=Order Canceled - reason:
+2026-01-27 14:39:34.125369: ReqId=392, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 14:39:34.129372: ReqId=391, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 14:39:34.215732: ReqId=393, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 14:39:34.216732: ReqId=393, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 14:40:38.515135: ReqId=393, Code=202, Msg=Order Canceled - reason:
+2026-01-27 15:07:02.244448: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-27 15:07:02.245447: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-27 15:07:02.245897: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-27 15:07:02.246448: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-27 15:07:02.246448: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-27 15:07:02.246448: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-27 15:07:02.246448: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-27 15:07:04.371191: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 457.1 to 457
+2026-01-27 15:07:04.665423: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.27 to 3
+2026-01-27 15:07:04.959210: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 680.52 to 680
+2026-01-27 15:07:05.268158: ReqId=2013, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2768.82 to 2768
+2026-01-27 15:07:05.332188: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1336.71 to 1336
+2026-01-27 15:07:05.464078: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 10.36 to 10
+2026-01-27 15:36:37.092935: ReqId=394, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:36:37.192460: ReqId=395, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:36:37.290156: ReqId=396, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:36:37.293155: ReqId=396, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:36:37.342307: ReqId=394, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:36:37.347305: ReqId=395, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:36:37.350305: ReqId=396, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:37:49.847421: ReqId=397, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:37:49.935126: ReqId=398, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:37:50.048602: ReqId=399, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:37:50.055119: ReqId=399, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:37:50.100132: ReqId=397, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:37:50.105641: ReqId=398, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:37:50.110641: ReqId=399, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:38:50.582286: ReqId=400, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:38:50.681820: ReqId=401, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:38:50.778800: ReqId=402, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:38:50.779801: ReqId=402, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:38:50.822207: ReqId=400, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:38:50.870246: ReqId=401, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:38:50.875178: ReqId=402, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:42:58.795547: ReqId=403, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:42:58.887081: ReqId=404, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:42:58.985620: ReqId=405, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:42:58.986617: ReqId=405, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:42:59.033666: ReqId=403, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 15:42:59.086203: ReqId=404, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 15:42:59.091201: ReqId=405, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 15:45:32.377199: ReqId=406, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:45:32.473123: ReqId=407, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:45:32.587808: ReqId=408, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:45:32.602806: ReqId=408, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:45:32.645191: ReqId=406, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:45:32.705410: ReqId=407, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:45:32.708410: ReqId=408, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:46:42.951676: ReqId=409, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:46:43.043685: ReqId=410, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:46:43.143436: ReqId=411, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 15:46:43.145478: ReqId=411, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 15:46:43.196038: ReqId=409, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:46:43.203037: ReqId=410, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 15:46:43.206036: ReqId=411, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-27 16:16:57.578962: ReqId=412, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:16:57.667692: ReqId=413, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:16:57.765580: ReqId=414, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:16:57.767583: ReqId=414, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:16:57.810094: ReqId=412, Code=399, Msg=Order Message: BUY 695 SAFX NASDAQ.SCM Warning: Your order will not be placed at the exchange until 2026-01-28 09:30:00 US/Eastern.
+2026-01-27 16:27:42.354564: ReqId=415, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:27:42.443585: ReqId=416, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:27:42.543412: ReqId=417, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:27:42.546412: ReqId=417, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:27:42.589323: ReqId=415, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:27:42.646976: ReqId=416, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:27:42.655485: ReqId=417, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:29:18.570215: ReqId=418, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:29:18.663748: ReqId=419, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:29:18.772075: ReqId=420, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:29:18.775073: ReqId=420, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:29:18.814600: ReqId=418, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:29:18.871416: ReqId=419, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:29:18.876411: ReqId=420, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:30:55.296294: ReqId=421, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:30:55.392310: ReqId=422, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:30:55.491220: ReqId=423, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-27 16:30:55.494219: ReqId=423, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-27 16:30:55.533472: ReqId=421, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:30:55.582566: ReqId=422, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 16:30:55.586604: ReqId=423, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  Margin concern/risk management: For risk management purposes, this product is in closing-only status. You may close existing positions but not open new ones.
+2026-01-27 17:04:04.360285: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-01-27 17:04:04.871227: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-27 17:09:04.731751: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-01-27 17:09:05.127934: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-01-27 17:09:09.476881: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-28 08:05:27.359703: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-01-28 08:05:27.361701: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarmnj
+2026-01-28 08:05:27.361701: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-28 08:05:27.362703: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfuture
+2026-01-28 08:05:27.362703: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-28 08:05:27.362703: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-01-28 08:05:27.363705: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-28 08:05:27.363705: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-28 08:05:27.363705: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-28 08:05:27.363705: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-28 08:05:27.364702: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-28 08:05:27.364702: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-28 08:05:27.364702: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-28 08:05:29.152358: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.5 to 2
+2026-01-28 08:05:29.374913: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2621.78 to 2621
+2026-01-28 08:05:29.659568: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 164.01 to 164
+2026-01-28 08:05:30.122860: ReqId=2013, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 28.23 to 28
+2026-01-28 08:05:30.193377: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.43 to 3
+2026-01-28 08:05:30.255559: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.05 to 3
+2026-01-28 08:09:01.960833: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-01-28 08:09:01.962833: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-01-28 08:09:01.967832: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-01-28 08:09:01.971339: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-01-28 08:09:01.973338: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-01-28 08:09:01.974339: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-01-28 08:09:01.977340: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-01-28 08:09:01.977340: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-01-28 08:29:30.848904: ReqId=424, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 08:29:30.892918: ReqId=425, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 08:29:30.976423: ReqId=426, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 08:29:30.980929: ReqId=426, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 08:55:05.894931: ReqId=427, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 08:55:05.944958: ReqId=428, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 08:55:06.044020: ReqId=429, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 08:55:06.050018: ReqId=429, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 09:30:10.793403: ReqId=414, Code=2161, Msg=SELL 695 SAFX NASDAQ.SCM  In accordance with our regulatory obligations as a broker, we will initially cap (or limit) the price of your Limit Order to 0.2220 or a more aggressive price still within your specified limit price.  If your order is not immediately executable, our systems may, depending on market conditions, cap your order to a limit price that is no more than the allowed amount away from the reference price at that time. If this happens, you will not receive a fill. This is a control designed to ensure that we comply with our regulatory obligations to avoid submitting disruptive orders to the marketplace. Please note that in some circumstances this may result in you receiving a less favorable fill or not receiving a fill.  In the future, please submit your order using a limit price that is closer to the current market price or submit an algorithmic Market Order (IBALGO).  If you would like to cancel your order, please use cancel order action.
+2026-01-28 09:30:11.148580: ReqId=413, Code=202, Msg=Order Canceled - reason:
+2026-01-28 09:30:15.857313: ReqId=425, Code=202, Msg=Order Canceled - reason:
+2026-01-28 09:30:42.067595: ReqId=429, Code=2161, Msg=SELL 256 TIRX NASDAQ.SCM  In accordance with our regulatory obligations as a broker, we will initially cap (or limit) the price of your Limit Order to 0.6055 or a more aggressive price still within your specified limit price.  If your order is not immediately executable, our systems may, depending on market conditions, cap your order to a limit price that is no more than the allowed amount away from the reference price at that time. If this happens, you will not receive a fill. This is a control designed to ensure that we comply with our regulatory obligations to avoid submitting disruptive orders to the marketplace. Please note that in some circumstances this may result in you receiving a less favorable fill or not receiving a fill.  In the future, please submit your order using a limit price that is closer to the current market price or submit an algorithmic Market Order (IBALGO).  If you would like to cancel your order, please use cancel order action.
+2026-01-28 09:30:54.002249: ReqId=428, Code=202, Msg=Order Canceled - reason:
+2026-01-28 09:33:23.214470: ReqId=430, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 09:33:23.300653: ReqId=431, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 09:33:23.398120: ReqId=432, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 09:33:23.399121: ReqId=432, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 09:33:29.386417: ReqId=432, Code=202, Msg=Order Canceled - reason:
+2026-01-28 09:34:27.586016: ReqId=433, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 09:34:27.683492: ReqId=434, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 09:34:27.785530: ReqId=435, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 09:34:27.791527: ReqId=435, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 09:34:32.386654: ReqId=435, Code=202, Msg=Order Canceled - reason:
+2026-01-28 09:36:16.216391: ReqId=436, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 09:36:16.306725: ReqId=437, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 09:36:16.414058: ReqId=438, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 09:36:16.420058: ReqId=438, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 09:36:45.823779: ReqId=438, Code=202, Msg=Order Canceled - reason:
+2026-01-28 10:03:01.982796: ReqId=439, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 10:03:02.077939: ReqId=440, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 10:03:02.180307: ReqId=441, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 10:03:02.181308: ReqId=441, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 10:06:37.887612: ReqId=440, Code=202, Msg=Order Canceled - reason:
+2026-01-28 10:10:54.920232: ReqId=443, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 10:10:54.925235: ReqId=442, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 10:10:54.983245: ReqId=444, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 10:10:54.985753: ReqId=444, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 10:12:39.374221: ReqId=444, Code=202, Msg=Order Canceled - reason:
+2026-01-28 10:12:39.782723: ReqId=445, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 10:12:39.875352: ReqId=446, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 10:12:39.975843: ReqId=447, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 10:12:39.976845: ReqId=447, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 10:14:52.582144: ReqId=447, Code=202, Msg=Order Canceled - reason:
+2026-01-28 12:18:36.994215: ReqId=449, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 12:18:36.995720: ReqId=448, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 12:18:37.089746: ReqId=450, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 12:18:37.091753: ReqId=450, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 12:18:37.147243: ReqId=448, Code=2161, Msg=BUY 250 TIRX NASDAQ.SCM  In accordance with our regulatory obligations as a broker, we will initially cap (or limit) the price of your Limit Order to 0.7960 or a more aggressive price still within your specified limit price.  If your order is not immediately executable, our systems may, depending on market conditions, cap your order to a limit price that is no more than the allowed amount away from the reference price at that time. If this happens, you will not receive a fill. This is a control designed to ensure that we comply with our regulatory obligations to avoid submitting disruptive orders to the marketplace. Please note that in some circumstances this may result in you receiving a less favorable fill or not receiving a fill.  In the future, please submit your order using a limit price that is closer to the current market price or submit an algorithmic Market Order (IBALGO).  If you would like to cancel your order, please use cancel order action.
+2026-01-28 12:20:11.907710: ReqId=450, Code=202, Msg=Order Canceled - reason:
+2026-01-28 12:20:12.410021: ReqId=451, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 12:20:12.509819: ReqId=452, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 12:20:12.608426: ReqId=453, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 12:20:12.608426: ReqId=453, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 12:23:17.359142: ReqId=453, Code=2161, Msg=SELL 239 TIRX NASDAQ.SCM  In accordance with our regulatory obligations as a broker, we will initially cap (or limit) the price of your Limit Order to 0.7881 or a more aggressive price still within your specified limit price.  If your order is not immediately executable, our systems may, depending on market conditions, cap your order to a limit price that is no more than the allowed amount away from the reference price at that time. If this happens, you will not receive a fill. This is a control designed to ensure that we comply with our regulatory obligations to avoid submitting disruptive orders to the marketplace. Please note that in some circumstances this may result in you receiving a less favorable fill or not receiving a fill.  In the future, please submit your order using a limit price that is closer to the current market price or submit an algorithmic Market Order (IBALGO).  If you would like to cancel your order, please use cancel order action.
+2026-01-28 12:23:18.110209: ReqId=452, Code=202, Msg=Order Canceled - reason:
+2026-01-28 12:31:11.891730: ReqId=454, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 12:31:11.984764: ReqId=455, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 12:31:12.082106: ReqId=456, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-28 12:31:12.083611: ReqId=456, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-28 12:31:12.145177: ReqId=454, Code=2161, Msg=BUY 206 TIRX NASDAQ.SCM  In accordance with our regulatory obligations as a broker, we will initially cap (or limit) the price of your Limit Order to 0.9179 or a more aggressive price still within your specified limit price.  If your order is not immediately executable, our systems may, depending on market conditions, cap your order to a limit price that is no more than the allowed amount away from the reference price at that time. If this happens, you will not receive a fill. This is a control designed to ensure that we comply with our regulatory obligations to avoid submitting disruptive orders to the marketplace. Please note that in some circumstances this may result in you receiving a less favorable fill or not receiving a fill.  In the future, please submit your order using a limit price that is closer to the current market price or submit an algorithmic Market Order (IBALGO).  If you would like to cancel your order, please use cancel order action.
+2026-01-28 12:31:13.763655: ReqId=455, Code=202, Msg=Order Canceled - reason:
+2026-01-29 09:30:09.478604: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-29 09:30:09.480602: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-29 09:30:09.481605: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-29 09:30:09.481605: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-29 09:30:09.482604: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-29 09:30:09.482604: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-29 09:30:09.482604: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-29 09:30:09.483607: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-29 09:30:09.483607: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-29 09:30:11.445642: ReqId=2005, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 9347.59 to 9347
+2026-01-29 09:30:11.573039: ReqId=2006, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16.98 to 16
+2026-01-29 09:30:11.872800: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.02 to 2
+2026-01-29 09:30:12.182478: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3353.86 to 3353
+2026-01-29 09:33:40.125702: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-29 09:33:40.126703: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-29 09:33:40.126703: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-29 09:33:40.127714: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-29 09:33:40.127714: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-29 09:33:40.128715: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-29 09:33:40.129711: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-29 09:33:40.129711: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-29 09:33:40.130712: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-29 09:33:42.751174: ReqId=2006, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16.98 to 16
+2026-01-29 09:33:42.950869: ReqId=2008, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3353.86 to 3353
+2026-01-29 09:33:43.246686: ReqId=2010, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 9347.59 to 9347
+2026-01-29 09:33:43.776177: ReqId=2012, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 159.61 to 159
+2026-01-29 09:33:43.874893: ReqId=2014, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.02 to 2
+2026-01-29 09:51:22.054637: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-29 09:51:22.057639: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-29 09:51:22.057639: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-29 09:51:22.058638: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-29 09:51:22.058638: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-29 09:51:22.059636: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-29 09:51:22.059636: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-29 09:51:22.059636: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-29 09:51:22.059636: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-29 09:51:23.973373: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16.98 to 16
+2026-01-29 09:51:24.291155: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.02 to 2
+2026-01-29 09:51:24.480378: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 9347.59 to 9347
+2026-01-29 09:51:24.777763: ReqId=2013, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3353.86 to 3353
+2026-01-29 09:51:24.859054: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 159.61 to 159
+2026-01-29 09:51:25.111260: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 102.55 to 102
+2026-01-29 09:53:23.017988: ReqId=424, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 09:53:23.071490: ReqId=425, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 09:53:23.126511: ReqId=426, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 09:53:23.132512: ReqId=426, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 09:53:36.155858: ReqId=426, Code=202, Msg=Order Canceled - reason:
+2026-01-29 09:54:50.855036: ReqId=427, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 09:54:50.955581: ReqId=428, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 09:54:51.216688: ReqId=429, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 09:54:51.220686: ReqId=429, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 09:55:24.431778: ReqId=428, Code=202, Msg=Order Canceled - reason:
+2026-01-29 10:09:50.678967: ReqId=431, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 10:09:50.687965: ReqId=430, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 10:09:50.761991: ReqId=432, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 10:09:50.762994: ReqId=432, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 10:10:13.462584: ReqId=431, Code=202, Msg=Order Canceled - reason:
+2026-01-29 11:22:57.176555: ReqId=434, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 11:22:57.177556: ReqId=433, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 11:22:57.255572: ReqId=435, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 11:22:57.259082: ReqId=435, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 11:38:58.593135: ReqId=435, Code=202, Msg=Order Canceled - reason:
+2026-01-29 11:40:23.621385: ReqId=436, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 11:40:23.715454: ReqId=437, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 11:40:23.814975: ReqId=438, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 11:40:23.816478: ReqId=438, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 11:40:24.053785: ReqId=437, Code=202, Msg=Order Canceled - reason:
+2026-01-29 12:23:26.834615: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-29 12:23:26.834615: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-29 12:23:26.835615: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-29 12:23:26.835615: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-29 12:23:26.835615: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-29 12:23:26.835615: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-29 12:23:26.836615: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-29 12:23:26.836615: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-29 12:23:26.836615: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-29 12:23:29.189129: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 161.58 to 161
+2026-01-29 12:23:29.381208: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3353.86 to 3353
+2026-01-29 12:23:29.543583: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 102.55 to 102
+2026-01-29 12:23:29.708224: ReqId=2013, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.5 to 2
+2026-01-29 12:23:29.860280: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 159.61 to 159
+2026-01-29 12:23:30.098603: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16.5 to 16
+2026-01-29 13:05:20.383766: ReqId=439, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 13:05:20.447788: ReqId=440, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 13:05:20.546430: ReqId=441, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 13:05:20.548429: ReqId=441, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 13:08:29.848942: ReqId=441, Code=202, Msg=Order Canceled - reason:
+2026-01-29 15:10:05.977721: ReqId=442, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 15:10:06.022092: ReqId=443, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 15:10:06.095229: ReqId=444, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 15:10:06.098745: ReqId=444, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 15:10:06.207404: ReqId=442, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-29 15:10:06.226411: ReqId=443, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-29 15:10:06.230416: ReqId=444, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-29 15:20:53.907753: ReqId=445, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 15:20:54.006060: ReqId=446, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 15:20:54.103479: ReqId=447, Code=10349, Msg=Order TIF was set to GTC based on order preset.
+2026-01-29 15:20:54.104479: ReqId=447, Code=2109, Msg=Order Event Warning:Attribute 'Outside Regular Trading Hours' is ignored based on the order type and destination. PlaceOrder is now being processed.
+2026-01-29 15:20:54.161203: ReqId=445, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-29 15:20:54.167209: ReqId=446, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-29 15:20:54.172526: ReqId=447, Code=201, Msg=Order rejected - reason:No Trading Permission, Customer Ineligible; Ineligibility reasons:  No Opening Trades: Small Cap, Subject to Compliance Restriction
+2026-01-29 17:04:04.282114: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-01-29 17:04:04.525799: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-01-29 17:04:06.918099: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-30 09:35:48.286131: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-30 09:35:48.289130: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-30 09:35:48.290132: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-30 09:35:48.291132: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-30 09:35:48.292130: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-30 09:35:48.293132: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-30 09:35:48.294133: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-30 09:35:48.294133: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-30 09:35:48.295133: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-30 09:35:51.464020: ReqId=2005, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 20.1 to 20
+2026-01-30 09:35:51.933464: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 357.24 to 357
+2026-01-30 09:35:52.028538: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 408.72 to 408
+2026-01-30 09:35:52.485334: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 284.23 to 284
+2026-01-30 09:46:11.888674: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-30 09:46:11.889676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-30 09:46:11.889676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-30 09:46:11.889676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-30 09:46:11.889676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-30 09:46:11.890675: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-30 09:46:11.890675: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-30 09:46:11.891125: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-30 09:46:11.891125: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-30 09:46:14.232725: ReqId=2005, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 408.72 to 408
+2026-01-30 09:46:14.532713: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 20.1 to 20
+2026-01-30 09:46:14.940438: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 284.23 to 284
+2026-01-30 09:46:15.266201: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 357.24 to 357
+2026-01-30 09:53:52.825025: ReqId=-1, Code=502, Msg=Couldn't connect to TWS. Confirm that "Enable ActiveX and Socket EClients" 
+is enabled and connection port is the same as "Socket Port" on the 
+TWS "Edit->Global Configuration...->API->Settings" menu. Live Trading ports: 
+TWS: 7496; IB Gateway: 4001. Simulated Trading ports for new installations 
+of version 954.1 or newer:  TWS: 7497; IB Gateway: 4002
+2026-01-30 09:54:37.855473: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-30 09:54:37.855981: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-30 09:54:37.855981: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-30 09:54:37.855981: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-30 09:54:37.856991: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-30 09:54:37.856991: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-30 09:54:37.856991: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-30 09:54:37.856991: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-30 09:54:37.857990: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-30 09:56:12.824072: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-30 09:56:12.824941: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-30 09:56:12.824941: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-30 09:56:12.824941: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-30 09:56:12.825944: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-30 09:56:12.825944: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-30 09:56:12.825944: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-30 09:56:12.826944: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-30 09:56:12.826944: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-30 09:56:13.364132: ReqId=2000, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 256.94 to 256
+2026-01-30 09:56:19.327517: ReqId=2001, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.36 to 4
+2026-01-30 09:56:31.142538: ReqId=2002, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 6.425 to 6
+2026-01-30 09:57:13.457550: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-30 09:57:13.458053: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-30 09:57:13.458053: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-30 09:57:13.459058: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-30 09:57:13.459058: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-30 09:57:13.459058: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-30 09:57:13.459058: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-30 09:57:13.460058: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-30 09:57:13.460058: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-30 09:57:13.765021: ReqId=2000, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 256.94 to 256
+2026-01-30 09:57:19.752365: ReqId=2001, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.36 to 4
+2026-01-30 09:57:31.673567: ReqId=2002, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 6.425 to 6
+2026-01-30 10:04:11.201833: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-01-30 10:04:11.202833: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-01-30 10:04:11.202833: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-01-30 10:04:11.206833: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-01-30 10:04:11.206833: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-01-30 10:04:11.206833: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-01-30 10:04:11.206833: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-01-30 10:04:11.207831: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-01-30 10:04:11.207831: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-01-30 10:04:16.231051: ReqId=2007, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5.2 to 5
+2026-01-30 10:04:16.635976: ReqId=2009, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 940.22 to 940
+2026-01-30 10:04:16.920137: ReqId=2011, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.52 to 23
+2026-01-30 10:04:17.133976: ReqId=2013, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-01-30 10:04:17.279240: ReqId=2015, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 21.66 to 21
+2026-01-30 10:04:17.428943: ReqId=2017, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 123.36 to 123

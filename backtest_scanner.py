@@ -8,7 +8,7 @@ from conditions import (
     AlertConditionSet,
     MarketData,
     PriceAboveVWAPCondition,
-    UnifiedMomentumCondition
+    SqueezeCondition
 )
 
 # Import TWS integration - REQUIRED
@@ -71,7 +71,7 @@ class BacktestAlertScanner:
         for symbol in self.symbols:
             cs = AlertConditionSet(f"{symbol}_backtest")
             # Unified Strict Momentum Logic
-            cs.add_condition(UnifiedMomentumCondition())
+            cs.add_condition(SqueezeCondition())
             self.condition_sets[symbol] = cs
 
     def add_candle(self, symbol, ts, o, h, l, c, v, vwap):

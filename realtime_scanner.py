@@ -10,6 +10,7 @@ from collections import deque
 import scanner_config as config
 import xml.etree.ElementTree as ET
 from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition
+import platform
 
 class RealtimeSymbolMonitor:
     def __init__(self, symbol: str):
@@ -28,6 +29,7 @@ class RealtimeSymbolMonitor:
         
         # Screening results
         self.triggered_conditions = []
+        self.last_alert_time = None  # Track when last alert triggered
         
         # Initialize Preliminary Condition Set
         self.condition_set = AlertConditionSet("Preliminary")
@@ -65,9 +67,12 @@ class RealtimeSymbolMonitor:
         
         if self.condition_set.check_all(data):
             self.triggered_conditions = [self.condition_set.get_trigger_summary()]
+            self.last_alert_time = self.last_update
             return self.triggered_conditions
         else:
-            self.triggered_conditions = []
+            # Keep triggered_conditions to show recent alerts, only clear after timeout
+            if self.last_alert_time and (self.last_update - self.last_alert_time) > timedelta(minutes=5):
+                self.triggered_conditions = []
             return []
 
 class RealtimeBroadScanner:
@@ -75,6 +80,7 @@ class RealtimeBroadScanner:
         self.symbols = symbols
         self.monitors = {s: RealtimeSymbolMonitor(s) for s in symbols}
         self.alert_callback = None
+        self.recent_alerts = deque(maxlen=10)  # Store last 10 alerts
 
     def on_preliminary_alert(self, callback: Callable):
         self.alert_callback = callback
@@ -86,7 +92,9 @@ class RealtimeBroadScanner:
             
             triggered = monitor.check_screening_conditions()
             if triggered and self.alert_callback:
-                self.alert_callback(symbol, datetime.now(), triggered, monitor)
+                alert_time = datetime.now()
+                self.recent_alerts.append((alert_time, symbol, triggered))
+                self.alert_callback(symbol, alert_time, triggered, monitor)
 
     def load_fundamentals(self, tws_app):
         print("[SCANNER] Loading fundamental data for screening...")
@@ -118,17 +126,41 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
         price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
         float_str = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
         rvol = f"{m.relative_volume:.2f}x"
-        alerts = ", ".join(m.triggered_conditions) if m.triggered_conditions else "--"
+        
+        # Show alerts with timestamp if recently triggered
+        if m.triggered_conditions and m.last_alert_time:
+            time_ago = datetime.now() - m.last_alert_time
+            mins_ago = int(time_ago.total_seconds() / 60)
+            secs_ago = int(time_ago.total_seconds() % 60)
+            if mins_ago > 0:
+                time_str = f"({mins_ago}m{secs_ago}s ago)"
+            else:
+                time_str = f"({secs_ago}s ago)"
+            alerts = f"{', '.join(m.triggered_conditions)} {time_str}"
+        else:
+            alerts = "--"
         
         print(f"{symbol:<8} | {price:<10} | {float_str:<12} | {rvol:<12} | {alerts}")
+    
     print("="*110)
+    
+    # Display recently triggered alerts
+    if scanner.recent_alerts:
+        print("\n🔔 RECENTLY TRIGGERED ALERTS:")
+        print("-"*110)
+        for alert_time, symbol, reasons in list(scanner.recent_alerts)[-5:]:  # Show last 5
+            time_str = alert_time.strftime('%H:%M:%S')
+            reason_str = ", ".join(reasons)
+            print(f"  [{time_str}] {symbol}: {reason_str}")
+        print("="*110)
+    
     print("[INFO] Preliminary screening active. Waiting for triggers...")
 
 def run_standalone_scanner():
     from tws_data_fetcher import create_tws_data_app
     
     # Use a default symbol list for standalone mode
-    SYMBOLS = ["MOVE", "BNAI", "DRCT", "THH", "REVB", "MAXN"] 
+    SYMBOLS = ["TWNP", "FAT", "VIVS","RPGL"] 
     unique_symbols = list(set(SYMBOLS))
     
     print("[INIT] Connecting to TWS for standalone scanner...")
@@ -145,8 +177,21 @@ def run_standalone_scanner():
         voice_reason = "Squeeze detected" if "Squeeze" in str(reasons) else "Momentum alert"
         alert_msg = f"Alert! {symbol} triggered {voice_reason}"
         print(f"[ALERT] {alert_msg}")
-        # espeak is pre-installed in the sandbox
-        os.system(f'espeak "{alert_msg}" 2>/dev/null')
+        
+        # Voice announcement - platform-specific
+        try:
+            if platform.system() == "Windows":
+                # Windows: Use PowerShell with SAPI
+                import subprocess
+                # Escape quotes for PowerShell
+                ps_script = f'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak("{symbol}")'
+                subprocess.run(["powershell", "-Command", ps_script], 
+                             capture_output=True, timeout=5)
+            else:
+                # Linux/Mac: Use espeak
+                os.system(f'espeak "{alert_msg}" 2>/dev/null')
+        except Exception as e:
+            print(f"[WARNING] Voice announcement failed: {e}")
 
     scanner.on_preliminary_alert(alert_handler)
     

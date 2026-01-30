@@ -18,10 +18,10 @@ from tws_data_fetcher import create_tws_data_app
 import scanner_config as config
 
 # CONFIGURATION
-SYMBOLS = ["MOVE", "BNAI", "DRCT", "THH", "REVB", "MAXN"]
-INVESTMENT_PER_TRADE = 100.0
-TP_PCT = 1.0
-SL_PCT = 10.0
+SYMBOLS = ["TCGL", "SGN", "CATX", "XPON","SER", "FEED"]
+INVESTMENT_PER_TRADE = 500.0
+TP_PCT = 5.0  
+SL_PCT = 5.0
 ACCOUNT_NUMBER = "DUO200259" # !!! IMPORTANT: REPLACE WITH YOUR IBKR PAPER TRADING ACCOUNT NUMBER !!!
 
 # Global state
