@@ -70,8 +70,9 @@ class BacktestAlertScanner:
     def _initialize_condition_sets(self):
         for symbol in self.symbols:
             cs = AlertConditionSet(f"{symbol}_backtest")
-            # Unified Strict Momentum Logic
-            cs.add_condition(SqueezeCondition())
+            # Using standard conditions from conditions.py
+            cs.add_condition(PriceAboveVWAPCondition())
+            cs.add_condition(SqueezeCondition(pct_threshold=10.0, minutes=5))
             self.condition_sets[symbol] = cs
 
     def add_candle(self, symbol, ts, o, h, l, c, v, vwap):
@@ -101,8 +102,7 @@ class BacktestAlertScanner:
     def run_backtest(self):
         for symbol in self.symbols:
             candles = sorted(self.symbol_data[symbol].data, key=lambda x: x['timestamp'])
-            price_history = {}
-            volume_history = {}
+            price_history = [] # Use list of tuples as expected by conditions.py
             
             # Cumulative tracking for accurate VWAP
             cumulative_pv = 0.0
@@ -118,8 +118,7 @@ class BacktestAlertScanner:
                 cumulative_volume += volume
                 current_vwap = cumulative_pv / cumulative_volume if cumulative_volume > 0 else 0.0
                 
-                price_history[ts] = price
-                volume_history[ts] = volume
+                price_history.append((ts, price))
                 
                 # Mock bid/ask for backtest spread filter
                 md = MarketData(
@@ -130,23 +129,13 @@ class BacktestAlertScanner:
                     timestamp=ts, 
                     bid=price-0.01, 
                     ask=price+0.01,
-                    price_history=price_history, 
-                    volume_history=volume_history
+                    price_history=price_history
                 )
                 cs = self.condition_sets[symbol]
                 if cs.check_all(md):
                     last = self.last_alert_time[symbol]
                     if last is None or (ts - last) >= self.alert_cooldown:
-                        # Capture logic used from conditions
-                        logic_used = "Unknown"
-                        for cond in cs.conditions:
-                            if isinstance(cond, UnifiedMomentumCondition):
-                                logic_used = cond.logic_used
-                                break
-                        
                         reasons = cs.triggered_reasons[:]
-                        reasons.append(f"Logic: {logic_used}")
-                        
                         alert = BacktestAlert(symbol, ts, price, volume, current_vwap, reasons)
                         self.alerts[symbol].append(alert)
                         self.last_alert_time[symbol] = ts
