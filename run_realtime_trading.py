@@ -15,10 +15,12 @@ from typing import List, Dict
 from realtime_scanner import RealtimeBroadScanner
 from execution_engine import ExecutionEngine
 from tws_data_fetcher import create_tws_data_app
+from top_gainers_fetcher import get_top_gainers
 import scanner_config as config
 
 # CONFIGURATION
-SYMBOLS = ["TCGL", "SGN", "CATX", "XPON","SER", "FEED"]
+# SYMBOLS will be dynamically fetched from top gainers (updates every 10 min)
+SYMBOLS = []  # Will be populated at runtime
 INVESTMENT_PER_TRADE = 500.0
 TP_PCT = 5.0  
 SL_PCT = 5.0
@@ -163,7 +165,11 @@ def unified_visualization(scanner, filtered_alerts, executor, tws_app):
 def run_trading_bot():
     global tws_app
     
+    # Get dynamic top gainers list
+    print("[INIT] Fetching top 20 gainers...")
+    SYMBOLS = get_top_gainers(top_n=20)
     unique_symbols = list(set(SYMBOLS))
+    print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
     
     print("[INIT] Connecting to TWS...")
     tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=888)

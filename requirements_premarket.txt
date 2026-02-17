@@ -1,3 +1,0 @@
-# Requirements for Premarket Scanner
-ibapi>=9.81.1
-pytz>=2021.1

@@ -303,10 +303,13 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
 
 def run_standalone_scanner():
     from tws_data_fetcher import create_tws_data_app
+    from top_gainers_fetcher import get_top_gainers
     
-    # Use a default symbol list for standalone mode
-    SYMBOLS = ["TWNP", "FAT", "VIVS", "RPGL"] 
+    # Get dynamic top gainers list (updates every 10 minutes)
+    print("[INIT] Fetching top gainers list...")
+    SYMBOLS = get_top_gainers(top_n=20)
     unique_symbols = list(set(SYMBOLS))
+    print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
     
     print("[INIT] Connecting to TWS for standalone scanner...")
     print(f"[INIT] Current market session: {get_market_session()}")
