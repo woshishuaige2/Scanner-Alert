@@ -19,6 +19,10 @@ MED_FLOAT_MAX = 50_000_000  # 50M shares
 MED_RVOL_MIN = 1.5          # 150% of daily average
 HIGH_RVOL_MIN = 3.0         # 300% of daily average
 
+# SQUEEZE ALERT CONDITIONS (Used by all scanners)
+SQUEEZE_PCT_THRESHOLD = 10.0   # Percentage increase required
+SQUEEZE_TIME_MINUTES = 5       # Time window in minutes
+
 # IN-DEPTH FILTERING (Used in run_realtime_trading.py)
 STRICT_MOMENTUM_REQUIRED = True
 MIN_PRICE_SURGE_10S = 1.5   # 1.5% surge in 10s

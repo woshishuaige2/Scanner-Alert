@@ -554,3 +554,376 @@ of version 954.1 or newer:  TWS: 7497; IB Gateway: 4002
 2026-01-30 10:12:24.386134: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
 2026-01-30 10:12:24.386134: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
 2026-01-30 10:12:24.643235: ReqId=2000, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16.5 to 16
+2026-02-17 10:02:12.352176: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:02:12.354182: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:02:12.354182: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:02:12.354182: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:02:12.355181: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:02:12.355181: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:02:12.355181: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:02:12.355181: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:02:12.355181: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:02:15.776261: ReqId=2008, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:02:26.103694: ReqId=2012, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:02:36.179639: ReqId=2014, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:02:47.288765: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 12.54 to 12
+2026-02-17 10:02:47.704338: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:02:47.890022: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.83 to 1
+2026-02-17 10:02:48.232769: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:02:48.524226: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:02:48.555564: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:02:48.598497: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:02:48.628057: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.09 to 1
+2026-02-17 10:02:48.655624: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:02:48.684806: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:02:48.729124: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:02:48.743119: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:02:48.759537: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:02:48.790049: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.4 to 1
+2026-02-17 10:02:48.826562: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:02:48.846613: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:02:48.865031: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 13.12 to 13
+2026-02-17 10:02:48.872025: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.03 to 2
+2026-02-17 10:02:48.887369: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:02:48.953316: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:02:52.085196: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-17 10:07:29.994180: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-17 10:31:25.268884: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:31:25.268884: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:31:25.269882: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:31:25.269882: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:31:25.269882: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:31:25.269882: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:31:25.270882: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:31:25.270882: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:31:25.271882: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:31:27.434958: ReqId=2004, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:31:38.037894: ReqId=2008, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:31:48.360708: ReqId=2011, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:32:02.534029: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.25 to 1
+2026-02-17 10:32:02.584526: ReqId=2022, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:32:02.878711: ReqId=2024, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:32:03.279424: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:32:03.324564: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:32:03.363599: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:32:03.375727: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:32:03.397207: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:32:03.412209: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:32:03.432721: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48.95 to 48
+2026-02-17 10:32:03.463231: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:32:03.498558: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.3 to 2
+2026-02-17 10:32:03.532072: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:32:03.564077: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:32:03.600332: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.37 to 3
+2026-02-17 10:32:03.628335: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:32:03.651838: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:32:03.674878: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.03 to 1
+2026-02-17 10:32:03.691512: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:32:03.810240: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:34:30.962798: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:34:30.963802: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:34:30.964801: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:34:30.964801: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:34:30.965805: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:34:30.965805: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:34:30.965805: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:34:30.966801: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:34:30.966801: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:34:34.867060: ReqId=2009, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:34:44.700008: ReqId=2010, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:34:57.213944: ReqId=2017, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:35:07.409607: ReqId=2020, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:35:07.609934: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:35:07.801172: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:35:08.267948: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.25 to 1
+2026-02-17 10:35:08.470215: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:35:08.503281: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:35:08.519286: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.03 to 1
+2026-02-17 10:35:08.530285: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:35:08.551840: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:35:08.562841: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:35:08.575841: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.37 to 3
+2026-02-17 10:35:08.586926: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48.95 to 48
+2026-02-17 10:35:08.611513: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:35:08.629025: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.3 to 2
+2026-02-17 10:35:08.647534: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:35:08.658533: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:35:08.668532: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:35:08.684047: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:35:08.710570: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:35:08.803126: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:37:52.795833: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:37:52.796837: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:37:52.796837: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:37:52.797834: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:37:52.797834: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:37:52.797834: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:37:52.797834: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:37:52.798834: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:37:52.798834: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:37:52.945433: ReqId=2000, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:38:06.201459: ReqId=2010, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:38:18.558850: ReqId=2019, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:38:28.444010: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:38:28.472499: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.3 to 2
+2026-02-17 10:38:28.495009: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:38:28.595063: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.25 to 1
+2026-02-17 10:38:28.643658: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:38:28.839516: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:38:29.136774: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:38:29.450773: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:38:29.502791: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.37 to 3
+2026-02-17 10:38:29.514798: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:38:29.534124: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.03 to 1
+2026-02-17 10:38:29.548123: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:38:29.557128: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:38:29.596272: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:38:29.616276: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:38:29.631795: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:38:29.651797: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:38:29.712815: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:38:29.736867: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:38:29.830425: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:41:26.031849: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:41:26.032849: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:41:26.033850: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:41:26.033850: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:41:26.033850: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:41:26.033850: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:41:26.033850: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:41:26.035356: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:41:26.035356: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:41:26.685129: ReqId=2002, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:41:36.843681: ReqId=2003, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:41:52.481581: ReqId=2016, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:42:02.314388: ReqId=2017, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:42:12.323598: ReqId=2018, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:42:22.421949: ReqId=2020, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 19140.83 to 19140
+2026-02-17 10:42:22.516489: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 464.33 to 464
+2026-02-17 10:42:22.609619: ReqId=2022, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4081.25 to 4081
+2026-02-17 10:42:22.714401: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2165.24 to 2165
+2026-02-17 10:42:22.815917: ReqId=2024, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7536.48 to 7536
+2026-02-17 10:42:22.916445: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 238.32 to 238
+2026-02-17 10:42:23.052007: ReqId=2026, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1517.3 to 1517
+2026-02-17 10:42:23.236569: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5644.03 to 5644
+2026-02-17 10:42:23.334107: ReqId=2028, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 33633.06 to 33633
+2026-02-17 10:42:23.418144: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 83137.46 to 83137
+2026-02-17 10:42:23.517668: ReqId=2030, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48930.06 to 48930
+2026-02-17 10:42:23.616715: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15994.09 to 15994
+2026-02-17 10:42:23.723264: ReqId=2032, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 28.64 to 28
+2026-02-17 10:42:23.824307: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 18452.04 to 18452
+2026-02-17 10:42:23.920830: ReqId=2034, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2210.4 to 2210
+2026-02-17 10:42:24.017204: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16572.29 to 16572
+2026-02-17 10:42:24.123274: ReqId=2036, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 89.78 to 89
+2026-02-17 10:42:24.255123: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 104.43 to 104
+2026-02-17 10:42:24.458227: ReqId=2038, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 17653.81 to 17653
+2026-02-17 10:42:24.628051: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7195.14 to 7195
+2026-02-17 10:42:24.777111: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:42:24.973298: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.03 to 1
+2026-02-17 10:42:25.168133: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:42:25.470103: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:42:25.769725: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:42:25.825245: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:42:25.841749: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:42:25.947376: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:42:25.963979: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:42:25.979489: ReqId=2061, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:42:26.006489: ReqId=2063, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:42:26.013996: ReqId=2065, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.37 to 3
+2026-02-17 10:42:26.027999: ReqId=2067, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:42:26.055512: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:42:26.070783: ReqId=2069, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:42:26.087991: ReqId=2071, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.3 to 2
+2026-02-17 10:42:26.105994: ReqId=2073, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:42:26.119990: ReqId=2075, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 17.48 to 17
+2026-02-17 10:42:26.137506: ReqId=2077, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 6.53 to 6
+2026-02-17 10:42:26.194334: ReqId=2079, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:43:38.557817: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:43:38.558820: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:43:38.558820: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:43:38.559819: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:43:38.559819: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:43:38.559819: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:43:38.559819: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:43:38.560819: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:43:38.560819: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:43:44.232213: ReqId=2011, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:43:55.816637: ReqId=2015, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:44:05.398724: ReqId=2016, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:44:15.887665: ReqId=2018, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:44:25.812312: ReqId=2020, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15994.09 to 15994
+2026-02-17 10:44:25.911571: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5736.39 to 5736
+2026-02-17 10:44:26.025137: ReqId=2022, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 18452.04 to 18452
+2026-02-17 10:44:26.183182: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 19140.83 to 19140
+2026-02-17 10:44:26.355234: ReqId=2024, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1550.34 to 1550
+2026-02-17 10:44:26.519041: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7536.48 to 7536
+2026-02-17 10:44:26.621084: ReqId=2026, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 28.64 to 28
+2026-02-17 10:44:26.716883: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5644.03 to 5644
+2026-02-17 10:44:26.820447: ReqId=2028, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7195.14 to 7195
+2026-02-17 10:44:26.915325: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48930.06 to 48930
+2026-02-17 10:44:27.023020: ReqId=2030, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16572.29 to 16572
+2026-02-17 10:44:27.127062: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2165.24 to 2165
+2026-02-17 10:44:27.221092: ReqId=2032, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 238.32 to 238
+2026-02-17 10:44:27.322567: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2210.4 to 2210
+2026-02-17 10:44:27.424669: ReqId=2034, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 83137.46 to 83137
+2026-02-17 10:44:27.528720: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4081.25 to 4081
+2026-02-17 10:44:27.624038: ReqId=2036, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 17653.81 to 17653
+2026-02-17 10:44:27.726074: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 464.33 to 464
+2026-02-17 10:44:27.820724: ReqId=2038, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 89.78 to 89
+2026-02-17 10:44:27.942348: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 33633.06 to 33633
+2026-02-17 10:44:28.282390: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:44:28.480315: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48.95 to 48
+2026-02-17 10:44:28.770932: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:44:29.076182: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:44:29.102180: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:44:29.115184: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 3.37 to 3
+2026-02-17 10:44:29.186889: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:44:29.198892: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:44:29.207889: ReqId=2061, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.3 to 2
+2026-02-17 10:44:29.221906: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:44:29.259175: ReqId=2063, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:44:29.274767: ReqId=2065, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:44:29.296765: ReqId=2067, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:44:29.309772: ReqId=2069, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:44:29.323669: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:44:29.335666: ReqId=2071, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:44:29.358188: ReqId=2073, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 6.53 to 6
+2026-02-17 10:44:29.376595: ReqId=2075, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.03 to 1
+2026-02-17 10:44:29.392593: ReqId=2077, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:44:29.478829: ReqId=2079, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:46:55.792368: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:46:55.793371: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:46:55.793371: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:46:55.793371: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:46:55.794374: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:46:55.794374: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:46:55.795370: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:46:55.795370: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:46:55.795370: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:46:56.186016: ReqId=2001, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:47:06.806097: ReqId=2005, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:47:16.923589: ReqId=2007, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:47:32.229601: ReqId=2020, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 238.32 to 238
+2026-02-17 10:47:32.332651: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 89.78 to 89
+2026-02-17 10:47:32.434352: ReqId=2022, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 18452.04 to 18452
+2026-02-17 10:47:32.533987: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 174.81 to 174
+2026-02-17 10:47:32.669552: ReqId=2024, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2275.9 to 2275
+2026-02-17 10:47:32.834141: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2165.24 to 2165
+2026-02-17 10:47:32.935494: ReqId=2026, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 464.33 to 464
+2026-02-17 10:47:33.035569: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4081.25 to 4081
+2026-02-17 10:47:33.138178: ReqId=2028, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 33633.06 to 33633
+2026-02-17 10:47:33.237543: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2210.4 to 2210
+2026-02-17 10:47:33.336582: ReqId=2030, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 19140.83 to 19140
+2026-02-17 10:47:33.448300: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16572.29 to 16572
+2026-02-17 10:47:33.538824: ReqId=2032, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7195.14 to 7195
+2026-02-17 10:47:33.637507: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15994.09 to 15994
+2026-02-17 10:47:33.774070: ReqId=2034, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 13740.66 to 13740
+2026-02-17 10:47:33.976659: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1577.74 to 1577
+2026-02-17 10:47:34.142196: ReqId=2036, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5644.03 to 5644
+2026-02-17 10:47:34.244946: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 83137.46 to 83137
+2026-02-17 10:47:34.347912: ReqId=2038, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48930.06 to 48930
+2026-02-17 10:47:34.452570: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7536.48 to 7536
+2026-02-17 10:47:34.589846: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:47:34.985870: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:47:35.297394: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:47:35.481758: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.03 to 2
+2026-02-17 10:47:35.598957: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5.79 to 5
+2026-02-17 10:47:35.637160: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:47:35.669183: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.03 to 1
+2026-02-17 10:47:35.694395: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:47:35.757411: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:47:35.770927: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:47:35.780470: ReqId=2061, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:47:35.808761: ReqId=2063, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.3 to 2
+2026-02-17 10:47:35.836767: ReqId=2065, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:47:35.878796: ReqId=2067, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:47:35.895818: ReqId=2069, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.4 to 1
+2026-02-17 10:47:35.918328: ReqId=2073, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:47:35.935336: ReqId=2075, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:47:35.958847: ReqId=2077, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:47:35.979326: ReqId=2079, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:47:36.001565: ReqId=2071, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:48:18.140218: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-17 10:48:19.184014: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-17 10:48:19.188011: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:afarm
+2026-02-17 10:48:28.419189: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-17 10:48:28.419189: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:48:28.420187: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-17 10:48:28.420187: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-17 10:48:28.421187: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:afarm
+2026-02-17 10:48:28.421187: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-17 10:48:28.421187: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:48:28.421187: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:48:28.422187: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:48:28.422187: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:48:28.422187: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:48:28.422187: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:48:31.160926: ReqId=2008, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:48:41.487880: ReqId=2011, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:48:52.822898: ReqId=2018, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:49:02.818969: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 8.97 to 8
+2026-02-17 10:49:03.129272: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15.04 to 15
+2026-02-17 10:49:03.343672: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:49:03.616710: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.03 to 1
+2026-02-17 10:49:03.836090: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48.95 to 48
+2026-02-17 10:49:03.955719: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.11 to 1
+2026-02-17 10:49:03.972229: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.4 to 1
+2026-02-17 10:49:03.998235: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 171.13 to 171
+2026-02-17 10:49:04.033397: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.36 to 23
+2026-02-17 10:49:04.045396: ReqId=2041, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 36.15 to 36
+2026-02-17 10:49:04.060397: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 23.75 to 23
+2026-02-17 10:49:04.077905: ReqId=2043, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4.2 to 4
+2026-02-17 10:49:04.101910: ReqId=2045, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.99 to 1
+2026-02-17 10:49:04.112497: ReqId=2047, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.03 to 2
+2026-02-17 10:49:04.128496: ReqId=2051, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 177.45 to 177
+2026-02-17 10:49:04.152498: ReqId=2053, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2.3 to 2
+2026-02-17 10:49:04.186550: ReqId=2055, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2759.51 to 2759
+2026-02-17 10:49:04.201558: ReqId=2057, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 35.75 to 35
+2026-02-17 10:49:04.212426: ReqId=2049, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1.5 to 1
+2026-02-17 10:49:04.267938: ReqId=2059, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 54.46 to 54
+2026-02-17 10:51:08.074451: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-17 10:51:08.076452: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-17 10:51:08.076452: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-17 10:51:08.077452: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-17 10:58:50.486596: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-17 10:58:50.486596: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-17 10:58:50.487593: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:afarm
+2026-02-17 10:58:50.487593: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-17 10:58:50.487593: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-17 10:58:50.487593: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-17 10:58:50.488595: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-17 10:58:50.488595: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-17 10:58:50.488595: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-17 10:58:50.488595: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-17 10:58:50.892281: ReqId=2001, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:59:00.966948: ReqId=2003, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:59:11.292243: ReqId=2006, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:59:26.369135: ReqId=2018, Code=430, Msg=The fundamentals data for the security specified is not available.failed to fetch
+2026-02-17 10:59:36.368709: ReqId=2020, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 174.81 to 174
+2026-02-17 10:59:36.462793: ReqId=2021, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 89.78 to 89
+2026-02-17 10:59:36.568881: ReqId=2022, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 18452.04 to 18452
+2026-02-17 10:59:36.675688: ReqId=2023, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 4081.25 to 4081
+2026-02-17 10:59:36.803731: ReqId=2024, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 1617.6 to 1617
+2026-02-17 10:59:36.968439: ReqId=2025, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7195.14 to 7195
+2026-02-17 10:59:37.072116: ReqId=2026, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2165.24 to 2165
+2026-02-17 10:59:37.169211: ReqId=2027, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 19140.83 to 19140
+2026-02-17 10:59:37.270313: ReqId=2028, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 16572.29 to 16572
+2026-02-17 10:59:37.368406: ReqId=2029, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 48930.06 to 48930
+2026-02-17 10:59:37.471123: ReqId=2030, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 13740.66 to 13740
+2026-02-17 10:59:37.570208: ReqId=2031, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 83137.46 to 83137
+2026-02-17 10:59:37.675304: ReqId=2032, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 5644.03 to 5644
+2026-02-17 10:59:37.777083: ReqId=2033, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 7536.48 to 7536
+2026-02-17 10:59:37.870184: ReqId=2034, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 238.32 to 238
+2026-02-17 10:59:37.973207: ReqId=2035, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 28.64 to 28
+2026-02-17 10:59:38.071775: ReqId=2036, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 2210.4 to 2210
+2026-02-17 10:59:38.173537: ReqId=2037, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 262300.4 to 262300
+2026-02-17 10:59:38.275638: ReqId=2038, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 104.43 to 104
+2026-02-17 10:59:38.375714: ReqId=2039, Code=2176, Msg=Warning: Your API version does not support fractional share size rules. Please upgrade to a minimum version 163. Trimmed value 15994.09 to 15994
+2026-02-17 10:59:38.403255: ReqId=2040, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-17 11:00:08.496139: ReqId=2041, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-17 11:00:38.604221: ReqId=2042, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-17 11:01:08.729608: ReqId=2043, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-17 11:01:38.853192: ReqId=2044, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-17 11:02:08.979320: ReqId=2045, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-17 11:02:39.089373: ReqId=2046, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-17 11:03:09.206237: ReqId=2047, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).

@@ -12,7 +12,7 @@ from datetime import datetime
 from collections import deque
 from typing import List, Dict
 
-from realtime_scanner import RealtimeBroadScanner
+from realtime_scanner_premarket import RealtimeBroadScanner
 from execution_engine import ExecutionEngine
 from tws_data_fetcher import create_tws_data_app
 from top_gainers_fetcher import get_top_gainers
@@ -162,6 +162,61 @@ def unified_visualization(scanner, filtered_alerts, executor, tws_app):
             print(f"{trade['symbol']:<8} | {'FAILED':<12} | {details:<65} | {time_disp}")
     print("="*115)
 
+def update_symbol_list(scanner, tws_app, current_symbols: List[str]) -> List[str]:
+    """Update the monitored symbol list with new top gainers"""
+    # Get updated list
+    new_symbols = list(set(get_top_gainers(top_n=20)))
+    
+    # Find differences
+    current_set = set(current_symbols)
+    new_set = set(new_symbols)
+    
+    symbols_to_add = new_set - current_set
+    symbols_to_remove = current_set - new_set
+    
+    if not symbols_to_add and not symbols_to_remove:
+        return current_symbols  # No changes
+    
+    print(f"[SYMBOL UPDATE] Adding {len(symbols_to_add)} new symbols, removing {len(symbols_to_remove)} old symbols")
+    
+    # Remove old symbols
+    for symbol in symbols_to_remove:
+        if symbol in scanner.monitors:
+            tws_app.unsubscribe_realtime_data(symbol)
+            del scanner.monitors[symbol]
+            scanner.symbols.remove(symbol)
+            print(f"[SYMBOL UPDATE] Removed {symbol}")
+    
+    # Add new symbols
+    def create_callback(sym):
+        return lambda s, p, v, vw, ts, b, a: scanner.update(s, price=p, volume=v, vwap=vw, bid=b, ask=a)
+    
+    for symbol in symbols_to_add:
+        from realtime_scanner_premarket import RealtimeSymbolMonitor
+        scanner.monitors[symbol] = RealtimeSymbolMonitor(symbol)
+        scanner.symbols.append(symbol)
+        tws_app.subscribe_market_data(symbol, create_callback(symbol))
+        print(f"[SYMBOL UPDATE] Added {symbol}")
+    
+    # Load fundamentals for new symbols
+    for symbol in symbols_to_add:
+        xml_data = tws_app.fetch_fundamental_data(symbol)
+        if xml_data:
+            try:
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(xml_data)
+                monitor = scanner.monitors[symbol]
+                for ratio in root.findall(".//Ratio"):
+                    field = ratio.get("FieldName")
+                    if field == 'FLOAT':
+                        monitor.float_shares = float(ratio.text)
+                    elif field == 'VOL10DAVG':
+                        monitor.avg_daily_volume = float(ratio.text)
+            except Exception:
+                pass
+    
+    return new_symbols
+
 def run_trading_bot():
     global tws_app
     
@@ -216,9 +271,16 @@ def run_trading_bot():
     time.sleep(2)
     
     eod_triggered = False
+    last_symbol_update = datetime.now()
+    symbol_update_interval = 600  # Update every 10 minutes
     
     while not should_exit:
         now = datetime.now()
+        
+        # Periodic Symbol List Update (every 10 minutes)
+        if (now - last_symbol_update).total_seconds() >= symbol_update_interval:
+            unique_symbols = update_symbol_list(scanner, tws_app, unique_symbols)
+            last_symbol_update = now
         
         # EOD Cleanup Check (3:59 PM ET)
         if now.hour == 15 and now.minute == 59 and not eod_triggered:
