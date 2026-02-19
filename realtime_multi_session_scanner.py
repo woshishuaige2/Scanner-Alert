@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition
 import platform
 import pytz
-from scanner_config import SQUEEZE_PCT_THRESHOLD, SQUEEZE_TIME_MINUTES, DISCORD_WEBHOOK_URL
+from scanner_config import SQUEEZE_PCT_THRESHOLD, SQUEEZE_TIME_MINUTES, DISCORD_WEBHOOK_URL, TWS_PORT
 import requests
 from top_gainers_fetcher import get_top_gainers
 
@@ -396,10 +396,15 @@ def send_discord_alert(symbol, session, reasons, monitor):
 def run_standalone_scanner():
     # Setup TWS App
     from tws_data_fetcher import create_tws_data_app
-    tws_app = create_tws_data_app("127.0.0.1", 7496, client_id=10)
+    print(f"[INIT] Connecting to TWS on port {TWS_PORT}...")
+    tws_app = create_tws_data_app("127.0.0.1", TWS_PORT, client_id=10)
     
     if not tws_app:
-        print("[ERROR] Could not connect to TWS. Please ensure TWS or IB Gateway is running on port 7496.")
+        print(f"[ERROR] Could not connect to TWS on port {TWS_PORT}.")
+        print("[DEBUG] 1. Check if TWS or IB Gateway is running.")
+        print(f"[DEBUG] 2. Check if the port in TWS matches {TWS_PORT} (Global Configuration -> API -> Settings).")
+        print("[DEBUG] 3. Ensure 'Enable ActiveX and Socket Clients' is checked in TWS API settings.")
+        print("[DEBUG] 4. If you are using Paper Trading, use port 7497. If Live, use 7496.")
         return
     
     # Wait for connection
@@ -407,7 +412,7 @@ def run_standalone_scanner():
     
     # Get dynamic top gainers list (updates every 10 minutes)
     print("[INIT] Fetching top gainers list...")
-    SYMBOLS = get_top_gainers(top_n=20)
+    SYMBOLS = get_top_gainers(top_n=20, ibkr_port=TWS_PORT)
     unique_symbols = list(set(SYMBOLS))
     print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
     
