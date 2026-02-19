@@ -395,9 +395,12 @@ def send_discord_alert(symbol, session, reasons, monitor):
 
 def run_standalone_scanner():
     # Setup TWS App
-    from ibkr_scanner import IBKRScannerApp
-    tws_app = IBKRScannerApp()
-    tws_app.connect("127.0.0.1", 7496, clientId=10)
+    from tws_data_fetcher import create_tws_data_app
+    tws_app = create_tws_data_app("127.0.0.1", 7496, client_id=10)
+    
+    if not tws_app:
+        print("[ERROR] Could not connect to TWS. Please ensure TWS or IB Gateway is running on port 7496.")
+        return
     
     # Wait for connection
     time.sleep(2)
