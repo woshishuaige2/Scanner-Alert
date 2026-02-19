@@ -23,7 +23,7 @@ SYMBOLS = ["TCGL", "SGN", "CATX", "XPON", "SER", "FEED"]
 
 ### 1. Run the Scanner (Premarket-Ready)
 ```bash
-python3 realtime_scanner_premarket.py
+python3 realtime_multi_session_scanner.py
 ```
 
 **What it does:**
@@ -96,7 +96,7 @@ The scanner automatically detects market session:
 
 ### Change Number of Symbols
 ```python
-# In realtime_scanner_premarket.py or run_realtime_trading.py
+# In realtime_multi_session_scanner.py or run_realtime_trading.py
 # Change this line:
 SYMBOLS = get_top_gainers(top_n=20)
 
