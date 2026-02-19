@@ -12,7 +12,8 @@ import xml.etree.ElementTree as ET
 from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition
 import platform
 import pytz
-from scanner_config import SQUEEZE_PCT_THRESHOLD, SQUEEZE_TIME_MINUTES
+from scanner_config import SQUEEZE_PCT_THRESHOLD, SQUEEZE_TIME_MINUTES, DISCORD_WEBHOOK_URL
+import requests
 from top_gainers_fetcher import get_top_gainers
 
 # Market session times (Eastern Time)
@@ -239,244 +240,167 @@ class RealtimeBroadScanner:
         print("[SCANNER] Loading previous day's closing prices...")
         for symbol, monitor in self.monitors.items():
             try:
-                # Fetch 2 days of historical data to get yesterday's close
-                # bars[-2] = yesterday's completed day, bars[-1] = today's incomplete bar
-                bars = tws_app.fetch_historical_bars(
-                    symbol=symbol,
-                    end_date=datetime.now(),
-                    duration="2 D",
-                    bar_size="1 day",
-                    what_to_show="TRADES"
-                )
-                if bars and len(bars) >= 2:
-                    # Use bars[-2] to get yesterday's completed close (not today's incomplete bar)
-                    monitor.day_start_price = bars[-2]['close']
-                    print(f"[SCANNER] {symbol} previous close: ${monitor.day_start_price:.2f} (from {len(bars)} bars)")
-                elif bars and len(bars) == 1:
-                    # Fallback: only one bar available
-                    monitor.day_start_price = bars[0]['close']
-                    print(f"[SCANNER] {symbol} previous close (fallback): ${monitor.day_start_price:.2f} (1 bar only)")
-                else:
-                    print(f"[SCANNER] {symbol} could not fetch previous close (no bars received)")
+                # Use a small historical data request to get the last close
+                close_price = tws_app.fetch_last_close(symbol)
+                if close_price:
+                    monitor.day_start_price = close_price
+                    print(f"[SCANNER] {symbol} Prev Close: ${close_price:.2f}")
             except Exception as e:
-                print(f"[SCANNER] Error fetching previous close for {symbol}: {e}")
-    
+                print(f"[SCANNER] Error loading prev close for {symbol}: {e}")
+
     def load_historical_prices(self, tws_app):
-        """Load recent intraday price history to enable squeeze detection on startup"""
-        print("[SCANNER] Loading historical intraday prices (last 1 hour)...")
+        """Load recent historical prices to populate history for squeeze detection"""
+        print("[SCANNER] Loading historical intraday data for squeeze detection...")
         for symbol, monitor in self.monitors.items():
             try:
-                # Fetch last 1 hour of 1-minute bars
-                bars = tws_app.fetch_historical_bars(
-                    symbol=symbol,
-                    end_date=datetime.now(),
-                    duration="1 H",
-                    bar_size="1 min",
-                    what_to_show="TRADES"
-                )
+                # Request last 15 minutes of 1-minute bars
+                bars = tws_app.fetch_historical_bars(symbol, duration="15 M", bar_size="1 min")
+                for bar in bars:
+                    # Add bar data to monitor history
+                    # We'll use the bar time and close price
+                    monitor.price_history.append((bar.date, bar.close))
+                    monitor.volume_history.append((bar.date, bar.volume))
                 if bars:
-                    # Populate price_history with historical data
-                    for bar in bars:
-                        bar_time = bar.get('timestamp', datetime.now())
-                        bar_close = bar.get('close', 0)
-                        if bar_close > 0:
-                            monitor.price_history.append((bar_time, bar_close))
-                    print(f"[SCANNER] {symbol} loaded {len(bars)} historical price points")
-                else:
-                    print(f"[SCANNER] {symbol} no historical prices available")
+                    print(f"[SCANNER] {symbol} Loaded {len(bars)} historical bars")
             except Exception as e:
-                print(f"[SCANNER] Error loading historical prices for {symbol}: {e}")
+                print(f"[SCANNER] Error loading history for {symbol}: {e}")
 
     def resync_vwap_all_symbols(self, tws_app):
-        """Resync VWAP for all symbols (called on session transitions)"""
-        print("[SCANNER] Resyncing VWAP for all symbols after session transition...")
-        for symbol in self.symbols:
+        """Resync VWAP for all symbols from TWS"""
+        print("[SCANNER] Resyncing VWAP for all symbols...")
+        for symbol, monitor in self.monitors.items():
             try:
-                tws_app.sync_vwap_from_start_of_day(symbol)
+                vwap = tws_app.fetch_current_vwap(symbol)
+                if vwap:
+                    monitor.vwap = vwap
             except Exception as e:
                 print(f"[SCANNER] Error resyncing VWAP for {symbol}: {e}")
-        time.sleep(2)  # Give time for sync to complete
 
 def display_broad_screening(scanner: RealtimeBroadScanner):
-    os.system('cls' if os.name == 'nt' else 'clear')
-    
-    # Get current market session
-    session = get_market_session()
-    session_color = {
-        "PREMARKET": "🌅",
-        "REGULAR": "🔔",
-        "AFTERHOURS": "🌙",
-        "CLOSED": "🚫"
-    }
-    session_icon = session_color.get(session, "")
-    
-    et_tz = pytz.timezone('US/Eastern')
-    now_et = datetime.now(et_tz)
-    time_str = now_et.strftime('%H:%M:%S ET')
-    
-    print("="*126)
-    print(f"     ROSS CAMERON STYLE PRELIMINARY SCANNER | {time_str} | {session_icon} {session} SESSION")
-    print("="*126)
-    print(f"{'SYMBOL':<8} | {'DAY %':<8} | {'PRICE':<10} | {'FLOAT':<12} | {'RVOL':<12} | {'SESSION VOL':<12} | {'SCREENING ALERTS'}")
-    print("-"*126)
-    
-    # Calculate gain % for each symbol and sort by it
-    symbol_gains = []
-    for symbol in scanner.symbols:
-        m = scanner.monitors[symbol]
-        if m.price_history and m.day_start_price and m.day_start_price > 0:
-            current_price = m.price_history[-1][1]
-            gain_pct = ((current_price - m.day_start_price) / m.day_start_price) * 100
-        else:
-            gain_pct = 0.0
-        symbol_gains.append((symbol, gain_pct))
-    
-    # Sort by gain percentage (descending)
-    symbol_gains.sort(key=lambda x: x[1], reverse=True)
-    
-    for symbol, gain_pct in symbol_gains:
-        m = scanner.monitors[symbol]
-        gain_str = f"{gain_pct:+.2f}%" if m.price_history and m.day_start_price else "N/A"
-        price = f"${m.price_history[-1][1]:.2f}" if m.price_history else "N/A"
-        float_str = f"{m.float_shares/1e6:.1f}M" if m.float_shares else "N/A"
-        rvol = f"{m.relative_volume:.2f}x" if m.relative_volume > 0 else "N/A"
-        session_vol = f"{m.session_volume:,.0f}" if m.session_volume > 0 else "0"
+    """Console display for the broad screening tool"""
+    # Clear screen
+    if platform.system() == "Windows":
+        os.system('cls')
+    else:
+        os.system('clear')
         
-        # Show alerts with timestamp if recently triggered
-        if m.triggered_conditions and m.last_alert_time:
-            time_ago = datetime.now() - m.last_alert_time
-            mins_ago = int(time_ago.total_seconds() / 60)
-            secs_ago = int(time_ago.total_seconds() % 60)
-            if mins_ago > 0:
-                time_str = f"({mins_ago}m{secs_ago}s ago)"
-            else:
-                time_str = f"({secs_ago}s ago)"
-            alerts = f"{', '.join(m.triggered_conditions)} {time_str}"
-        else:
-            alerts = "--"
+    print("="*80)
+    print(f"ROSS CAMERON-STYLE BROAD SCANNER | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Session: {get_market_session()}")
+    print("="*80)
+    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'VWAP':<8} | {'GAIN%':<8} | {'REL VOL':<8} | {'TRIGGERED CONDITIONS'}")
+    print("-"*80)
+    
+    # Sort symbols by session volume or gain
+    sorted_monitors = sorted(scanner.monitors.items(), 
+                           key=lambda x: x[1].session_volume if x[1].session_volume else 0, 
+                           reverse=True)
+    
+    for symbol, monitor in sorted_monitors[:20]:  # Show top 20
+        if not monitor.price_history:
+            continue
+            
+        price = monitor.price_history[-1][1]
+        vwap = monitor.vwap
         
-        print(f"{symbol:<8} | {gain_str:<8} | {price:<10} | {float_str:<12} | {rvol:<12} | {session_vol:<12} | {alerts}")
-    
-    print("="*126)
-    
-    # Display recently triggered alerts
-    if scanner.recent_alerts:
-        print(f"\n🔔 RECENTLY TRIGGERED ALERTS ({session} SESSION):")
-        print("-"*126)
-        for alert_time, symbol, reasons in list(scanner.recent_alerts)[-5:]:  # Show last 5
-            time_str = alert_time.strftime('%H:%M:%S')
-            reason_str = ", ".join(reasons)
-            print(f"  [{time_str}] {symbol}: {reason_str}")
-        print("="*126)
-    
-    # Session-specific info
-    if session == "PREMARKET":
-        print(f"[INFO] PREMARKET MODE: Squeeze threshold {SQUEEZE_PCT_THRESHOLD}% in {SQUEEZE_TIME_MINUTES} min")
-        print("[INFO] RVOL compared to typical premarket volume (~5% of daily average)")
-    elif session == "REGULAR":
-        print(f"[INFO] REGULAR HOURS: Squeeze threshold {SQUEEZE_PCT_THRESHOLD}% in {SQUEEZE_TIME_MINUTES} min")
-    elif session == "CLOSED":
-        print("[WARNING] Market is CLOSED. Scanner will activate when premarket opens at 4:00 AM ET")
-    
-    print("[INFO] Preliminary screening active. Waiting for triggers...")
+        gain_pct = 0.0
+        if monitor.day_start_price and monitor.day_start_price > 0:
+            gain_pct = ((price - monitor.day_start_price) / monitor.day_start_price) * 100
+            
+        rel_vol = monitor.relative_volume
+        conditions = ", ".join(monitor.triggered_conditions) if monitor.triggered_conditions else ""
+        
+        # Highlight if conditions met
+        if monitor.triggered_conditions:
+            print(f"\033[92m{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol:>7.2f}x | {conditions}\033[0m")
+        else:
+            print(f"{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol:>7.2f}x | {conditions}")
+
+    print("\n" + "="*80)
+    print("RECENT ALERTS:")
+    for timestamp, symbol, reasons in list(scanner.recent_alerts)[-5:]:
+        print(f"[{timestamp.strftime('%H:%M:%S')}] {symbol}: {', '.join(reasons)}")
+    print("="*80)
 
 def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbols: List[str]) -> List[str]:
-    """Update the monitored symbol list with new top gainers"""
-    # Get updated list
-    new_symbols = list(set(get_top_gainers(top_n=20)))
+    """Fetch new top gainers and update the scanner's monitor list"""
+    print("\n[SCANNER] Updating top gainers list...")
+    new_symbols = get_top_gainers(top_n=20)
+    unique_new = list(set(new_symbols))
     
-    # Find differences
-    current_set = set(current_symbols)
-    new_set = set(new_symbols)
+    # Identify truly new symbols
+    added = [s for s in unique_new if s not in current_symbols]
     
-    symbols_to_add = new_set - current_set
-    symbols_to_remove = current_set - new_set
-    
-    if not symbols_to_add and not symbols_to_remove:
-        return current_symbols  # No changes
-    
-    print(f"\n[SYMBOL UPDATE] Adding {len(symbols_to_add)} new, removing {len(symbols_to_remove)} old symbols")
-    
-    # Remove old symbols
-    for symbol in symbols_to_remove:
-        if symbol in scanner.monitors:
-            tws_app.unsubscribe_realtime_data(symbol)
-            del scanner.monitors[symbol]
-            scanner.symbols.remove(symbol)
-    
-    # Add new symbols
-    def create_callback(sym):
-        return lambda s, p, v, vw, ts, b, a: scanner.update(s, price=p, volume=v, vwap=vw, bid=b, ask=a)
-    
-    for symbol in symbols_to_add:
-        scanner.monitors[symbol] = RealtimeSymbolMonitor(symbol)
-        scanner.symbols.append(symbol)
-        tws_app.subscribe_market_data(symbol, create_callback(symbol))
-    
-    # Load fundamentals for new symbols
-    if symbols_to_add:
-        print(f"[SYMBOL UPDATE] Loading fundamentals for {len(symbols_to_add)} new symbols...")
-        for symbol in symbols_to_add:
-            monitor = scanner.monitors[symbol]
-            
-            # Load fundamentals
-            xml_data = tws_app.fetch_fundamental_data(symbol)
+    if added:
+        print(f"[SCANNER] Adding {len(added)} new symbols to monitor: {', '.join(added)}")
+        for s in added:
+            scanner.monitors[s] = RealtimeSymbolMonitor(s)
+            # Load fundamentals for new symbol
+            xml_data = tws_app.fetch_fundamental_data(s)
             if xml_data:
                 try:
                     root = ET.fromstring(xml_data)
                     for ratio in root.findall(".//Ratio"):
                         field = ratio.get("FieldName")
                         if field == 'FLOAT':
-                            monitor.float_shares = float(ratio.text)
+                            scanner.monitors[s].float_shares = float(ratio.text)
                         elif field == 'VOL10DAVG':
-                            monitor.avg_daily_volume = float(ratio.text)
-                except Exception:
-                    pass
+                            scanner.monitors[s].avg_daily_volume = float(ratio.text)
+                except: pass
             
-            # Load previous close
-            try:
-                bars = tws_app.fetch_historical_bars(
-                    symbol=symbol,
-                    end_date=datetime.now(),
-                    duration="2 D",
-                    bar_size="1 day",
-                    what_to_show="TRADES"
-                )
-                if bars and len(bars) >= 2:
-                    # Use bars[-2] to get yesterday's completed close
-                    monitor.day_start_price = bars[-2]['close']
-                elif bars and len(bars) == 1:
-                    # Fallback: only one bar available
-                    monitor.day_start_price = bars[0]['close']
-            except Exception:
-                pass
+            # Load prev close
+            close = tws_app.fetch_last_close(s)
+            if close: scanner.monitors[s].day_start_price = close
             
-            # Load historical intraday prices
-            try:
-                bars = tws_app.fetch_historical_bars(
-                    symbol=symbol,
-                    end_date=datetime.now(),
-                    duration="1 H",
-                    bar_size="1 min",
-                    what_to_show="TRADES"
-                )
-                if bars:
-                    for bar in bars:
-                        bar_time = bar.get('timestamp', datetime.now())
-                        bar_close = bar.get('close', 0)
-                        if bar_close > 0:
-                            monitor.price_history.append((bar_time, bar_close))
-            except Exception:
-                pass
+            # Subscribe to data
+            tws_app.subscribe_market_data(s, lambda sym, p, v, vw, ts, b, a: scanner.update(sym, p, v, vw, b, a))
+            
+    return list(set(current_symbols + unique_new))
+
+def send_discord_alert(symbol, session, reasons, monitor):
+    """Send a simple text alert to Discord with price and volume info."""
+    if not DISCORD_WEBHOOK_URL:
+        return
+
+    reason_str = ", ".join(reasons) if reasons else "Unknown condition"
     
-    if symbols_to_add or symbols_to_remove:
-        print(f"[SYMBOL UPDATE] Now monitoring: {', '.join(new_symbols[:10])}{'...' if len(new_symbols) > 10 else ''}")
+    # Format price and volume information
+    price = monitor.price_history[-1][1] if monitor.price_history else 0.0
+    vwap = monitor.vwap
+    rel_vol = monitor.relative_volume
+    session_vol = monitor.session_volume
     
-    return new_symbols
+    # Calculate gain from day start if available
+    gain_pct = 0.0
+    if monitor.day_start_price and monitor.day_start_price > 0:
+        gain_pct = ((price - monitor.day_start_price) / monitor.day_start_price) * 100
+
+    # Construct the message
+    message = (
+        f"🚨 **{session} ALERT: {symbol}** 🚨\n"
+        f"**Trigger:** {reason_str}\n"
+        f"**Price:** ${price:.2f} ({gain_pct:+.2f}% from start)\n"
+        f"**VWAP:** ${vwap:.2f} (Price {'above' if price > vwap else 'below'} VWAP)\n"
+        f"**RelVol:** {rel_vol:.2f}x\n"
+        f"**Session Vol:** {session_vol:,.0f}\n"
+        f"**Time (ET):** {datetime.now(pytz.timezone('US/Eastern')).strftime('%H:%M:%S')}"
+    )
+
+    try:
+        payload = {"content": message}
+        response = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
+        if response.status_code != 204:
+            print(f"[WARNING] Discord alert failed with status {response.status_code}: {response.text}")
+    except Exception as e:
+        print(f"[WARNING] Error sending Discord alert: {e}")
 
 def run_standalone_scanner():
-    from tws_data_fetcher import create_tws_data_app
-    from top_gainers_fetcher import get_top_gainers
+    # Setup TWS App
+    from ibkr_scanner import IBKRScannerApp
+    tws_app = IBKRScannerApp()
+    tws_app.connect("127.0.0.1", 7496, clientId=10)
+    
+    # Wait for connection
+    time.sleep(2)
     
     # Get dynamic top gainers list (updates every 10 minutes)
     print("[INIT] Fetching top gainers list...")
@@ -486,21 +410,17 @@ def run_standalone_scanner():
     
     print("[INIT] Connecting to TWS for standalone scanner...")
     print(f"[INIT] Current market session: {get_market_session()}")
-    tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=999)
-    if not tws_app:
-        print("[ERROR] Could not connect to TWS. Exiting.")
-        return
-
-    scanner = RealtimeBroadScanner(symbols=unique_symbols)
-    scanner.last_session = get_market_session()
     
-    # Voice Announcement Handler
+    scanner = RealtimeBroadScanner(unique_symbols)
+
     def alert_handler(symbol, timestamp, reasons, monitor):
         session = get_market_session()
-        # We only want the core reason for voice, not the detailed price strings
-        voice_reason = "Squeeze detected" if "Squeeze" in str(reasons) else "Momentum alert"
+        voice_reason = reasons[0] if reasons else "Condition met"
         alert_msg = f"{session} Alert! {symbol} triggered {voice_reason}"
         print(f"[ALERT] {alert_msg}")
+        
+        # Send Discord Alert
+        send_discord_alert(symbol, session, reasons, monitor)
         
         # Voice announcement - platform-specific
         try:

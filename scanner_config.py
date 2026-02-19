@@ -23,6 +23,9 @@ HIGH_RVOL_MIN = 3.0         # 300% of daily average
 SQUEEZE_PCT_THRESHOLD = 10.0   # Percentage increase required
 SQUEEZE_TIME_MINUTES = 5       # Time window in minutes
 
+# DISCORD ALERT CONFIGURATION
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1474054384131248310/43pw1SxLPf2j9Rj1gRrh6SL3SZ9zuHhqn2QmRFZ-sZ7a_DnordIXbbHFKxyaGjYzoSAg"
+
 # IN-DEPTH FILTERING (Used in run_realtime_trading.py)
 STRICT_MOMENTUM_REQUIRED = True
 MIN_PRICE_SURGE_10S = 1.5   # 1.5% surge in 10s
