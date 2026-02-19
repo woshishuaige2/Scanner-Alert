@@ -13,7 +13,7 @@ from ibapi.wrapper import EWrapper
 from ibapi.scanner import ScannerSubscription
 from ibapi.contract import ContractDetails
 
-class IBKRScanner(EWrapper, EClient):
+class IBKRScannerApp(EWrapper, EClient):
     """IBKR Scanner using native TWS scanner API"""
     
     def __init__(self):
@@ -79,7 +79,7 @@ def get_top_gainers_ibkr(top_n: int = 20, host: str = "127.0.0.1", port: int = 7
     print(f"[IBKR SCANNER] Fetching top {top_n} gainers from IBKR...")
     
     # Create scanner app
-    scanner_app = IBKRScanner()
+    scanner_app = IBKRScannerApp()
     
     try:
         # Connect to TWS
