@@ -44,7 +44,7 @@ class TopGainersFetcher:
         """Fetch top gainers from IBKR native scanner."""
         try:
             from ibkr_scanner import get_top_gainers_ibkr
-            from realtime_scanner_premarket import get_market_session
+            from realtime_multi_session_scanner import get_market_session
             
             session = get_market_session()
             is_premarket = (session == "PREMARKET")
