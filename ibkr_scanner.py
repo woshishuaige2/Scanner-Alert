@@ -118,11 +118,14 @@ def get_top_gainers_ibkr(top_n: int = 20, host: str = "127.0.0.1", port: int = 7
         scanner_app.reqScannerSubscription(req_id, scan_sub, [], [])
         
         # Wait for results
-        timeout = 15
+        timeout = 10  # Reduced timeout for startup gainer fetching
         waited = 0
         while not scanner_app.scanner_complete and waited < timeout:
             time.sleep(0.1)
             waited += 0.1
+        
+        if not scanner_app.scanner_complete:
+            print("[IBKR SCANNER] Scanner results timed out, continuing with partial results...")
         
         # Cancel subscription
         scanner_app.cancelScannerSubscription(req_id)
