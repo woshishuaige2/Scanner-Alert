@@ -466,7 +466,7 @@ def run_standalone_scanner():
     # Session transition check interval
     last_session_check = datetime.now()
     last_symbol_update = datetime.now()
-    symbol_update_interval = 600  # Update every 10 minutes
+    symbol_update_interval = 60  # Update every 1 minute (testing)
     
     try:
         while True:
@@ -476,7 +476,7 @@ def run_standalone_scanner():
                     scanner.resync_vwap_all_symbols(tws_app)
                 last_session_check = datetime.now()
             
-            # Periodic Symbol List Update (every 10 minutes)
+            # Periodic Symbol List Update (every 1 minute - testing)
             if (datetime.now() - last_symbol_update).total_seconds() >= symbol_update_interval:
                 unique_symbols = update_scanner_symbols(scanner, tws_app, unique_symbols)
                 last_symbol_update = datetime.now()
