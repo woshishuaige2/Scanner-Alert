@@ -374,15 +374,11 @@ def send_discord_alert(symbol, session, reasons, monitor):
     if monitor.day_start_price and monitor.day_start_price > 0:
         gain_pct = ((price - monitor.day_start_price) / monitor.day_start_price) * 100
 
-    # Construct the message
+    # Construct the message - refined for concise notification
+    # Format: [SESSION] SYMBOL | PRICE (GAIN%) | SQUEEZE/TRIGGER
     message = (
-        f"🚨 **{session} ALERT: {symbol}** 🚨\n"
-        f"**Trigger:** {reason_str}\n"
-        f"**Price:** ${price:.2f} ({gain_pct:+.2f}% from start)\n"
-        f"**VWAP:** ${vwap:.2f} (Price {'above' if price > vwap else 'below'} VWAP)\n"
-        f"**RelVol:** {rel_vol:.2f}x\n"
-        f"**Session Vol:** {session_vol:,.0f}\n"
-        f"**Time (ET):** {datetime.now(pytz.timezone('US/Eastern')).strftime('%H:%M:%S')}"
+        f"🚀 **{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | {reason_str}\n"
+        f"*{session}* | VWAP: ${vwap:.2f} | RelVol: {rel_vol:.2f}x | Vol: {session_vol:,.0f}"
     )
 
     try:
