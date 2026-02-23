@@ -403,13 +403,13 @@ def run_standalone_scanner():
         print("[DEBUG] 4. If you are using Paper Trading, use port 7497. If Live, use 7496.")
         return
     
-    # Wait for connection to stabilize
-    print("[INIT] Waiting for connection to stabilize...")
-    time.sleep(1)
+    # Wait for connection
+    time.sleep(2)
     
     # Get dynamic top gainers list (updates every 10 minutes)
-    print("[INIT] Fetching top gainers list from IBKR/Yahoo...")
-    SYMBOLS = get_top_gainers(top_n=20, ibkr_port=TWS_PORT)
+    print("[INIT] Fetching top gainers list...")
+    # Use IBKR scanner for most accurate gainers data
+    SYMBOLS = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT)
     unique_symbols = list(set(SYMBOLS))
     print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
     

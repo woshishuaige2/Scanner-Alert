@@ -93,6 +93,14 @@ class TWSDataApp(EClient, EWrapper):
         with open("tws_errors.log", "a") as f:
             f.write(f"{datetime.now()}: ReqId={reqId}, Code={errorCode}, Msg={errorString}\n")
 
+        # Critical connection errors that prevent startup
+        if errorCode in [326, 502, 503, 504]:
+            print(f"[TWS CRITICAL ERROR] Code {errorCode}: {errorString}")
+            if errorCode == 326:
+                print("[SOLUTION] Client ID is in use. Change client_id in code or restart TWS")
+            self.connected = False
+            return
+
         # Suppress common info/warning messages that don't affect functionality
         suppressed_codes = [
             2104, 2106, 2107, 2119, 2158,  # Market data farm connection messages
@@ -408,6 +416,21 @@ class TWSDataApp(EClient, EWrapper):
             with self.lock:
                 if req_id in self.fundamental_events: del self.fundamental_events[req_id]
             return None
+        
+    def fetch_last_close(self, symbol: str) -> Optional[float]:
+        """Fetch the last closing price for a symbol."""
+        bars = self.fetch_historical_bars(symbol, datetime.now(), duration="1 D", bar_size="1 min")
+        if bars:
+            return bars[-1]['close']
+        return None
+
+    def fetch_current_vwap(self, symbol: str) -> Optional[float]:
+        """Fetch the current VWAP for a symbol."""
+        with self.lock:
+            if symbol in self.realtime_data:
+                return self.realtime_data[symbol].get('vwap')
+        return None
+
 
 
 def create_tws_data_app(host="127.0.0.1", port=7497, client_id=0) -> Optional[TWSDataApp]:
@@ -432,16 +455,3 @@ def create_tws_data_app(host="127.0.0.1", port=7497, client_id=0) -> Optional[TW
         return None
     return app
 
-def fetch_last_close(self, symbol: str) -> Optional[float]:
-    """Fetch the last closing price for a symbol."""
-    bars = self.fetch_historical_bars(symbol, datetime.now(), duration="1 D", bar_size="1 min")
-    if bars:
-        return bars[-1]['close']
-    return None
-
-def fetch_current_vwap(self, symbol: str) -> Optional[float]:
-    """Fetch the current VWAP for a symbol."""
-    with self.lock:
-        if symbol in self.realtime_data:
-            return self.realtime_data[symbol].get('vwap')
-    return None
