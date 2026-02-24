@@ -80,9 +80,11 @@ class RealtimeSymbolMonitor:
         self.float_shares = None
         self.avg_daily_volume = None
         self.relative_volume = 0.0
+        self.rel_vol_1m = 0.0 # 1-minute relative volume fallback
         
         # Premarket-specific tracking
         self.session_volume = 0.0  # Volume for current session only
+        self.minute_volumes = deque(maxlen=11) # Track last 11 minutes of volume for 1m-RelVol
         self.last_session = None
         self.day_start_price = None  # Track first price of the day for total % gain calculation
         self.last_day = None  # Track which day we're on
@@ -133,24 +135,35 @@ class RealtimeSymbolMonitor:
         self.ask = ask
         self.vwap = vwap
         
-        # Track session volume
+        # Track session volume and 1-minute relative volume
         if len(self.volume_history) >= 2:
             volume_delta = volume - self.volume_history[-2][1]
             if volume_delta > 0:
                 self.session_volume += volume_delta
+                
+                # Update minute volumes for fallback RelVol
+                if not self.minute_volumes or (now - self.minute_volumes[-1][0]).total_seconds() >= 60:
+                    self.minute_volumes.append([now, volume_delta])
+                else:
+                    self.minute_volumes[-1][1] += volume_delta
         
-        # Calculate Relative Volume based on session
+        # Calculate 1-minute Relative Volume (fallback)
+        if len(self.minute_volumes) >= 2:
+            current_min_vol = self.minute_volumes[-1][1]
+            prev_minutes = list(self.minute_volumes)[:-1]
+            avg_min_vol = sum(v[1] for v in prev_minutes) / len(prev_minutes)
+            self.rel_vol_1m = current_min_vol / avg_min_vol if avg_min_vol > 0 else 0.0
+
+        # Calculate Daily Relative Volume based on session
         if self.avg_daily_volume and self.avg_daily_volume > 0:
             if current_session == "PREMARKET":
-                # For premarket, compare to typical premarket volume (assume ~5% of daily)
                 typical_premarket_vol = self.avg_daily_volume * 0.05
-                if typical_premarket_vol > 0:
-                    self.relative_volume = self.session_volume / typical_premarket_vol
-                else:
-                    self.relative_volume = 0.0
+                self.relative_volume = self.session_volume / typical_premarket_vol if typical_premarket_vol > 0 else 0.0
             else:
-                # Regular hours: use standard daily volume comparison
                 self.relative_volume = volume / self.avg_daily_volume
+        else:
+            # If no fundamental daily volume, use our 1m fallback as the main metric
+            self.relative_volume = self.rel_vol_1m
 
     def check_screening_conditions(self) -> List[str]:
         if not self.price_history:
@@ -307,13 +320,17 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
             gain_pct = ((price - monitor.day_start_price) / monitor.day_start_price) * 100
             
         rel_vol = monitor.relative_volume
+        rel_vol_str = f"{rel_vol:>7.2f}x"
+        if rel_vol == 0 and monitor.rel_vol_1m > 0:
+            rel_vol_str = f"{monitor.rel_vol_1m:>7.2f}m" # 'm' indicates 1-minute fallback
+            
         conditions = ", ".join(monitor.triggered_conditions) if monitor.triggered_conditions else ""
         
         # Highlight if conditions met
         if monitor.triggered_conditions:
-            print(f"\033[92m{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol:>7.2f}x | {conditions}\033[0m")
+            print(f"\033[92m{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol_str} | {conditions}\033[0m")
         else:
-            print(f"{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol:>7.2f}x | {conditions}")
+            print(f"{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol_str} | {conditions}")
 
     print("\n" + "="*80)
     print("RECENT ALERTS:")

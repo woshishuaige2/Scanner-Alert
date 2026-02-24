@@ -418,10 +418,15 @@ class TWSDataApp(EClient, EWrapper):
             return None
         
     def fetch_last_close(self, symbol: str) -> Optional[float]:
-        """Fetch the last closing price for a symbol."""
-        bars = self.fetch_historical_bars(symbol, datetime.now(), duration="1 D", bar_size="1 min")
-        if bars:
-            return bars[-1]['close']
+        """Fetch the last closing price for a symbol (from the previous regular trading session)."""
+        # We request 2 days to ensure we span across weekends/holidays and get the previous session's close
+        bars = self.fetch_historical_bars(symbol, datetime.now(), duration="2 D", bar_size="1 day", what_to_show="TRADES")
+        if len(bars) >= 2:
+            # bars[-1] is today's current bar, bars[-2] is the previous day's complete bar
+            return bars[-2]['close']
+        elif len(bars) == 1:
+            # If only one bar returned, it might be the previous day's close if today hasn't started
+            return bars[0]['close']
         return None
 
     def fetch_current_vwap(self, symbol: str) -> Optional[float]:
