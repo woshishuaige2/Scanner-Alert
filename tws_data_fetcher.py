@@ -211,7 +211,18 @@ class TWSDataApp(EClient, EWrapper):
                 self.realtime_data[symbol]['ask_size'] = size
         elif tt == 'VOLUME':
             with self.lock:
-                self.realtime_data[symbol]['volume'] = size
+                old_volume = self.realtime_data[symbol].get('volume', 0)
+                
+                # IBKR volume unit correction: Some stocks report in units of 100
+                # This is common for penny stocks and certain securities
+                corrected_size = size
+                if size < 10000 and size > 0:  # Suspiciously low volume
+                    # Mark for potential correction (will be applied by scanner logic)
+                    if 'volume_unit_checked' not in self.realtime_data[symbol]:
+                        self.realtime_data[symbol]['volume_needs_correction'] = True
+                        self.realtime_data[symbol]['volume_unit_checked'] = True
+                
+                self.realtime_data[symbol]['volume'] = corrected_size
                 
                 # Trigger callback when we have price and volume update
                 price = self.realtime_data[symbol]['price']
@@ -428,6 +439,24 @@ class TWSDataApp(EClient, EWrapper):
             # If only one bar returned, it might be the previous day's close if today hasn't started
             return bars[0]['close']
         return None
+    
+    def fetch_avg_daily_volume(self, symbol: str, days: int = 10) -> Optional[float]:
+        """Calculate average daily volume from historical data (fallback when fundamental data unavailable)."""
+        # Request historical daily bars to calculate average volume
+        duration = f"{days} D"
+        bars = self.fetch_historical_bars(symbol, datetime.now(), duration=duration, bar_size="1 day", what_to_show="TRADES")
+        
+        if not bars:
+            return None
+        
+        # Calculate average volume from the bars (excluding today's incomplete bar)
+        complete_bars = bars[:-1] if len(bars) > 1 else bars
+        if not complete_bars:
+            return None
+            
+        total_volume = sum(bar['volume'] for bar in complete_bars)
+        avg_volume = total_volume / len(complete_bars)
+        return avg_volume if avg_volume > 0 else None
 
     def fetch_current_vwap(self, symbol: str) -> Optional[float]:
         """Fetch the current VWAP for a symbol."""

@@ -927,3 +927,837 @@ of version 954.1 or newer:  TWS: 7497; IB Gateway: 4002
 2026-02-17 11:02:08.979320: ReqId=2045, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
 2026-02-17 11:02:39.089373: ReqId=2046, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
 2026-02-17 11:03:09.206237: ReqId=2047, Code=321, Msg=Error validating request.-'bL' : cause - When specifying a unit, historical data request duration format is integer{SPACE}unit (S|D|W|M|Y).
+2026-02-20 09:49:12.321674: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-20 09:49:12.321674: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarmnj
+2026-02-20 09:49:12.321674: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 09:49:12.322676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfuture
+2026-02-20 09:49:12.322676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 09:49:12.322676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 09:49:12.323676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 09:49:12.323676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 09:49:12.323676: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 09:49:12.323676: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-20 09:49:12.323676: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-20 09:49:12.323676: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 09:49:12.323676: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 09:50:53.238252: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 09:53:21.372425: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-20 09:53:21.373424: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarmnj
+2026-02-20 09:53:21.373424: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 09:53:21.377421: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfuture
+2026-02-20 09:53:21.377421: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 09:53:21.377421: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 09:53:21.377421: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 09:53:21.378422: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 09:53:21.378422: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 09:53:21.379422: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-20 09:53:21.379422: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-20 09:53:21.379422: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 09:53:21.380421: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 09:55:37.856038: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-20 09:55:37.857038: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-20 09:55:37.859037: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-20 09:55:37.860036: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-20 09:55:37.861037: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-20 09:55:37.862036: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-20 09:57:23.614923: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 09:57:23.615920: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 09:57:23.615920: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 09:57:23.616921: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 09:57:23.616921: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 09:57:23.616921: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 09:57:23.616921: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-20 09:57:23.616921: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-20 09:57:23.618470: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 09:57:23.618470: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:02:35.714401: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:02:35.717399: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:02:35.718400: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:02:35.719399: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:02:35.719399: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:02:35.720902: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:02:35.720902: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-20 10:02:35.721907: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-20 10:02:35.721907: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:02:35.722907: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:06:16.943627: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 10:06:51.474628: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 10:07:26.926255: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 10:07:45.520940: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:07:45.521946: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:07:45.521946: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:07:45.522944: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:07:45.523942: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:07:45.523942: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:07:45.523942: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-20 10:07:45.523942: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-20 10:07:45.523942: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:07:45.524942: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:07:58.845827: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:07:58.846827: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:07:58.846827: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:07:58.858825: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:07:58.858825: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:07:58.858825: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:07:58.859828: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-20 10:07:58.859828: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-20 10:07:58.859828: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:07:58.859828: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:08:05.047553: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:08:15.056402: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:08:25.054142: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:08:35.070037: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:08:45.082084: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:08:55.083645: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:09:05.089693: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:09:15.089191: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:09:25.092474: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:09:35.103976: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:09:45.108416: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:09:55.106026: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:10:05.117626: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:10:05.618950: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 10:10:15.125281: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:10:25.136655: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:10:35.140960: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:10:45.143387: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:10:55.151478: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:13:14.191951: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:13:14.193951: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:13:14.193951: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:13:14.194956: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:13:14.195952: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:13:14.195952: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:13:14.196951: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:13:14.196951: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:13:29.791693: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:13:29.791693: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:13:29.792694: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:13:29.797692: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:13:29.797692: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:13:29.797692: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:13:29.798693: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:13:29.802695: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:13:33.716245: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:13:43.694541: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:13:53.697527: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:14:03.703423: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:14:13.713823: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:14:23.713387: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:14:33.713655: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:14:43.714252: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:14:53.723431: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:15:03.732572: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:15:13.735577: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:15:23.741667: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:15:33.754910: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:15:43.759534: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:15:53.768235: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:16:03.780503: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:16:13.792007: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:16:23.804565: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:16:33.818296: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:16:43.824454: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:19:01.839670: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:19:01.840669: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:19:01.840669: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:19:01.841672: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:19:01.841672: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:19:01.842670: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:19:01.842670: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:19:01.842670: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:19:05.244598: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:19:15.244326: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:19:25.256754: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:19:35.260441: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:19:45.262844: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:19:55.264849: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:20:05.277793: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:20:15.291586: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:20:24.135084: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:20:24.136083: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:20:24.136083: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:20:24.137084: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:20:24.137084: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:20:24.137084: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:20:24.137084: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:20:24.137084: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:20:33.639217: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 10:27:49.232867: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:27:49.233869: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:27:49.233869: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:27:49.234868: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:27:49.234868: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:27:49.234868: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:27:49.235869: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:27:49.235869: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:27:55.062938: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:28:05.068608: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:28:15.068941: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:28:24.575236: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 10:28:25.101316: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:28:34.103815: ReqId=-1, Code=326, Msg=Unable to connect as the client id is already in use. Retry with a unique client id.
+2026-02-20 10:28:35.087467: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:28:45.089059: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:28:55.088980: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:28:58.473503: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:28:58.474501: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:28:58.475508: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:28:58.475508: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:28:58.475508: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:28:58.476506: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:28:58.476506: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:28:58.476506: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:29:01.216778: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:05.098724: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:11.126139: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:15.107440: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:21.132432: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:25.109564: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:31.138039: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:35.110254: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:41.154126: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:45.116745: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:51.164421: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:29:55.129199: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:01.175641: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:05.138938: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:11.189036: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:15.152417: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:21.194787: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:25.143465: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:31.203563: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:35.157842: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:41.211717: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:45.166868: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:51.219341: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:30:55.175134: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:31:01.234407: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:31:05.183214: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:31:11.247464: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:31:21.262140: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:31:31.268264: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:31:41.279194: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:31:51.286327: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:32:01.285193: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:32:11.293046: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:38:21.725234: ReqId=2060, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:39:27.857929: ReqId=2060, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:59:32.238325: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-20 10:59:32.239325: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 10:59:32.239325: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarm
+2026-02-20 10:59:32.239325: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-20 10:59:32.239325: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-20 10:59:32.240325: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-20 10:59:32.240325: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-20 10:59:32.240325: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-20 10:59:35.168301: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:59:45.067203: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 10:59:55.079340: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:00:05.091945: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:00:15.095719: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:00:25.098852: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:00:35.106305: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:00:45.118505: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:00:55.120013: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:01:05.119976: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:01:15.126389: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:01:25.133029: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:01:35.146164: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:01:45.154920: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:01:55.155084: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:02:05.170255: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:02:15.186548: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:02:25.197696: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:02:35.211244: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:02:45.224402: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 11:10:01.496486: ReqId=2060, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-20 13:12:05.695259: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:jfarm
+2026-02-20 13:12:07.151145: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-20 14:31:49.231598: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:jfarm
+2026-02-20 14:31:50.932976: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-23 01:23:55.185954: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-02-23 01:23:55.699772: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:jfarm
+2026-02-23 01:23:55.725803: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:eufarm
+2026-02-23 01:23:55.878232: ReqId=-1, Code=2105, Msg=HMDS data farm connection is broken:ushmds
+2026-02-23 01:23:56.135854: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usopt.nj
+2026-02-23 01:23:56.186502: ReqId=-1, Code=2157, Msg=Sec-def data farm connection is broken:secdefnj
+2026-02-23 01:24:28.438623: ReqId=-1, Code=1100, Msg=Connectivity between IBKR and Trader Workstation has been lost.
+2026-02-23 01:24:28.459619: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usfarm
+2026-02-23 01:24:28.542467: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usfarm.nj
+2026-02-23 01:27:33.297997: ReqId=-1, Code=1100, Msg=Connectivity between IBKR and Trader Workstation has been lost.
+2026-02-23 01:30:34.587901: ReqId=-1, Code=1100, Msg=Connectivity between IBKR and Trader Workstation has been lost.
+2026-02-23 10:34:45.799168: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-23 10:34:45.801168: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-23 10:34:45.801168: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-23 10:34:45.801168: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfuture
+2026-02-23 10:34:45.802171: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-23 10:34:45.802171: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-23 10:34:45.802171: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarmnj
+2026-02-23 10:34:45.802171: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-23 10:34:45.802171: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-23 10:34:45.802171: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-23 10:34:45.802171: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-23 10:34:45.803680: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-23 10:34:52.490662: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:35:02.412076: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:35:12.412288: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:35:22.421020: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:35:32.447356: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:35:42.457740: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:35:52.460602: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:36:02.471309: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:36:12.478355: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:36:22.482504: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:36:32.487763: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:36:42.498913: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:36:52.507309: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:37:02.510084: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:37:12.520424: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:37:22.531371: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:37:32.554214: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:37:42.549462: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:37:46.696256: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-23 10:37:46.699256: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-23 10:37:46.707260: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-23 10:37:46.709261: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-23 10:37:46.711261: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-23 10:37:46.712260: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-23 10:37:52.566081: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:38:02.577476: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:45:23.104088: ReqId=2080, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:45:33.714401: ReqId=2084, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:45:43.921509: ReqId=2088, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:45:54.147233: ReqId=2092, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 10:55:10.949607: ReqId=2096, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:05:26.529136: ReqId=2100, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:15:40.611235: ReqId=2104, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:15:51.120022: ReqId=2108, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:16:01.423051: ReqId=2112, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:16:11.733066: ReqId=2116, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:25:27.534008: ReqId=2120, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:25:37.940164: ReqId=2124, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 11:35:55.779299: ReqId=2128, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:00:25.083912: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-23 12:00:25.085916: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-23 12:00:25.085916: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-23 12:00:25.085916: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfuture
+2026-02-23 12:00:25.086919: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-23 12:00:25.086919: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-23 12:00:25.086919: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarmnj
+2026-02-23 12:00:25.086919: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-23 12:00:25.087916: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-23 12:00:25.088916: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-23 12:00:25.088916: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-23 12:00:25.088916: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-23 12:00:32.617169: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:00:42.525567: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:00:52.526561: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:01:02.534287: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:01:12.532235: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:01:22.536350: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:01:32.536630: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:01:42.542336: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:01:52.554825: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:02:02.556449: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:02:12.569200: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:02:22.571643: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:02:26.328670: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-23 12:02:26.328670: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-23 12:02:26.331184: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-23 12:02:26.334190: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-23 12:02:26.335198: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-23 12:02:26.335198: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-23 12:02:32.580871: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:02:42.594266: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:02:52.595819: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:03:02.599230: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:03:12.605488: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:03:22.615872: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:03:32.615736: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:03:42.636120: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:11:05.069430: ReqId=2080, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:11:15.486431: ReqId=2084, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:11:25.792658: ReqId=2088, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:20:40.262671: ReqId=2092, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:20:50.776085: ReqId=2096, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:41:07.320141: ReqId=2100, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:41:17.734222: ReqId=2104, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 12:51:31.476988: ReqId=2108, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 13:00:45.340308: ReqId=2112, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 14:18:53.278845: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:hfarm
+2026-02-23 14:18:55.195884: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-23 14:20:51.989343: ReqId=2116, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 14:24:50.094305: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:hfarm
+2026-02-23 14:24:51.449810: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-23 14:31:07.445729: ReqId=2120, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 14:31:17.958229: ReqId=2124, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 15:10:56.505805: ReqId=2128, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 16:01:49.473651: ReqId=2132, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 16:01:59.997215: ReqId=2136, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-23 16:02:09.887432: ReqId=2137, Code=162, Msg=Historical Market Data Service error message:HMDS query returned no data: ASPCR@SMART Trades
+2026-02-23 16:02:40.194854: ReqId=2139, Code=162, Msg=Historical Market Data Service error message:HMDS query returned no data: ASPCR@SMART Trades
+2026-02-24 08:48:54.726156: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-24 08:48:54.726156: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-24 08:48:54.726156: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-24 08:48:54.727156: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-24 08:48:54.727156: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-24 08:48:54.728163: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-24 08:48:54.728163: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-24 08:48:54.729159: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-24 08:48:54.730158: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-24 08:48:54.732160: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-24 08:49:01.933512: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:49:11.836684: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:49:21.843974: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:49:31.851596: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:49:41.862277: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:49:51.864068: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:50:01.878470: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:50:11.889408: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:50:21.897224: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:50:31.900357: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:50:41.907074: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:50:51.915870: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:51:01.922161: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:51:11.926578: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:51:21.932141: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:51:31.942756: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:51:41.959656: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:51:51.971269: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:52:01.972468: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:52:11.984769: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:59:32.613720: ReqId=2080, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 08:59:43.109556: ReqId=2084, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:19:04.451146: ReqId=2088, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:28:35.094908: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-24 09:28:35.095907: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-24 09:28:35.095907: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-24 09:28:35.096903: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-24 09:28:35.096903: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-24 09:28:35.096903: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-24 09:28:35.096903: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-24 09:28:35.097904: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-24 09:28:35.097904: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-24 09:28:35.097904: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-24 09:28:41.903353: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:28:51.819597: ReqId=2001, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:29:01.825030: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:29:11.835254: ReqId=2003, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:29:21.848374: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:29:31.855772: ReqId=2005, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:29:41.863726: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:29:51.871869: ReqId=2007, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:30:01.874610: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:30:11.870932: ReqId=2009, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:30:21.870786: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:30:31.878193: ReqId=2011, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:30:41.888475: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:30:51.895758: ReqId=2013, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:31:01.906194: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:31:11.907347: ReqId=2015, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:31:21.917497: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:31:31.923509: ReqId=2017, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:31:41.929060: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:31:51.939410: ReqId=2019, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:38:51.030638: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-24 09:38:51.031637: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-24 09:38:51.031637: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-24 09:38:51.032638: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-24 09:38:51.032638: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-24 09:38:51.033646: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-24 09:38:51.033646: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-24 09:38:51.033646: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-24 09:38:51.034639: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-24 09:38:51.034639: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-24 09:38:53.665964: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:39:03.787944: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:39:13.888990: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:39:24.000749: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:39:34.106452: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:39:44.211964: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:39:54.322075: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:40:04.535996: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:40:14.649187: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:40:24.753324: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:40:34.955922: ReqId=2020, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:40:45.166233: ReqId=2022, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:40:55.272504: ReqId=2024, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:41:05.379581: ReqId=2026, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:41:15.489879: ReqId=2028, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:41:25.703503: ReqId=2030, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:41:35.816849: ReqId=2032, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:41:45.926539: ReqId=2034, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:41:56.139644: ReqId=2036, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:42:06.242922: ReqId=2038, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:48:07.435280: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-24 09:48:07.436284: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-24 09:48:07.436284: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-24 09:48:07.436284: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-24 09:48:07.437280: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-24 09:48:07.437280: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-24 09:48:07.437280: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-24 09:48:07.438282: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-24 09:48:07.438282: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-24 09:48:07.438282: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-24 09:48:11.920515: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:48:22.039585: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:48:32.144361: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:48:42.246529: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:48:52.352052: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:49:02.460822: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:49:12.567497: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:49:22.687826: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:49:32.904432: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:49:43.122726: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:49:53.339711: ReqId=2020, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:50:03.542782: ReqId=2022, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:50:13.649202: ReqId=2024, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:50:23.765876: ReqId=2026, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:50:33.871750: ReqId=2028, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:50:44.075837: ReqId=2030, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:50:54.188165: ReqId=2032, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:51:04.306090: ReqId=2034, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:51:14.405754: ReqId=2036, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:51:24.522796: ReqId=2038, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:54:20.807772: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-24 09:54:20.808771: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-24 09:54:20.808771: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-24 09:54:20.810772: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-24 09:54:20.810772: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-24 09:54:20.811444: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-24 09:54:20.811444: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-24 09:54:20.812454: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-24 09:54:20.812454: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-24 09:54:20.812454: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-24 09:54:23.754590: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:54:33.982976: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:54:44.079631: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:54:54.186592: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:55:04.289442: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:55:14.410119: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:55:24.516988: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:55:34.629235: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:55:44.850418: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:55:54.959433: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:56:05.076094: ReqId=2020, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:56:15.293469: ReqId=2022, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:56:25.404128: ReqId=2024, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:56:35.511295: ReqId=2026, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:56:45.624533: ReqId=2028, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:56:55.838618: ReqId=2030, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:57:05.940939: ReqId=2032, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:57:16.054359: ReqId=2034, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:57:26.156939: ReqId=2036, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 09:57:36.263694: ReqId=2038, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:04:54.718543: ReqId=2100, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:05:05.140017: ReqId=2105, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:05:15.452982: ReqId=2110, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:05:25.772035: ReqId=2115, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:05:35.978764: ReqId=2120, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:14:49.781843: ReqId=2125, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:25:06.714186: ReqId=2130, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:35:24.408532: ReqId=2135, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:35:35.024202: ReqId=2140, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:35:45.244786: ReqId=2145, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:45:01.516122: ReqId=2150, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 10:55:18.292553: ReqId=2155, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:04:35.230316: ReqId=2160, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:14:52.341383: ReqId=2165, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:25:09.457908: ReqId=2170, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:35:26.547519: ReqId=2175, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:35:37.060527: ReqId=2180, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:44:53.329276: ReqId=2185, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:45:03.940804: ReqId=2190, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 11:55:21.369253: ReqId=2195, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:14:43.705475: ReqId=2200, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:25:00.246065: ReqId=2205, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:35:17.560035: ReqId=2210, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:35:28.168897: ReqId=2215, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:44:44.579331: ReqId=2220, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:44:55.189905: ReqId=2225, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:55:12.043901: ReqId=2230, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 12:55:22.563388: ReqId=2235, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 13:04:38.835051: ReqId=2240, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 13:25:02.154992: ReqId=2245, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 14:05:38.478663: ReqId=2250, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 14:10:04.165759: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:hfarm
+2026-02-24 14:10:05.709947: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-24 14:14:54.427969: ReqId=2255, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 16:13:26.249213: ReqId=2260, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-24 16:13:30.503420: ReqId=-1, Code=1100, Msg=Connectivity between IBKR and Trader Workstation has been lost.
+2026-02-24 16:13:32.967787: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:hfarm
+2026-02-24 16:13:32.984298: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cafarm
+2026-02-24 16:13:33.012302: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-02-24 16:13:33.027304: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usopt.nj
+2026-02-24 16:13:33.072327: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usfarm.nj
+2026-02-24 16:13:33.208969: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usfarm
+2026-02-24 16:13:33.227483: ReqId=-1, Code=2157, Msg=Sec-def data farm connection is broken:secdefnj
+2026-02-24 16:13:33.242004: ReqId=-1, Code=2105, Msg=HMDS data farm connection is broken:fundfarm
+2026-02-24 16:13:33.255517: ReqId=-1, Code=2105, Msg=HMDS data farm connection is broken:euhmds
+2026-02-24 16:13:33.262517: ReqId=-1, Code=2105, Msg=HMDS data farm connection is broken:ushmds
+2026-02-24 16:13:34.251499: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-24 16:13:34.322562: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-24 16:13:34.323802: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-24 16:13:34.417182: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-24 16:13:34.444770: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-24 16:13:34.459275: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-24 16:13:34.698515: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-24 16:13:34.986832: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-24 16:13:34.987835: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-24 16:13:35.168601: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-24 16:13:35.320562: ReqId=-1, Code=1102, Msg=Connectivity between IBKR and Trader Workstation has been restored - data maintained. All data farms are connected: cafarm; hfarm; cashfarm; usopt.nj; usfarm.nj; usfarm; euhmds; fundfarm; ushmds; secdefnj.
+2026-02-25 08:06:47.078245: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-25 08:06:47.078245: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-25 08:06:47.079754: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarmnj
+2026-02-25 08:06:47.079754: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-25 08:06:47.079754: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfuture
+2026-02-25 08:06:47.080766: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-25 08:06:47.080766: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-25 08:06:47.082764: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-25 08:06:47.082764: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-25 08:06:47.082764: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-25 08:06:47.083764: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-25 08:06:47.083764: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-25 08:06:47.083764: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-25 08:06:53.785422: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:07:03.896395: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:07:14.099179: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:07:24.313216: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:07:34.519128: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:07:44.732097: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:07:54.943227: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:08:05.156995: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:08:15.361001: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:08:25.563956: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:08:35.778746: ReqId=2020, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:08:45.996345: ReqId=2022, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:08:55.795064: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-25 08:08:55.799063: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-25 08:08:55.805063: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-25 08:08:55.811065: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-25 08:08:55.812065: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-25 08:08:55.814064: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-25 08:08:56.199283: ReqId=2024, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:09:06.402592: ReqId=2026, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:09:16.609340: ReqId=2028, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:09:26.812100: ReqId=2030, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:09:37.017960: ReqId=2032, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:09:47.222926: ReqId=2034, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:09:57.438326: ReqId=2036, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:10:07.656423: ReqId=2038, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:17:27.179145: ReqId=2100, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:17:37.682088: ReqId=2105, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:17:48.095070: ReqId=2110, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:27:05.188012: ReqId=2115, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:27:15.704805: ReqId=2120, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:37:33.495429: ReqId=2125, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:37:44.109083: ReqId=2130, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:47:01.150165: ReqId=2135, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:47:11.763414: ReqId=2140, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 08:57:28.057725: ReqId=2145, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:07:44.516192: ReqId=2150, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:16:58.269778: ReqId=2155, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:17:08.870503: ReqId=2160, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:17:19.084216: ReqId=2165, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:27:34.255752: ReqId=2170, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:37:50.856583: ReqId=2175, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:38:01.460095: ReqId=2180, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:38:11.667316: ReqId=2185, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:38:22.076133: ReqId=2190, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:47:39.953729: ReqId=2195, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:47:50.558117: ReqId=2200, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:48:00.866610: ReqId=2205, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:48:11.167396: ReqId=2210, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:48:21.381502: ReqId=2215, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 09:57:38.883802: ReqId=2220, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 10:07:57.813992: ReqId=2225, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 10:27:23.914140: ReqId=2230, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 10:27:34.523972: ReqId=2235, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 10:37:52.891563: ReqId=2240, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 10:47:10.627776: ReqId=2245, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 10:47:21.332038: ReqId=2250, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:17:56.314174: ReqId=2255, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:18:06.817328: ReqId=2260, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:27:24.445360: ReqId=2265, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:37:43.275710: ReqId=2270, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:37:53.792985: ReqId=2275, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:47:11.286585: ReqId=2280, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:47:21.792837: ReqId=2285, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:57:40.150399: ReqId=2290, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 11:57:50.564692: ReqId=2295, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 12:17:15.505183: ReqId=2300, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 12:17:26.007628: ReqId=2305, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 12:17:36.324946: ReqId=2310, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 13:07:24.584321: ReqId=2315, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 13:27:46.769342: ReqId=2320, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 14:30:17.272702: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:jfarm
+2026-02-25 14:30:19.050353: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-25 14:30:50.310074: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:jfarm
+2026-02-25 14:30:51.641752: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-25 15:17:54.542316: ReqId=2325, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 15:38:14.432825: ReqId=2330, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-25 15:58:53.654089: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:usfarm
+2026-02-25 15:58:54.606584: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-25 17:09:04.678024: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cashfarm
+2026-02-25 17:09:05.304224: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-25 20:08:17.262349: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:08:27.275051: ReqId=2336, Code=504, Msg=Not connected
+2026-02-25 20:08:57.440873: ReqId=2337, Code=504, Msg=Not connected
+2026-02-25 20:09:27.617556: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:09:27.618463: ReqId=2339, Code=504, Msg=Not connected
+2026-02-25 20:09:27.618463: ReqId=2338, Code=504, Msg=Not connected
+2026-02-25 20:09:27.619441: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:09:37.634100: ReqId=2341, Code=504, Msg=Not connected
+2026-02-25 20:10:07.782810: ReqId=2342, Code=504, Msg=Not connected
+2026-02-25 20:10:37.946039: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:10:37.947040: ReqId=2344, Code=504, Msg=Not connected
+2026-02-25 20:10:37.950045: ReqId=2343, Code=504, Msg=Not connected
+2026-02-25 20:10:37.952038: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:10:47.967127: ReqId=2346, Code=504, Msg=Not connected
+2026-02-25 20:11:18.159466: ReqId=2347, Code=504, Msg=Not connected
+2026-02-25 20:11:48.346572: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:11:48.349667: ReqId=2349, Code=504, Msg=Not connected
+2026-02-25 20:11:48.353579: ReqId=2348, Code=504, Msg=Not connected
+2026-02-25 20:11:48.356615: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:11:58.369280: ReqId=2351, Code=504, Msg=Not connected
+2026-02-25 20:12:28.544086: ReqId=2352, Code=504, Msg=Not connected
+2026-02-25 20:12:58.728568: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:12:58.728568: ReqId=2354, Code=504, Msg=Not connected
+2026-02-25 20:12:58.736563: ReqId=2353, Code=504, Msg=Not connected
+2026-02-25 20:12:58.737549: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:13:08.740344: ReqId=2356, Code=504, Msg=Not connected
+2026-02-25 20:13:38.920025: ReqId=2357, Code=504, Msg=Not connected
+2026-02-25 20:14:09.082263: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:14:09.083266: ReqId=2359, Code=504, Msg=Not connected
+2026-02-25 20:14:09.084267: ReqId=2358, Code=504, Msg=Not connected
+2026-02-25 20:14:09.087266: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:14:19.093699: ReqId=2361, Code=504, Msg=Not connected
+2026-02-25 20:14:49.254235: ReqId=2362, Code=504, Msg=Not connected
+2026-02-25 20:15:19.429944: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:15:19.430940: ReqId=2364, Code=504, Msg=Not connected
+2026-02-25 20:15:19.432954: ReqId=2363, Code=504, Msg=Not connected
+2026-02-25 20:15:19.436941: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:15:29.450298: ReqId=2366, Code=504, Msg=Not connected
+2026-02-25 20:15:59.607343: ReqId=2367, Code=504, Msg=Not connected
+2026-02-25 20:16:29.788106: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:16:29.791107: ReqId=2369, Code=504, Msg=Not connected
+2026-02-25 20:16:29.793193: ReqId=2368, Code=504, Msg=Not connected
+2026-02-25 20:16:29.798097: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:16:39.814116: ReqId=2371, Code=504, Msg=Not connected
+2026-02-25 20:17:10.005113: ReqId=2372, Code=504, Msg=Not connected
+2026-02-25 20:17:40.160915: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:17:40.161947: ReqId=2374, Code=504, Msg=Not connected
+2026-02-25 20:17:40.161947: ReqId=2373, Code=504, Msg=Not connected
+2026-02-25 20:17:40.162923: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:17:50.179096: ReqId=2376, Code=504, Msg=Not connected
+2026-02-25 20:18:20.350159: ReqId=2377, Code=504, Msg=Not connected
+2026-02-25 20:18:50.531325: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:18:50.533235: ReqId=2379, Code=504, Msg=Not connected
+2026-02-25 20:18:50.533235: ReqId=2378, Code=504, Msg=Not connected
+2026-02-25 20:18:50.534210: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:19:00.551369: ReqId=2381, Code=504, Msg=Not connected
+2026-02-25 20:19:30.745255: ReqId=2382, Code=504, Msg=Not connected
+2026-02-25 20:20:00.919733: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:20:00.921731: ReqId=2384, Code=504, Msg=Not connected
+2026-02-25 20:20:00.926729: ReqId=2383, Code=504, Msg=Not connected
+2026-02-25 20:20:00.933730: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:20:10.951575: ReqId=2386, Code=504, Msg=Not connected
+2026-02-25 20:20:41.136835: ReqId=2387, Code=504, Msg=Not connected
+2026-02-25 20:21:11.297718: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:21:11.302728: ReqId=2389, Code=504, Msg=Not connected
+2026-02-25 20:21:11.306718: ReqId=2388, Code=504, Msg=Not connected
+2026-02-25 20:21:11.308673: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:21:21.315931: ReqId=2391, Code=504, Msg=Not connected
+2026-02-25 20:21:51.488512: ReqId=2392, Code=504, Msg=Not connected
+2026-02-25 20:22:21.661902: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:22:21.662898: ReqId=2394, Code=504, Msg=Not connected
+2026-02-25 20:22:21.672456: ReqId=2393, Code=504, Msg=Not connected
+2026-02-25 20:22:21.683459: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:22:31.703075: ReqId=2396, Code=504, Msg=Not connected
+2026-02-25 20:23:01.872737: ReqId=2397, Code=504, Msg=Not connected
+2026-02-25 20:23:32.051053: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:23:32.052976: ReqId=2399, Code=504, Msg=Not connected
+2026-02-25 20:23:32.057067: ReqId=2398, Code=504, Msg=Not connected
+2026-02-25 20:23:32.060007: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:23:42.069194: ReqId=2401, Code=504, Msg=Not connected
+2026-02-25 20:24:12.232199: ReqId=2402, Code=504, Msg=Not connected
+2026-02-25 20:24:42.422568: ReqId=-1, Code=504, Msg=Not connected
+2026-02-25 20:24:42.423555: ReqId=2404, Code=504, Msg=Not connected
+2026-02-25 20:24:42.427618: ReqId=2403, Code=504, Msg=Not connected
+2026-02-26 09:06:07.130444: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-26 09:06:07.130444: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:hfarm
+2026-02-26 09:06:07.130444: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:eufarmnj
+2026-02-26 09:06:07.132956: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cashfarm
+2026-02-26 09:06:07.132956: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfuture
+2026-02-26 09:06:07.132956: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usopt.nj
+2026-02-26 09:06:07.133954: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:jfarm
+2026-02-26 09:06:07.133954: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm.nj
+2026-02-26 09:06:07.133954: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:usfarm
+2026-02-26 09:06:07.133954: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:euhmds
+2026-02-26 09:06:07.133954: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:fundfarm
+2026-02-26 09:06:07.134960: ReqId=-1, Code=2106, Msg=HMDS data farm connection is OK:ushmds
+2026-02-26 09:06:07.134960: ReqId=-1, Code=2158, Msg=Sec-def data farm connection is OK:secdefnj
+2026-02-26 09:06:13.869344: ReqId=2000, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:06:23.984643: ReqId=2002, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:06:34.200882: ReqId=2004, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:06:44.419672: ReqId=2006, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:06:54.622736: ReqId=2008, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:07:04.830845: ReqId=2010, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:07:15.039923: ReqId=2012, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:07:25.256849: ReqId=2014, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:07:35.467600: ReqId=2016, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:07:45.679286: ReqId=2018, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:07:55.890307: ReqId=2020, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:07:57.862458: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-26 09:07:57.867457: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.hfarm
+2026-02-26 09:07:57.883457: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-26 09:07:57.891842: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.eufarmnj
+2026-02-26 09:07:57.895844: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-26 09:07:57.900844: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-26 09:07:57.905843: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.usfuture
+2026-02-26 09:07:57.908843: ReqId=-1, Code=2108, Msg=Market data farm connection is inactive but should be available upon demand.jfarm
+2026-02-26 09:08:06.112101: ReqId=2022, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:08:16.327361: ReqId=2024, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:08:26.544359: ReqId=2026, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:08:36.779730: ReqId=2028, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:08:46.986738: ReqId=2030, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:08:57.198251: ReqId=2032, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:09:07.405476: ReqId=2034, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:09:17.618224: ReqId=2036, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:09:27.833252: ReqId=2038, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:16:46.611182: ReqId=2100, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:16:57.229313: ReqId=2105, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:27:12.498265: ReqId=2110, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:27:23.015623: ReqId=2115, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:27:33.431588: ReqId=2120, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:36:49.869241: ReqId=2125, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:37:00.490358: ReqId=2130, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:37:10.705470: ReqId=2135, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:46:24.689255: ReqId=2140, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:46:35.302621: ReqId=2145, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:46:45.601357: ReqId=2150, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:46:55.809348: ReqId=2155, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:47:06.115352: ReqId=2160, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:56:19.470518: ReqId=2165, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:56:30.078355: ReqId=2170, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:56:42.770699: ReqId=2175, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 09:56:53.086093: ReqId=2180, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:07:06.452353: ReqId=2185, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:16:26.834751: ReqId=2190, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:26:45.157686: ReqId=2195, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:26:55.768315: ReqId=2200, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:27:05.976649: ReqId=2205, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:36:24.029962: ReqId=2210, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:36:34.543146: ReqId=2215, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 10:57:01.664838: ReqId=2220, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 11:16:28.758245: ReqId=2225, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 11:36:49.472902: ReqId=2230, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 11:42:03.000379: ReqId=-1, Code=2103, Msg=Market data farm connection is broken:cafarm
+2026-02-26 11:42:03.988005: ReqId=-1, Code=2104, Msg=Market data farm connection is OK:cafarm
+2026-02-26 11:57:08.072261: ReqId=2235, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 12:16:32.617075: ReqId=2240, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 12:16:43.131107: ReqId=2245, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 12:37:09.206146: ReqId=2250, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 13:06:43.368440: ReqId=2255, Code=10358, Msg=Fundamentals data is not allowed.
+2026-02-26 13:37:16.632886: ReqId=2260, Code=10358, Msg=Fundamentals data is not allowed.

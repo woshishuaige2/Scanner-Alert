@@ -234,6 +234,7 @@ class RealtimeBroadScanner:
     def load_fundamentals(self, tws_app):
         print("[SCANNER] Loading fundamental data for screening...")
         for symbol, monitor in self.monitors.items():
+            # Try fundamental data first
             xml_data = tws_app.fetch_fundamental_data(symbol)
             if xml_data:
                 try:
@@ -247,6 +248,16 @@ class RealtimeBroadScanner:
                     print(f"[SCANNER] {symbol} Float: {monitor.float_shares/1e6:.1f}M, Avg Vol: {monitor.avg_daily_volume/1e6:.1f}M")
                 except Exception as e:
                     print(f"[SCANNER] Error parsing fundamentals for {symbol}: {e}")
+            
+            # Fallback: Calculate avg volume from historical data if not available from fundamentals
+            if monitor.avg_daily_volume is None:
+                print(f"[SCANNER] {symbol} Fundamental data unavailable, calculating from historical data...")
+                avg_vol = tws_app.fetch_avg_daily_volume(symbol, days=10)
+                if avg_vol:
+                    monitor.avg_daily_volume = avg_vol
+                    print(f"[SCANNER] {symbol} Avg Vol (10-day): {avg_vol/1e6:.1f}M")
+                else:
+                    print(f"[SCANNER] {symbol} Could not calculate avg volume")
     
     def load_previous_closes(self, tws_app):
         """Load previous day's closing prices for all symbols"""
@@ -297,15 +308,21 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
     else:
         os.system('clear')
         
-    print("="*80)
+    print("="*110)
     print(f"ROSS CAMERON-STYLE BROAD SCANNER | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Session: {get_market_session()}")
-    print("="*80)
-    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'VWAP':<8} | {'GAIN%':<8} | {'REL VOL':<8} | {'TRIGGERED CONDITIONS'}")
-    print("-"*80)
+    print("="*110)
+    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'VWAP':<8} | {'GAIN%':<8} | {'VOL':<10} | {'REL VOL':<8} | {'TRIGGERED CONDITIONS'}")
+    print("-"*110)
     
-    # Sort symbols by session volume or gain
+    # Sort symbols by gain percentage (decreasing order)
+    def get_gain_pct(monitor):
+        if monitor.price_history and monitor.day_start_price and monitor.day_start_price > 0:
+            price = monitor.price_history[-1][1]
+            return ((price - monitor.day_start_price) / monitor.day_start_price) * 100
+        return 0.0
+    
     sorted_monitors = sorted(scanner.monitors.items(), 
-                           key=lambda x: x[1].session_volume if x[1].session_volume else 0, 
+                           key=lambda x: get_gain_pct(x[1]), 
                            reverse=True)
     
     for symbol, monitor in sorted_monitors[:20]:  # Show top 20
@@ -314,6 +331,25 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
             
         price = monitor.price_history[-1][1]
         vwap = monitor.vwap
+        
+        # Get current volume
+        volume = monitor.volume_history[-1][1] if monitor.volume_history else 0
+        
+        # IBKR volume unit correction: Some stocks report in units of 100 shares
+        # Auto-correct if volume < 10K and relative volume suggests real activity
+        current_session = get_market_session()
+        if volume < 10000 and volume > 0 and current_session in ["REGULAR", "PREMARKET"]:
+            if monitor.relative_volume > 0.2:  # Has reasonable relative volume
+                # Apply 100x correction factor
+                volume = volume * 100
+        
+        # Format volume for display (K = thousands, M = millions)
+        if volume >= 1_000_000:
+            vol_str = f"{volume/1_000_000:.2f}M"
+        elif volume >= 1_000:
+            vol_str = f"{volume/1_000:.2f}K"
+        else:
+            vol_str = f"{volume:.0f}"
         
         gain_pct = 0.0
         if monitor.day_start_price and monitor.day_start_price > 0:
@@ -328,15 +364,15 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
         
         # Highlight if conditions met
         if monitor.triggered_conditions:
-            print(f"\033[92m{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol_str} | {conditions}\033[0m")
+            print(f"\033[92m{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {vol_str:>10} | {rel_vol_str} | {conditions}\033[0m")
         else:
-            print(f"{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {rel_vol_str} | {conditions}")
+            print(f"{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {vol_str:>10} | {rel_vol_str} | {conditions}")
 
-    print("\n" + "="*80)
+    print("\n" + "="*110)
     print("RECENT ALERTS:")
     for timestamp, symbol, reasons in list(scanner.recent_alerts)[-5:]:
         print(f"[{timestamp.strftime('%H:%M:%S')}] {symbol}: {', '.join(reasons)}")
-    print("="*80)
+    print("="*110)
 
 def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbols: List[str]) -> List[str]:
     """Fetch new top gainers and update the scanner's monitor list"""
@@ -363,6 +399,12 @@ def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbo
                         elif field == 'VOL10DAVG':
                             scanner.monitors[s].avg_daily_volume = float(ratio.text)
                 except: pass
+            
+            # Fallback for avg volume if fundamental data not available
+            if scanner.monitors[s].avg_daily_volume is None:
+                avg_vol = tws_app.fetch_avg_daily_volume(s, days=10)
+                if avg_vol:
+                    scanner.monitors[s].avg_daily_volume = avg_vol
             
             # Load prev close
             close = tws_app.fetch_last_close(s)
