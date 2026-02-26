@@ -216,11 +216,18 @@ class TWSDataApp(EClient, EWrapper):
                 # IBKR volume unit correction: Some stocks report in units of 100
                 # This is common for penny stocks and certain securities
                 corrected_size = size
-                if size < 10000 and size > 0:  # Suspiciously low volume
-                    # Mark for potential correction (will be applied by scanner logic)
-                    if 'volume_unit_checked' not in self.realtime_data[symbol]:
-                        self.realtime_data[symbol]['volume_needs_correction'] = True
-                        self.realtime_data[symbol]['volume_unit_checked'] = True
+                
+                # Check if we need to apply the 100x correction
+                # We use historical average volume as a reference if available
+                avg_vol = self.realtime_data[symbol].get('avg_daily_volume')
+                if avg_vol and size > 0:
+                    # If current reported volume is < 1% of average daily volume 
+                    # but it's a top gainer, it's likely reported in 100s
+                    if size < (avg_vol / 50): 
+                        corrected_size = size * 100
+                elif size < 10000 and size > 0:
+                    # Fallback heuristic if no avg_vol is known yet
+                    corrected_size = size * 100
                 
                 self.realtime_data[symbol]['volume'] = corrected_size
                 

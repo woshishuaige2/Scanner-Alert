@@ -212,6 +212,10 @@ def update_symbol_list(scanner, tws_app, current_symbols: List[str]) -> List[str
                         monitor.float_shares = float(ratio.text)
                     elif field == 'VOL10DAVG':
                         monitor.avg_daily_volume = float(ratio.text)
+                        # Update TWS app data for volume correction reference
+                        with tws_app.lock:
+                            if symbol in tws_app.realtime_data:
+                                tws_app.realtime_data[symbol]['avg_daily_volume'] = monitor.avg_daily_volume
             except Exception:
                 pass
     

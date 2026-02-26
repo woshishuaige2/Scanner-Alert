@@ -245,6 +245,10 @@ class RealtimeBroadScanner:
                             monitor.float_shares = float(ratio.text)
                         elif field == 'VOL10DAVG':
                             monitor.avg_daily_volume = float(ratio.text)
+                            # Update TWS app data for volume correction reference
+                            with tws_app.lock:
+                                if symbol in tws_app.realtime_data:
+                                    tws_app.realtime_data[symbol]['avg_daily_volume'] = monitor.avg_daily_volume
                     print(f"[SCANNER] {symbol} Float: {monitor.float_shares/1e6:.1f}M, Avg Vol: {monitor.avg_daily_volume/1e6:.1f}M")
                 except Exception as e:
                     print(f"[SCANNER] Error parsing fundamentals for {symbol}: {e}")
@@ -255,6 +259,10 @@ class RealtimeBroadScanner:
                 avg_vol = tws_app.fetch_avg_daily_volume(symbol, days=10)
                 if avg_vol:
                     monitor.avg_daily_volume = avg_vol
+                    # Update TWS app data for volume correction reference
+                    with tws_app.lock:
+                        if symbol in tws_app.realtime_data:
+                            tws_app.realtime_data[symbol]['avg_daily_volume'] = avg_vol
                     print(f"[SCANNER] {symbol} Avg Vol (10-day): {avg_vol/1e6:.1f}M")
                 else:
                     print(f"[SCANNER] {symbol} Could not calculate avg volume")
@@ -335,19 +343,11 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
         # Get current volume
         volume = monitor.volume_history[-1][1] if monitor.volume_history else 0
         
-        # IBKR volume unit correction: Some stocks report in units of 100 shares
-        # Auto-correct if volume < 10K and relative volume suggests real activity
-        current_session = get_market_session()
-        if volume < 10000 and volume > 0 and current_session in ["REGULAR", "PREMARKET"]:
-            if monitor.relative_volume > 0.2:  # Has reasonable relative volume
-                # Apply 100x correction factor
-                volume = volume * 100
-        
         # Format volume for display (K = thousands, M = millions)
         if volume >= 1_000_000:
             vol_str = f"{volume/1_000_000:.2f}M"
         elif volume >= 1_000:
-            vol_str = f"{volume/1_000:.2f}K"
+            vol_str = f"{volume/1_000:.1f}K"
         else:
             vol_str = f"{volume:.0f}"
         
@@ -370,7 +370,8 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
 
     print("\n" + "="*110)
     print("RECENT ALERTS:")
-    for timestamp, symbol, reasons in list(scanner.recent_alerts)[-5:]:
+    # Show last 10 alerts instead of 5
+    for timestamp, symbol, reasons in list(scanner.recent_alerts)[-10:]:
         print(f"[{timestamp.strftime('%H:%M:%S')}] {symbol}: {', '.join(reasons)}")
     print("="*110)
 
