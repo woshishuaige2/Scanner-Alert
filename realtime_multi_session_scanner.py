@@ -15,6 +15,7 @@ import pytz
 from scanner_config import SQUEEZE_PCT_THRESHOLD, SQUEEZE_TIME_MINUTES, DISCORD_WEBHOOK_URL, TWS_PORT
 import requests
 from top_gainers_fetcher import get_top_gainers
+from alert_rating import calculate_alert_rating
 
 # Market session times (Eastern Time)
 PREMARKET_START = (4, 0)   # 4:00 AM ET
@@ -92,6 +93,9 @@ class RealtimeSymbolMonitor:
         # Screening results
         self.triggered_conditions = []
         self.last_alert_time = None  # Track when last alert triggered
+        self.alert_score = 0
+        self.alert_grade = "C"
+        self.alert_score_reasons = []
         
         # Initialize Preliminary Condition Set (same thresholds for all sessions)
         self.condition_set = AlertConditionSet("Preliminary")
@@ -190,6 +194,15 @@ class RealtimeSymbolMonitor:
                     return []
             
             # Cooldown passed or first alert - trigger it
+            self.alert_score, self.alert_grade, self.alert_score_reasons = calculate_alert_rating(
+                price_history=list(self.price_history),
+                last_update=self.last_update,
+                relative_volume=self.relative_volume,
+                float_shares=self.float_shares,
+                current_price=self.price_history[-1][1],
+                squeeze_pct_threshold=SQUEEZE_PCT_THRESHOLD,
+                squeeze_time_minutes=SQUEEZE_TIME_MINUTES,
+            )
             self.triggered_conditions = [self.condition_set.get_trigger_summary()]
             self.last_alert_time = self.last_update
             return self.triggered_conditions
@@ -197,6 +210,9 @@ class RealtimeSymbolMonitor:
             # Keep triggered_conditions to show recent alerts, only clear after timeout
             if self.last_alert_time and (self.last_update - self.last_alert_time) > timedelta(minutes=5):
                 self.triggered_conditions = []
+                self.alert_score = 0
+                self.alert_grade = "C"
+                self.alert_score_reasons = []
             return []
 
 class RealtimeBroadScanner:
@@ -316,11 +332,11 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
     else:
         os.system('clear')
         
-    print("="*110)
+    print("="*125)
     print(f"ROSS CAMERON-STYLE BROAD SCANNER | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Session: {get_market_session()}")
-    print("="*110)
-    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'VWAP':<8} | {'GAIN%':<8} | {'VOL':<10} | {'REL VOL':<8} | {'TRIGGERED CONDITIONS'}")
-    print("-"*110)
+    print("="*125)
+    print(f"{'SYMBOL':<8} | {'PRICE':<8} | {'VWAP':<8} | {'GAIN%':<8} | {'VOL':<10} | {'REL VOL':<8} | {'GRADE':<7} | {'TRIGGERED CONDITIONS'}")
+    print("-"*125)
     
     # Sort symbols by gain percentage (decreasing order)
     def get_gain_pct(monitor):
@@ -364,16 +380,18 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
         
         # Highlight if conditions met
         if monitor.triggered_conditions:
-            print(f"\033[92m{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {vol_str:>10} | {rel_vol_str} | {conditions}\033[0m")
+            grade_str = f"{monitor.alert_grade} ({monitor.alert_score})"
+            print(f"\033[92m{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {vol_str:>10} | {rel_vol_str} | {grade_str:<7} | {conditions}\033[0m")
         else:
-            print(f"{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {vol_str:>10} | {rel_vol_str} | {conditions}")
+            grade_str = f"{monitor.alert_grade} ({monitor.alert_score})" if monitor.alert_score else "-"
+            print(f"{symbol:<8} | ${price:<7.2f} | ${vwap:<7.2f} | {gain_pct:>7.2f}% | {vol_str:>10} | {rel_vol_str} | {grade_str:<7} | {conditions}")
 
-    print("\n" + "="*110)
+    print("\n" + "="*125)
     print("RECENT ALERTS:")
     # Show last 10 alerts instead of 5
     for timestamp, symbol, reasons in list(scanner.recent_alerts)[-10:]:
         print(f"[{timestamp.strftime('%H:%M:%S')}] {symbol}: {', '.join(reasons)}")
-    print("="*110)
+    print("="*125)
 
 def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbols: List[str]) -> List[str]:
     """Fetch new top gainers and update the scanner's monitor list"""
@@ -437,9 +455,11 @@ def send_discord_alert(symbol, session, reasons, monitor):
     # Construct the message - refined for concise notification
     # Format: [SESSION] SYMBOL | PRICE (GAIN%) | SQUEEZE/TRIGGER
     message = (
-        f"🚀 **{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | {reason_str}\n"
+        f"🚀 **{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | Grade: **{monitor.alert_grade} ({monitor.alert_score})** | {reason_str}\n"
         f"*{session}* | VWAP: ${vwap:.2f} | RelVol: {rel_vol:.2f}x | Vol: {session_vol:,.0f}"
     )
+    if monitor.alert_score_reasons:
+        message += f"\nScore factors: {', '.join(monitor.alert_score_reasons)}"
 
     try:
         payload = {"content": message}
@@ -452,8 +472,9 @@ def send_discord_alert(symbol, session, reasons, monitor):
 def run_standalone_scanner():
     # Setup TWS App
     from tws_data_fetcher import create_tws_data_app
-    print(f"[INIT] Connecting to TWS on port {TWS_PORT}...")
-    tws_app = create_tws_data_app("127.0.0.1", TWS_PORT, client_id=10)
+    client_id = int(os.getenv("SCANNER_TWS_CLIENT_ID", "10"))
+    print(f"[INIT] Connecting to TWS on port {TWS_PORT} with client ID {client_id}...")
+    tws_app = create_tws_data_app("127.0.0.1", TWS_PORT, client_id=client_id)
     
     if not tws_app:
         print(f"[ERROR] Could not connect to TWS on port {TWS_PORT}.")

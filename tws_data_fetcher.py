@@ -271,7 +271,8 @@ class TWSDataApp(EClient, EWrapper):
         end_date: datetime,
         duration: str = "1 D",
         bar_size: str = "1 min",
-        what_to_show: str = "TRADES"
+        what_to_show: str = "TRADES",
+        use_rth: int = 0,
     ) -> List[Dict]:
         """Fetch historical bar data from TWS."""
         contract = Contract()
@@ -293,7 +294,7 @@ class TWSDataApp(EClient, EWrapper):
             durationStr=duration,
             barSizeSetting=bar_size,
             whatToShow=what_to_show,
-            useRTH=0, # Use 0 to include pre-market for accurate VWAP
+            useRTH=use_rth,
             formatDate=1,
             keepUpToDate=False,
             chartOptions=[]
@@ -438,7 +439,14 @@ class TWSDataApp(EClient, EWrapper):
     def fetch_last_close(self, symbol: str) -> Optional[float]:
         """Fetch the last closing price for a symbol (from the previous regular trading session)."""
         # We request 2 days to ensure we span across weekends/holidays and get the previous session's close
-        bars = self.fetch_historical_bars(symbol, datetime.now(), duration="2 D", bar_size="1 day", what_to_show="TRADES")
+        bars = self.fetch_historical_bars(
+            symbol,
+            datetime.now(),
+            duration="2 D",
+            bar_size="1 day",
+            what_to_show="TRADES",
+            use_rth=1,
+        )
         if len(bars) >= 2:
             # bars[-1] is today's current bar, bars[-2] is the previous day's complete bar
             return bars[-2]['close']
