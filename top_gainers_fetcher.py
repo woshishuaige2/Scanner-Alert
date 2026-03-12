@@ -132,7 +132,7 @@ class TopGainersFetcher:
 # Global instance
 _global_fetcher = None
 
-def get_top_gainers(top_n: int = 20, use_ibkr: bool = True, ibkr_port: int = 7497) -> List[str]:
+def get_top_gainers(top_n: int = 20, use_ibkr: bool = True, ibkr_port: int = 7497, force_refresh: bool = False) -> List[str]:
     global _global_fetcher
     if _global_fetcher is None:
         _global_fetcher = TopGainersFetcher(top_n=top_n, use_ibkr=use_ibkr, ibkr_port=ibkr_port)
@@ -140,6 +140,8 @@ def get_top_gainers(top_n: int = 20, use_ibkr: bool = True, ibkr_port: int = 749
         # Update port if it changed
         _global_fetcher.ibkr_port = ibkr_port
         
-    if not _global_fetcher.running:
+    if force_refresh:
+        _global_fetcher.update_symbols()
+    elif not _global_fetcher.running:
         _global_fetcher.start_auto_update()
     return _global_fetcher.get_symbols()

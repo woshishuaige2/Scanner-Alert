@@ -67,6 +67,17 @@ def get_session_start_time() -> datetime:
     
     return start_time
 
+def get_next_10_minute_mark() -> datetime:
+    """Return the next wall-clock 10-minute boundary in Eastern Time."""
+    et_tz = pytz.timezone('US/Eastern')
+    now_et = datetime.now(et_tz)
+    next_minute = ((now_et.minute // 10) + 1) * 10
+    if next_minute >= 60:
+        next_mark = now_et.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    else:
+        next_mark = now_et.replace(minute=next_minute, second=0, microsecond=0)
+    return next_mark
+
 class RealtimeSymbolMonitor:
     def __init__(self, symbol: str):
         self.symbol = symbol
@@ -244,7 +255,7 @@ class RealtimeBroadScanner:
             triggered = monitor.check_screening_conditions()
             if triggered and self.alert_callback:
                 alert_time = datetime.now()
-                self.recent_alerts.append((alert_time, symbol, triggered))
+                self.recent_alerts.append((alert_time, symbol, triggered, monitor.alert_grade, monitor.alert_score))
                 self.alert_callback(symbol, alert_time, triggered, monitor)
 
     def load_fundamentals(self, tws_app):
@@ -389,14 +400,14 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
     print("\n" + "="*125)
     print("RECENT ALERTS:")
     # Show last 10 alerts instead of 5
-    for timestamp, symbol, reasons in list(scanner.recent_alerts)[-10:]:
-        print(f"[{timestamp.strftime('%H:%M:%S')}] {symbol}: {', '.join(reasons)}")
+    for timestamp, symbol, reasons, grade, score in list(scanner.recent_alerts)[-10:]:
+        print(f"[{timestamp.strftime('%H:%M:%S')}] {symbol} [{grade} {score}]: {', '.join(reasons)}")
     print("="*125)
 
 def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbols: List[str]) -> List[str]:
     """Fetch new top gainers and update the scanner's monitor list"""
     print("\n[SCANNER] Updating top gainers list...")
-    new_symbols = get_top_gainers(top_n=20)
+    new_symbols = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT, force_refresh=True)
     unique_new = list(set(new_symbols))
     
     # Identify truly new symbols
@@ -454,8 +465,10 @@ def send_discord_alert(symbol, session, reasons, monitor):
 
     # Construct the message - refined for concise notification
     # Format: [SESSION] SYMBOL | PRICE (GAIN%) | SQUEEZE/TRIGGER
+    alert_icon = "🚀🚀" if monitor.alert_grade == "A" else "🚀"
+    grade_label = "QUALITY A" if monitor.alert_grade == "A" else f"Grade {monitor.alert_grade}"
     message = (
-        f"🚀 **{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | Grade: **{monitor.alert_grade} ({monitor.alert_score})** | {reason_str}\n"
+        f"{alert_icon} **{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | **{grade_label} ({monitor.alert_score})** | {reason_str}\n"
         f"*{session}* | VWAP: ${vwap:.2f} | RelVol: {rel_vol:.2f}x | Vol: {session_vol:,.0f}"
     )
     if monitor.alert_score_reasons:
@@ -490,7 +503,7 @@ def run_standalone_scanner():
     # Get dynamic top gainers list (updates every 10 minutes)
     print("[INIT] Fetching top gainers list...")
     # Use IBKR scanner for most accurate gainers data
-    SYMBOLS = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT)
+    SYMBOLS = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT, force_refresh=True)
     unique_symbols = list(set(SYMBOLS))
     print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
     
@@ -547,8 +560,7 @@ def run_standalone_scanner():
     
     # Session transition check interval
     last_session_check = datetime.now()
-    last_symbol_update = datetime.now()
-    symbol_update_interval = 60  # Update every 1 minute (testing)
+    next_symbol_update = get_next_10_minute_mark()
     
     try:
         while True:
@@ -558,10 +570,10 @@ def run_standalone_scanner():
                     scanner.resync_vwap_all_symbols(tws_app)
                 last_session_check = datetime.now()
             
-            # Periodic Symbol List Update (every 1 minute - testing)
-            if (datetime.now() - last_symbol_update).total_seconds() >= symbol_update_interval:
+            # Update the scanner list on wall-clock 10-minute boundaries.
+            if datetime.now(pytz.timezone('US/Eastern')) >= next_symbol_update:
                 unique_symbols = update_scanner_symbols(scanner, tws_app, unique_symbols)
-                last_symbol_update = datetime.now()
+                next_symbol_update = get_next_10_minute_mark()
             
             display_broad_screening(scanner)
             time.sleep(1)
