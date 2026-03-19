@@ -4,7 +4,7 @@ Defines centralized screening conditions for the scanner.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 
@@ -24,7 +24,8 @@ class MarketData:
     timestamp: datetime
     bid: float = 0.0
     ask: float = 0.0
-    price_history: List[tuple] = None  # List of (timestamp, price)
+    price_history: List[tuple] = field(default_factory=list)   # List[(timestamp, price)]
+    volume_history: List[tuple] = field(default_factory=list)  # List[(timestamp, cumulative_volume)]
 
 class AlertCondition(ABC):
     """Base class for all alert conditions."""
@@ -78,6 +79,77 @@ class SqueezeCondition(AlertCondition):
                 self.triggered_reason = f"Up {increase:.2f}% in {self.lookback_seconds/60:.0f}m"
                 return True
         return False
+
+
+class FastIgnitionCondition(AlertCondition):
+    """Condition: very fast momentum + sustained volume with limited pullback."""
+
+    def __init__(
+        self,
+        pct_threshold_5s: float = 1.0,
+        pct_threshold_15s: float = 2.0,
+        volume_multiplier: float = 2.0,
+        max_retracement_pct: float = 0.8,
+    ):
+        super().__init__("Fast Ignition")
+        self.pct_threshold_5s = pct_threshold_5s
+        self.pct_threshold_15s = pct_threshold_15s
+        self.volume_multiplier = volume_multiplier
+        self.max_retracement_pct = max_retracement_pct
+
+    def _find_first_after(self, history: List[tuple], target_ts: datetime) -> Optional[float]:
+        for ts, value in history:
+            if ts >= target_ts:
+                return value
+        return history[0][1] if history else None
+
+    def check(self, data: MarketData) -> bool:
+        if len(data.price_history) < 3 or len(data.volume_history) < 3:
+            return False
+
+        now = data.timestamp
+        price_5s_ago = self._find_first_after(data.price_history, now - timedelta(seconds=5))
+        price_15s_ago = self._find_first_after(data.price_history, now - timedelta(seconds=15))
+        if not price_5s_ago or not price_15s_ago:
+            return False
+
+        pct_5s = ((data.price - price_5s_ago) / price_5s_ago) * 100 if price_5s_ago > 0 else 0.0
+        pct_15s = ((data.price - price_15s_ago) / price_15s_ago) * 100 if price_15s_ago > 0 else 0.0
+        if pct_5s < self.pct_threshold_5s or pct_15s < self.pct_threshold_15s:
+            return False
+
+        # Estimate 5-second burst volume vs trailing 60-second average 5-second bucket.
+        vol_now = data.volume_history[-1][1]
+        vol_5s_ago = self._find_first_after(data.volume_history, now - timedelta(seconds=5))
+        vol_65s_ago = self._find_first_after(data.volume_history, now - timedelta(seconds=65))
+        if vol_5s_ago is None or vol_65s_ago is None:
+            return False
+
+        burst_5s = max(0.0, vol_now - vol_5s_ago)
+        trailing_60s = max(0.0, vol_5s_ago - vol_65s_ago)
+        avg_5s_bucket = trailing_60s / 12.0 if trailing_60s > 0 else 0.0
+        vol_mult = (burst_5s / avg_5s_bucket) if avg_5s_bucket > 0 else 0.0
+        if vol_mult < self.volume_multiplier:
+            return False
+
+        # Keep pullback small from the local high in the last 15 seconds.
+        recent_prices = [
+            p for ts, p in data.price_history
+            if ts >= now - timedelta(seconds=15)
+        ]
+        if not recent_prices:
+            return False
+
+        peak = max(recent_prices)
+        retracement_pct = ((peak - data.price) / peak) * 100 if peak > 0 else 0.0
+        if retracement_pct > self.max_retracement_pct:
+            return False
+
+        self.triggered_reason = (
+            f"FastIgnition +{pct_5s:.2f}%/5s +{pct_15s:.2f}%/15s "
+            f"Vol x{vol_mult:.2f} Retrace {retracement_pct:.2f}%"
+        )
+        return True
 
 def passes_spread_filter(bid: float, ask: float, price: float) -> bool:
     """Check if the bid-ask spread is within acceptable limits."""

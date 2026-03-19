@@ -9,10 +9,19 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Callable, Optional
 from collections import deque
 import xml.etree.ElementTree as ET
-from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition
+from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition, FastIgnitionCondition
 import platform
 import pytz
-from scanner_config import SQUEEZE_PCT_THRESHOLD, SQUEEZE_TIME_MINUTES, DISCORD_WEBHOOK_URL, TWS_PORT
+from scanner_config import (
+    SQUEEZE_PCT_THRESHOLD,
+    SQUEEZE_TIME_MINUTES,
+    FAST_IGNITION_PCT_5S,
+    FAST_IGNITION_PCT_15S,
+    FAST_IGNITION_VOLUME_MULTIPLIER,
+    FAST_IGNITION_MAX_RETRACEMENT_PCT,
+    DISCORD_WEBHOOK_URL,
+    TWS_PORT,
+)
 import requests
 from top_gainers_fetcher import get_top_gainers
 from alert_rating import calculate_alert_rating
@@ -22,6 +31,41 @@ PREMARKET_START = (4, 0)   # 4:00 AM ET
 MARKET_OPEN = (9, 30)      # 9:30 AM ET
 MARKET_CLOSE = (16, 0)     # 4:00 PM ET
 AFTERHOURS_END = (20, 0)   # 8:00 PM ET
+ALERT_SCORE_AUDIT_FILE = os.path.join(os.path.dirname(__file__), "temp_alert_score_audit.log")
+
+
+def initialize_alert_score_audit_file():
+    """Initialize (truncate) the per-run score audit file in the project folder."""
+    header = (
+        "# Alert Score Audit Log (temp)\n"
+        f"# Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        "# One block per triggered alert with scoring factor breakdown.\n\n"
+    )
+    with open(ALERT_SCORE_AUDIT_FILE, "w", encoding="utf-8") as f:
+        f.write(header)
+
+
+def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, trigger_reasons: List[str], monitor):
+    """Append one triggered alert with point-by-point factors to the temp audit file."""
+    trigger_str = ", ".join(trigger_reasons) if trigger_reasons else "Unknown"
+    factors = monitor.alert_score_reasons if monitor.alert_score_reasons else []
+
+    lines = [
+        f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {symbol} | Session={session} | Grade={monitor.alert_grade} | Score={monitor.alert_score}",
+        f"Trigger: {trigger_str}",
+        "Score factors:",
+    ]
+
+    if factors:
+        for factor in factors:
+            lines.append(f"- {factor}")
+    else:
+        lines.append("- None")
+
+    lines.append("")
+
+    with open(ALERT_SCORE_AUDIT_FILE, "a", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
 def get_market_session() -> str:
     """Determine current market session (PREMARKET, REGULAR, AFTERHOURS, CLOSED)"""
@@ -100,6 +144,12 @@ class RealtimeSymbolMonitor:
         self.last_session = None
         self.day_start_price = None  # Track first price of the day for total % gain calculation
         self.last_day = None  # Track which day we're on
+
+        # Intraday 1-minute candle drawdown tracking (high-to-low).
+        self.current_minute_bucket = None
+        self.current_minute_high = None
+        self.current_minute_low = None
+        self.max_intraday_1m_drawdown_pct = None
         
         # Screening results
         self.triggered_conditions = []
@@ -109,9 +159,22 @@ class RealtimeSymbolMonitor:
         self.alert_score_reasons = []
         
         # Initialize Preliminary Condition Set (same thresholds for all sessions)
-        self.condition_set = AlertConditionSet("Preliminary")
-        self.condition_set.add_condition(PriceAboveVWAPCondition())
-        self.condition_set.add_condition(SqueezeCondition(pct_threshold=SQUEEZE_PCT_THRESHOLD, minutes=SQUEEZE_TIME_MINUTES))
+        self.fast_condition_set = AlertConditionSet("Fast Ignition")
+        self.fast_condition_set.add_condition(PriceAboveVWAPCondition())
+        self.fast_condition_set.add_condition(
+            FastIgnitionCondition(
+                pct_threshold_5s=FAST_IGNITION_PCT_5S,
+                pct_threshold_15s=FAST_IGNITION_PCT_15S,
+                volume_multiplier=FAST_IGNITION_VOLUME_MULTIPLIER,
+                max_retracement_pct=FAST_IGNITION_MAX_RETRACEMENT_PCT,
+            )
+        )
+
+        self.confirmation_condition_set = AlertConditionSet("Preliminary")
+        self.confirmation_condition_set.add_condition(PriceAboveVWAPCondition())
+        self.confirmation_condition_set.add_condition(
+            SqueezeCondition(pct_threshold=SQUEEZE_PCT_THRESHOLD, minutes=SQUEEZE_TIME_MINUTES)
+        )
 
     def update_market_data(self, price: float, volume: float, vwap: float, bid: float = 0, ask: float = 0):
         now = datetime.now()
@@ -129,17 +192,40 @@ class RealtimeSymbolMonitor:
             if self.day_start_price is None:
                 self.day_start_price = price
             self.last_day = current_day
+            self.current_minute_bucket = None
+            self.current_minute_high = None
+            self.current_minute_low = None
+            self.max_intraday_1m_drawdown_pct = None
         
         # Set day start price ONLY if not yet set (will use historical close if available)
         if self.day_start_price is None:
             self.day_start_price = price
+
+        # Update 1-minute high/low buckets and the day's max high-to-low drawdown.
+        minute_bucket = now.replace(second=0, microsecond=0)
+        if self.current_minute_bucket != minute_bucket:
+            if self.current_minute_high is not None and self.current_minute_low is not None and self.current_minute_high > 0:
+                minute_drawdown_pct = ((self.current_minute_high - self.current_minute_low) / self.current_minute_high) * 100
+                if self.max_intraday_1m_drawdown_pct is None:
+                    self.max_intraday_1m_drawdown_pct = minute_drawdown_pct
+                else:
+                    self.max_intraday_1m_drawdown_pct = max(self.max_intraday_1m_drawdown_pct, minute_drawdown_pct)
+            self.current_minute_bucket = minute_bucket
+            self.current_minute_high = price
+            self.current_minute_low = price
+        else:
+            self.current_minute_high = price if self.current_minute_high is None else max(self.current_minute_high, price)
+            self.current_minute_low = price if self.current_minute_low is None else min(self.current_minute_low, price)
         
-        # Check if we've transitioned to a new session
-        if self.last_session != current_session:
+        # Initialize session state without wiping any warmup history. Only clear
+        # when transitioning between two real sessions.
+        if self.last_session is None:
+            self.last_session = current_session
+        elif self.last_session != current_session:
             print(f"[SESSION] {self.symbol}: Transitioned from {self.last_session} to {current_session}")
             self.last_session = current_session
             self.session_volume = 0.0
-            # Clear price history on session transition to avoid cross-session comparisons
+            # Clear price history on session transition to avoid cross-session comparisons.
             self.price_history.clear()
             self.volume_history.clear()
         
@@ -193,16 +279,32 @@ class RealtimeSymbolMonitor:
             timestamp=self.last_update,
             bid=self.bid,
             ask=self.ask,
-            price_history=list(self.price_history)
+            price_history=list(self.price_history),
+            volume_history=list(self.volume_history),
         )
         
-        if self.condition_set.check_all(data):
+        trigger_summary = None
+        if self.fast_condition_set.check_all(data):
+            trigger_summary = self.fast_condition_set.get_trigger_summary()
+        elif self.confirmation_condition_set.check_all(data):
+            trigger_summary = self.confirmation_condition_set.get_trigger_summary()
+
+        if trigger_summary:
             # Check 60-second cooldown before triggering new alert
             if self.last_alert_time:
                 seconds_since_last_alert = (self.last_update - self.last_alert_time).total_seconds()
                 if seconds_since_last_alert < 60:
                     # Still in cooldown period, don't trigger new alert
                     return []
+
+            # Include the in-progress current minute candle in drawdown quality scoring.
+            effective_max_drawdown = self.max_intraday_1m_drawdown_pct
+            if self.current_minute_high is not None and self.current_minute_low is not None and self.current_minute_high > 0:
+                current_minute_drawdown = ((self.current_minute_high - self.current_minute_low) / self.current_minute_high) * 100
+                if effective_max_drawdown is None:
+                    effective_max_drawdown = current_minute_drawdown
+                else:
+                    effective_max_drawdown = max(effective_max_drawdown, current_minute_drawdown)
             
             # Cooldown passed or first alert - trigger it
             self.alert_score, self.alert_grade, self.alert_score_reasons = calculate_alert_rating(
@@ -213,8 +315,9 @@ class RealtimeSymbolMonitor:
                 current_price=self.price_history[-1][1],
                 squeeze_pct_threshold=SQUEEZE_PCT_THRESHOLD,
                 squeeze_time_minutes=SQUEEZE_TIME_MINUTES,
+                max_intraday_1m_drawdown_pct=effective_max_drawdown,
             )
-            self.triggered_conditions = [self.condition_set.get_trigger_summary()]
+            self.triggered_conditions = [trigger_summary]
             self.last_alert_time = self.last_update
             return self.triggered_conditions
         else:
@@ -468,7 +571,8 @@ def send_discord_alert(symbol, session, reasons, monitor):
     alert_icon = "🚀🚀" if monitor.alert_grade == "A" else "🚀"
     grade_label = "QUALITY A" if monitor.alert_grade == "A" else f"Grade {monitor.alert_grade}"
     message = (
-        f"{alert_icon} **{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | **{grade_label} ({monitor.alert_score})** | {reason_str}\n"
+        f"{alert_icon} **{grade_label} ({monitor.alert_score})** | {reason_str}\n"
+        f"*{session}* |**{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | **{grade_label} ({monitor.alert_score})** | {reason_str}\n"
         f"*{session}* | VWAP: ${vwap:.2f} | RelVol: {rel_vol:.2f}x | Vol: {session_vol:,.0f}"
     )
     if monitor.alert_score_reasons:
@@ -485,7 +589,7 @@ def send_discord_alert(symbol, session, reasons, monitor):
 def run_standalone_scanner():
     # Setup TWS App
     from tws_data_fetcher import create_tws_data_app
-    client_id = int(os.getenv("SCANNER_TWS_CLIENT_ID", "10"))
+    client_id = int(os.getenv("SCANNER_TWS_CLIENT_ID", "11"))
     print(f"[INIT] Connecting to TWS on port {TWS_PORT} with client ID {client_id}...")
     tws_app = create_tws_data_app("127.0.0.1", TWS_PORT, client_id=client_id)
     
@@ -511,12 +615,17 @@ def run_standalone_scanner():
     print(f"[INIT] Current market session: {get_market_session()}")
     
     scanner = RealtimeBroadScanner(unique_symbols)
+    initialize_alert_score_audit_file()
+    print(f"[INIT] Score audit log: {ALERT_SCORE_AUDIT_FILE}")
 
     def alert_handler(symbol, timestamp, reasons, monitor):
         session = get_market_session()
         voice_reason = reasons[0] if reasons else "Condition met"
         alert_msg = f"{session} Alert! {symbol} triggered {voice_reason}"
         print(f"[ALERT] {alert_msg}")
+
+        # Append a per-alert scoring breakdown for tuning and diagnostics.
+        append_alert_score_audit(symbol, timestamp, session, reasons, monitor)
         
         # Send Discord Alert
         send_discord_alert(symbol, session, reasons, monitor)

@@ -20,8 +20,14 @@ MED_RVOL_MIN = 1.5          # 150% of daily average
 HIGH_RVOL_MIN = 3.0         # 300% of daily average
 
 # SQUEEZE ALERT CONDITIONS (Used by all scanners)
-SQUEEZE_PCT_THRESHOLD = 10.0   # Percentage increase required
+SQUEEZE_PCT_THRESHOLD = 5.0   # Percentage increase required
 SQUEEZE_TIME_MINUTES = 5       # Time window in minutes
+
+# FAST IGNITION CONDITIONS (Used by realtime_multi_session_scanner.py)
+FAST_IGNITION_PCT_5S = 0.8              # Minimum move over last 5 seconds
+FAST_IGNITION_PCT_15S = 1.5             # Minimum move over last 15 seconds
+FAST_IGNITION_VOLUME_MULTIPLIER = 2.0   # 5s burst volume vs trailing average
+FAST_IGNITION_MAX_RETRACEMENT_PCT = 0.7 # Allowed pullback from local high
 
 # DISCORD ALERT CONFIGURATION
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1474054384131248310/43pw1SxLPf2j9Rj1gRrh6SL3SZ9zuHhqn2QmRFZ-sZ7a_DnordIXbbHFKxyaGjYzoSAg"
