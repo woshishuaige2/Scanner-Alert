@@ -36,6 +36,15 @@ AFTERHOURS_END = (20, 0)   # 8:00 PM ET
 ALERT_SCORE_AUDIT_FILE = os.path.join(os.path.dirname(__file__), "temp_alert_score_audit.log")
 
 
+def format_compact_volume(value: float) -> str:
+    """Format volume using M/K units without rounding small values down to 0.0M."""
+    if value >= 1_000_000:
+        return f"{value/1_000_000:.2f}M"
+    if value >= 1_000:
+        return f"{value/1_000:.1f}K"
+    return f"{value:.0f}"
+
+
 def initialize_alert_score_audit_file():
     """Initialize (truncate) the per-run score audit file in the project folder."""
     header = (
@@ -53,9 +62,13 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
     factors = monitor.alert_score_reasons if monitor.alert_score_reasons else []
     breakout_debug = monitor.alert_breakout_debug_info if monitor.alert_breakout_debug_info else None
     drawdown_debug = monitor.alert_drawdown_debug_info if monitor.alert_drawdown_debug_info else None
+    header_line = f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {symbol} | Session={session} | Grade={monitor.alert_grade} | Score={monitor.alert_score}"
+    separator = "=" * max(len(header_line), 100)
 
     lines = [
-        f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {symbol} | Session={session} | Grade={monitor.alert_grade} | Score={monitor.alert_score}",
+        separator,
+        header_line,
+        separator,
         f"Trigger: {trigger_str}",
         "Score factors:",
     ]
@@ -97,7 +110,7 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
             ]
         )
 
-    lines.append("")
+    lines.extend(["", "-" * len(separator), ""])
 
     with open(ALERT_SCORE_AUDIT_FILE, "a", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -196,6 +209,7 @@ class RealtimeSymbolMonitor:
         self.alert_score = 0
         self.alert_grade = "C"
         self.alert_score_reasons = []
+        self.alert_is_suppressed = False
         self.alert_breakout_debug_info = None
         self.alert_drawdown_debug_info = None
         
@@ -420,14 +434,13 @@ class RealtimeSymbolMonitor:
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
             )
-            if self.alert_score < ALERT_MIN_SCORE_TO_NOTIFY:
+            self.alert_is_suppressed = (
+                self.alert_grade == "Below Threshold" or self.alert_score < ALERT_MIN_SCORE_TO_NOTIFY
+            )
+            if self.alert_is_suppressed:
                 self.triggered_conditions = []
-                self.alert_score = 0
-                self.alert_grade = "C"
-                self.alert_score_reasons = []
-                self.alert_breakout_debug_info = None
-                self.alert_drawdown_debug_info = None
-                return []
+                self.last_alert_time = self.last_update
+                return [trigger_summary]
             self.triggered_conditions = [trigger_summary]
             self.last_alert_time = self.last_update
             return self.triggered_conditions
@@ -438,6 +451,7 @@ class RealtimeSymbolMonitor:
                 self.alert_score = 0
                 self.alert_grade = "C"
                 self.alert_score_reasons = []
+                self.alert_is_suppressed = False
                 self.alert_breakout_debug_info = None
                 self.alert_drawdown_debug_info = None
             return []
@@ -471,7 +485,8 @@ class RealtimeBroadScanner:
             triggered = monitor.check_screening_conditions()
             if triggered and self.alert_callback:
                 alert_time = datetime.now()
-                self.recent_alerts.append((alert_time, symbol, triggered, monitor.alert_grade, monitor.alert_score))
+                if not monitor.alert_is_suppressed:
+                    self.recent_alerts.append((alert_time, symbol, triggered, monitor.alert_grade, monitor.alert_score))
                 self.alert_callback(symbol, alert_time, triggered, monitor)
 
     def load_fundamentals(self, tws_app):
@@ -487,12 +502,15 @@ class RealtimeBroadScanner:
                         if field == 'FLOAT':
                             monitor.float_shares = float(ratio.text)
                         elif field == 'VOL10DAVG':
-                            monitor.avg_daily_volume = float(ratio.text)
+                            monitor.avg_daily_volume = tws_app.normalize_stock_volume(ratio.text)
                             # Update TWS app data for volume correction reference
                             with tws_app.lock:
                                 if symbol in tws_app.realtime_data:
                                     tws_app.realtime_data[symbol]['avg_daily_volume'] = monitor.avg_daily_volume
-                    print(f"[SCANNER] {symbol} Float: {monitor.float_shares/1e6:.1f}M, Avg Vol: {monitor.avg_daily_volume/1e6:.1f}M")
+                    print(
+                        f"[SCANNER] {symbol} Float: {monitor.float_shares/1e6:.1f}M, "
+                        f"Avg Vol: {format_compact_volume(monitor.avg_daily_volume)}"
+                    )
                 except Exception as e:
                     print(f"[SCANNER] Error parsing fundamentals for {symbol}: {e}")
             
@@ -506,7 +524,7 @@ class RealtimeBroadScanner:
                     with tws_app.lock:
                         if symbol in tws_app.realtime_data:
                             tws_app.realtime_data[symbol]['avg_daily_volume'] = avg_vol
-                    print(f"[SCANNER] {symbol} Avg Vol (10-day): {avg_vol/1e6:.1f}M")
+                    print(f"[SCANNER] {symbol} Avg Vol (10-day): {format_compact_volume(avg_vol)}")
                 else:
                     print(f"[SCANNER] {symbol} Could not calculate avg volume")
     
@@ -586,13 +604,7 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
         # Get current volume
         volume = monitor.volume_history[-1][1] if monitor.volume_history else 0
         
-        # Format volume for display (K = thousands, M = millions)
-        if volume >= 1_000_000:
-            vol_str = f"{volume/1_000_000:.2f}M"
-        elif volume >= 1_000:
-            vol_str = f"{volume/1_000:.1f}K"
-        else:
-            vol_str = f"{volume:.0f}"
+        vol_str = format_compact_volume(volume)
         
         gain_pct = 0.0
         if monitor.day_start_price and monitor.day_start_price > 0:
@@ -643,7 +655,7 @@ def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbo
                         if field == 'FLOAT':
                             scanner.monitors[s].float_shares = float(ratio.text)
                         elif field == 'VOL10DAVG':
-                            scanner.monitors[s].avg_daily_volume = float(ratio.text)
+                            scanner.monitors[s].avg_daily_volume = tws_app.normalize_stock_volume(ratio.text)
                 except: pass
             
             # Fallback for avg volume if fundamental data not available
@@ -734,12 +746,19 @@ def run_standalone_scanner():
     def alert_handler(symbol, timestamp, reasons, monitor):
         session = get_market_session()
         voice_reason = reasons[0] if reasons else "Condition met"
-        alert_msg = f"{session} Alert! {symbol} triggered {voice_reason}"
-        print(f"[ALERT] {alert_msg}")
+        if monitor.alert_is_suppressed:
+            alert_msg = f"{session} Below-threshold {symbol} triggered {voice_reason} [{monitor.alert_grade} {monitor.alert_score}]"
+            print(f"[INFO] {alert_msg}")
+        else:
+            alert_msg = f"{session} Alert! {symbol} triggered {voice_reason}"
+            print(f"[ALERT] {alert_msg}")
 
         # Append a per-alert scoring breakdown for tuning and diagnostics.
         append_alert_score_audit(symbol, timestamp, session, reasons, monitor)
-        
+
+        if monitor.alert_is_suppressed:
+            return
+
         # Send Discord Alert
         send_discord_alert(symbol, session, reasons, monitor)
         

@@ -29,6 +29,7 @@ Temporary grade mapping while news catalyst scoring is unimplemented:
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from scanner_config import (
+    ALERT_MIN_SCORE_TO_NOTIFY,
     ALERT_BREAKOUT_LOOKBACK_MINUTES,
     ALERT_DRAWDOWN_LOOKBACK_MINUTES,
     ALERT_DRAWDOWN_LOWER_BASE_PCT,
@@ -202,7 +203,7 @@ def calculate_alert_rating(
         grade = "A"
     elif score >= ALERT_GRADE_B_MIN_SCORE:
         grade = "B"
-    elif score >= 3:
+    elif score >= ALERT_MIN_SCORE_TO_NOTIFY:
         grade = "C"
     else:
         grade = "Below Threshold"

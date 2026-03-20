@@ -13,6 +13,8 @@ from collections import deque
 import threading
 import time
 
+IBKR_US_STOCK_VOLUME_MULTIPLIER = 100
+
 
 def tick_type_str(tickType):
     """Return a human-friendly string for tickType across ibapi versions."""
@@ -58,7 +60,20 @@ class TWSDataApp(EClient, EWrapper):
         
         # Fundamental data storage
         self.fundamental_data = {} # symbol -> XML string
-        self.fundamental_events = {} # symbol -> threading.Event
+        self.fundamental_events = {} # reqId -> threading.Event
+
+    @staticmethod
+    def normalize_stock_volume(value) -> float:
+        """
+        Normalize IBKR stock volume units to shares.
+
+        IBKR commonly reports US stock volume in lots of 100 across both
+        streaming market data and historical bars. We normalize at ingestion
+        so all downstream consumers see share counts consistently.
+        """
+        if value is None:
+            return 0.0
+        return float(value) * IBKR_US_STOCK_VOLUME_MULTIPLIER
         
     def nextValidId(self, orderId: int):
         """Called when connection is established"""
@@ -137,13 +152,15 @@ class TWSDataApp(EClient, EWrapper):
                 # Fallback: calculate simple average of high and low
                 vwap = (bar.high + bar.low) / 2.0
             
+            normalized_volume = self.normalize_stock_volume(bar.volume)
+
             self.historical_data[reqId].append({
                 'date': bar.date,
                 'open': bar.open,
                 'high': bar.high,
                 'low': bar.low,
                 'close': bar.close,
-                'volume': bar.volume,
+                'volume': normalized_volume,
                 'average': vwap,  # VWAP
                 'barCount': bar.barCount
             })
@@ -211,25 +228,8 @@ class TWSDataApp(EClient, EWrapper):
                 self.realtime_data[symbol]['ask_size'] = size
         elif tt == 'VOLUME':
             with self.lock:
-                old_volume = self.realtime_data[symbol].get('volume', 0)
-                
-                # IBKR volume unit correction: Some stocks report in units of 100
-                # This is common for penny stocks and certain securities
-                corrected_size = size
-                
-                # Check if we need to apply the 100x correction
-                # We use historical average volume as a reference if available
-                avg_vol = self.realtime_data[symbol].get('avg_daily_volume')
-                if avg_vol and size > 0:
-                    # If current reported volume is < 1% of average daily volume 
-                    # but it's a top gainer, it's likely reported in 100s
-                    if size < (avg_vol / 50): 
-                        corrected_size = size * 100
-                elif size < 10000 and size > 0:
-                    # Fallback heuristic if no avg_vol is known yet
-                    corrected_size = size * 100
-                
-                self.realtime_data[symbol]['volume'] = corrected_size
+                normalized_volume = self.normalize_stock_volume(size)
+                self.realtime_data[symbol]['volume'] = normalized_volume
                 
                 # Trigger callback when we have price and volume update
                 price = self.realtime_data[symbol]['price']
@@ -241,7 +241,7 @@ class TWSDataApp(EClient, EWrapper):
                             self.realtime_data[symbol]['cumulative_pv'] = 0.0
                             self.realtime_data[symbol]['cumulative_volume'] = 0.0
                         
-                        current_daily_volume = size
+                        current_daily_volume = normalized_volume
                         last_daily_volume = self.realtime_data[symbol].get('last_daily_volume', 0)
                         volume_increment = current_daily_volume - last_daily_volume
                         
@@ -256,7 +256,7 @@ class TWSDataApp(EClient, EWrapper):
                     vwap = self.realtime_data[symbol]['vwap']
                     bid = self.realtime_data[symbol].get('bid', 0.0)
                     ask = self.realtime_data[symbol].get('ask', 0.0)
-                    callback(symbol, price, size, vwap, datetime.now(), bid, ask)
+                    callback(symbol, price, normalized_volume, vwap, datetime.now(), bid, ask)
     
     def get_next_req_id(self):
         """Get next request ID"""

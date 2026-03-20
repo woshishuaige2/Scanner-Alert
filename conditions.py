@@ -7,6 +7,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+from scanner_config import (
+    VWAP_BUFFER_OVER_3_PCT,
+    VWAP_BUFFER_UNDER_1_PCT,
+    VWAP_BUFFER_UNDER_1_PRICE_MAX,
+    VWAP_BUFFER_UNDER_3_PCT,
+    VWAP_BUFFER_UNDER_3_PRICE_MAX,
+)
 
 
 # =============================================================================
@@ -45,11 +52,24 @@ class PriceAboveVWAPCondition(AlertCondition):
     """Condition: Price is above VWAP"""
     def __init__(self):
         super().__init__("Price Above VWAP")
+
+    def _get_required_buffer_pct(self, price: float) -> float:
+        if price < VWAP_BUFFER_UNDER_1_PRICE_MAX:
+            return VWAP_BUFFER_UNDER_1_PCT
+        if price < VWAP_BUFFER_UNDER_3_PRICE_MAX:
+            return VWAP_BUFFER_UNDER_3_PCT
+        return VWAP_BUFFER_OVER_3_PCT
     
     def check(self, data: MarketData) -> bool:
-        if data.vwap > 0 and data.price > data.vwap:
-            self.triggered_reason = f"Price ${data.price:.2f} > VWAP ${data.vwap:.2f}"
-            return True
+        if data.vwap > 0:
+            required_buffer_pct = self._get_required_buffer_pct(data.price)
+            required_price = data.vwap * (1 + required_buffer_pct / 100.0)
+            if data.price > required_price:
+                self.triggered_reason = (
+                    f"Price ${data.price:.2f} > VWAP ${data.vwap:.2f}"
+                    f" + {required_buffer_pct:.1f}% buffer"
+                )
+                return True
         return False
 
 class SqueezeCondition(AlertCondition):
