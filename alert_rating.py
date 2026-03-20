@@ -8,18 +8,31 @@ Scoring rules (additive points):
 - Squeeze strength (lookback window): +3 if >= 20%, +2 if >= 15%, +1 if >= configured threshold.
 - Hold move quality: +1 if current price holds at least 50% of the move from base to peak.
 - Intraday drawdown quality (1-minute candles):
-    +1 if no candle has high-to-low drawdown >= 10%.
-    +1 if no candle has high-to-low drawdown >= 5%.
+    Build a volatility reference from the average of the top configured number of green
+    1-minute candle body percentages over the configured rolling lookback window.
+    Upper threshold = max(configured base upper %, configured upper multiplier * vol reference).
+    Lower threshold = max(configured base lower %, configured lower multiplier * vol reference).
+    +1 if no candle has high-to-low drawdown >= upper threshold.
+    +1 if no candle has high-to-low drawdown >= lower threshold.
 - News catalyst: +2 if there is meaningful company-specific news today.
 
 Grade mapping (max score 12):
 - A: score >= 9
 - B: score >= 6
-- C: score < 6
+- C: score 3-5
+- Below alert threshold: score < 3
 """
 
 from datetime import timedelta
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+from scanner_config import (
+    ALERT_DRAWDOWN_LOOKBACK_MINUTES,
+    ALERT_DRAWDOWN_LOWER_BASE_PCT,
+    ALERT_DRAWDOWN_LOWER_VOL_MULTIPLIER,
+    ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT,
+    ALERT_DRAWDOWN_UPPER_BASE_PCT,
+    ALERT_DRAWDOWN_UPPER_VOL_MULTIPLIER,
+)
 
 
 def _is_current_minute_new_high(price_history, last_update) -> bool:
@@ -34,6 +47,54 @@ def _is_current_minute_new_high(price_history, last_update) -> bool:
     return max(current_minute_prices) >= max(prior_prices)
 
 
+def _compute_dynamic_drawdown_thresholds(
+    recent_green_1m_body_pcts: Optional[List[float]],
+) -> Tuple[float, float]:
+    """Return drawdown thresholds scaled by recent green 1-minute candle strength."""
+    positive_bodies = sorted((pct for pct in (recent_green_1m_body_pcts or []) if pct > 0), reverse=True)
+    top_bodies = positive_bodies[:ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT]
+    volatility_reference_pct = sum(top_bodies) / len(top_bodies) if top_bodies else 0.0
+
+    upper_threshold_pct = max(
+        ALERT_DRAWDOWN_UPPER_BASE_PCT,
+        ALERT_DRAWDOWN_UPPER_VOL_MULTIPLIER * volatility_reference_pct,
+    )
+    lower_threshold_pct = max(
+        ALERT_DRAWDOWN_LOWER_BASE_PCT,
+        ALERT_DRAWDOWN_LOWER_VOL_MULTIPLIER * volatility_reference_pct,
+    )
+    return upper_threshold_pct, lower_threshold_pct
+
+
+def get_drawdown_debug_info(
+    max_intraday_1m_drawdown_pct: Optional[float],
+    recent_green_1m_body_pcts: Optional[List[float]],
+) -> Optional[Dict[str, Any]]:
+    """Return drawdown debug data used to score the dynamic quality checks."""
+    if max_intraday_1m_drawdown_pct is None:
+        return None
+
+    positive_bodies = sorted((pct for pct in (recent_green_1m_body_pcts or []) if pct > 0), reverse=True)
+    top_bodies = positive_bodies[:ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT]
+    volatility_reference_pct = sum(top_bodies) / len(top_bodies) if top_bodies else 0.0
+    upper_threshold_pct, lower_threshold_pct = _compute_dynamic_drawdown_thresholds(recent_green_1m_body_pcts)
+
+    return {
+        "lookback_minutes": ALERT_DRAWDOWN_LOOKBACK_MINUTES,
+        "top_green_candle_count": ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT,
+        "recent_green_body_count": len(positive_bodies),
+        "top_green_1m_body_pcts": top_bodies,
+        "volatility_reference_pct": volatility_reference_pct,
+        "observed_max_drawdown_pct": max_intraday_1m_drawdown_pct,
+        "upper_base_threshold_pct": ALERT_DRAWDOWN_UPPER_BASE_PCT,
+        "lower_base_threshold_pct": ALERT_DRAWDOWN_LOWER_BASE_PCT,
+        "upper_dynamic_threshold_pct": upper_threshold_pct,
+        "lower_dynamic_threshold_pct": lower_threshold_pct,
+        "passed_upper_threshold": max_intraday_1m_drawdown_pct < upper_threshold_pct,
+        "passed_lower_threshold": max_intraday_1m_drawdown_pct < lower_threshold_pct,
+    }
+
+
 def calculate_alert_rating(
     price_history,
     last_update,
@@ -43,6 +104,7 @@ def calculate_alert_rating(
     squeeze_pct_threshold: float,
     squeeze_time_minutes: int,
     max_intraday_1m_drawdown_pct: Optional[float] = None,
+    recent_green_1m_body_pcts: Optional[List[float]] = None,
     has_meaningful_news_today: bool = False,
 ) -> Tuple[int, str, List[str]]:
     if not price_history or last_update is None:
@@ -91,12 +153,18 @@ def calculate_alert_rating(
 
     # Drawdown quality points based on max observed 1-minute high-to-low drawdown.
     if max_intraday_1m_drawdown_pct is not None:
-        if max_intraday_1m_drawdown_pct < 10:
+        drawdown_debug_info = get_drawdown_debug_info(
+            max_intraday_1m_drawdown_pct=max_intraday_1m_drawdown_pct,
+            recent_green_1m_body_pcts=recent_green_1m_body_pcts,
+        )
+        upper_drawdown_threshold_pct = drawdown_debug_info["upper_dynamic_threshold_pct"]
+        lower_drawdown_threshold_pct = drawdown_debug_info["lower_dynamic_threshold_pct"]
+        if max_intraday_1m_drawdown_pct < upper_drawdown_threshold_pct:
             score += 1
-            reasons.append("No 1m H-L drawdown >=10% (+1)")
-        if max_intraday_1m_drawdown_pct < 5:
+            reasons.append(f"No 1m H-L drawdown >={upper_drawdown_threshold_pct:.1f}% (+1)")
+        if max_intraday_1m_drawdown_pct < lower_drawdown_threshold_pct:
             score += 1
-            reasons.append("No 1m H-L drawdown >=5% (+1)")
+            reasons.append(f"No 1m H-L drawdown >={lower_drawdown_threshold_pct:.1f}% (+1)")
 
     if has_meaningful_news_today:
         score += 2
@@ -106,7 +174,9 @@ def calculate_alert_rating(
         grade = "A"
     elif score >= 6:
         grade = "B"
-    else:
+    elif score >= 3:
         grade = "C"
+    else:
+        grade = "Below Threshold"
 
     return score, grade, reasons

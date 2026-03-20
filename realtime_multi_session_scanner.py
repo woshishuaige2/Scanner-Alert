@@ -13,6 +13,8 @@ from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, S
 import platform
 import pytz
 from scanner_config import (
+    ALERT_MIN_SCORE_TO_NOTIFY,
+    ALERT_DRAWDOWN_LOOKBACK_MINUTES,
     SQUEEZE_PCT_THRESHOLD,
     SQUEEZE_TIME_MINUTES,
     FAST_IGNITION_PCT_5S,
@@ -24,7 +26,7 @@ from scanner_config import (
 )
 import requests
 from top_gainers_fetcher import get_top_gainers
-from alert_rating import calculate_alert_rating
+from alert_rating import calculate_alert_rating, get_drawdown_debug_info
 
 # Market session times (Eastern Time)
 PREMARKET_START = (4, 0)   # 4:00 AM ET
@@ -49,6 +51,7 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
     """Append one triggered alert with point-by-point factors to the temp audit file."""
     trigger_str = ", ".join(trigger_reasons) if trigger_reasons else "Unknown"
     factors = monitor.alert_score_reasons if monitor.alert_score_reasons else []
+    drawdown_debug = monitor.alert_drawdown_debug_info if monitor.alert_drawdown_debug_info else None
 
     lines = [
         f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {symbol} | Session={session} | Grade={monitor.alert_grade} | Score={monitor.alert_score}",
@@ -61,6 +64,21 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
             lines.append(f"- {factor}")
     else:
         lines.append("- None")
+
+    if drawdown_debug:
+        top_green_body_str = ", ".join(f"{pct:.2f}%" for pct in drawdown_debug["top_green_1m_body_pcts"]) or "None"
+        lines.extend(
+            [
+                "Drawdown debug:",
+                f"- Observed max 1m H-L drawdown: {drawdown_debug['observed_max_drawdown_pct']:.2f}%",
+                f"- Lookback: {drawdown_debug['lookback_minutes']}m",
+                f"- Green 1m candles in lookback: {drawdown_debug['recent_green_body_count']}",
+                f"- Top {drawdown_debug['top_green_candle_count']} green 1m body % values: {top_green_body_str}",
+                f"- Volatility reference: {drawdown_debug['volatility_reference_pct']:.2f}%",
+                f"- Upper threshold: max({drawdown_debug['upper_base_threshold_pct']:.2f}%, dynamic) = {drawdown_debug['upper_dynamic_threshold_pct']:.2f}% | pass={drawdown_debug['passed_upper_threshold']}",
+                f"- Lower threshold: max({drawdown_debug['lower_base_threshold_pct']:.2f}%, dynamic) = {drawdown_debug['lower_dynamic_threshold_pct']:.2f}% | pass={drawdown_debug['passed_lower_threshold']}",
+            ]
+        )
 
     lines.append("")
 
@@ -147,9 +165,12 @@ class RealtimeSymbolMonitor:
 
         # Intraday 1-minute candle drawdown tracking (high-to-low).
         self.current_minute_bucket = None
+        self.current_minute_open = None
         self.current_minute_high = None
         self.current_minute_low = None
+        self.current_minute_close = None
         self.max_intraday_1m_drawdown_pct = None
+        self.green_1m_body_history = deque(maxlen=max(ALERT_DRAWDOWN_LOOKBACK_MINUTES * 3, 180))
         
         # Screening results
         self.triggered_conditions = []
@@ -157,6 +178,7 @@ class RealtimeSymbolMonitor:
         self.alert_score = 0
         self.alert_grade = "C"
         self.alert_score_reasons = []
+        self.alert_drawdown_debug_info = None
         
         # Initialize Preliminary Condition Set (same thresholds for all sessions)
         self.fast_condition_set = AlertConditionSet("Fast Ignition")
@@ -193,9 +215,12 @@ class RealtimeSymbolMonitor:
                 self.day_start_price = price
             self.last_day = current_day
             self.current_minute_bucket = None
+            self.current_minute_open = None
             self.current_minute_high = None
             self.current_minute_low = None
+            self.current_minute_close = None
             self.max_intraday_1m_drawdown_pct = None
+            self.green_1m_body_history.clear()
         
         # Set day start price ONLY if not yet set (will use historical close if available)
         if self.day_start_price is None:
@@ -210,12 +235,24 @@ class RealtimeSymbolMonitor:
                     self.max_intraday_1m_drawdown_pct = minute_drawdown_pct
                 else:
                     self.max_intraday_1m_drawdown_pct = max(self.max_intraday_1m_drawdown_pct, minute_drawdown_pct)
+            if (
+                self.current_minute_bucket is not None
+                and self.current_minute_open is not None
+                and self.current_minute_close is not None
+                and self.current_minute_open > 0
+            ):
+                minute_body_pct = ((self.current_minute_close - self.current_minute_open) / self.current_minute_open) * 100
+                if minute_body_pct > 0:
+                    self.green_1m_body_history.append((self.current_minute_bucket, minute_body_pct))
             self.current_minute_bucket = minute_bucket
+            self.current_minute_open = price
             self.current_minute_high = price
             self.current_minute_low = price
+            self.current_minute_close = price
         else:
             self.current_minute_high = price if self.current_minute_high is None else max(self.current_minute_high, price)
             self.current_minute_low = price if self.current_minute_low is None else min(self.current_minute_low, price)
+            self.current_minute_close = price
         
         # Initialize session state without wiping any warmup history. Only clear
         # when transitioning between two real sessions.
@@ -228,6 +265,13 @@ class RealtimeSymbolMonitor:
             # Clear price history on session transition to avoid cross-session comparisons.
             self.price_history.clear()
             self.volume_history.clear()
+            self.current_minute_bucket = minute_bucket
+            self.current_minute_open = price
+            self.current_minute_high = price
+            self.current_minute_low = price
+            self.current_minute_close = price
+            self.max_intraday_1m_drawdown_pct = None
+            self.green_1m_body_history.clear()
         
         self.price_history.append((now, price))
         self.volume_history.append((now, volume))
@@ -265,6 +309,25 @@ class RealtimeSymbolMonitor:
         else:
             # If no fundamental daily volume, use our 1m fallback as the main metric
             self.relative_volume = self.rel_vol_1m
+
+    def _get_recent_green_1m_body_pcts(self) -> List[float]:
+        """Return recent positive 1-minute candle body percentages for drawdown thresholding."""
+        if self.last_update is None:
+            return []
+
+        lookback_start = self.last_update - timedelta(minutes=ALERT_DRAWDOWN_LOOKBACK_MINUTES)
+        recent_green_body_pcts = [
+            body_pct for bucket, body_pct in self.green_1m_body_history if bucket >= lookback_start
+        ]
+        if (
+            self.current_minute_open is not None
+            and self.current_minute_close is not None
+            and self.current_minute_open > 0
+        ):
+            current_minute_body_pct = ((self.current_minute_close - self.current_minute_open) / self.current_minute_open) * 100
+            if current_minute_body_pct > 0:
+                recent_green_body_pcts.append(current_minute_body_pct)
+        return recent_green_body_pcts
 
     def check_screening_conditions(self) -> List[str]:
         if not self.price_history:
@@ -307,6 +370,11 @@ class RealtimeSymbolMonitor:
                     effective_max_drawdown = max(effective_max_drawdown, current_minute_drawdown)
             
             # Cooldown passed or first alert - trigger it
+            recent_green_1m_body_pcts = self._get_recent_green_1m_body_pcts()
+            self.alert_drawdown_debug_info = get_drawdown_debug_info(
+                max_intraday_1m_drawdown_pct=effective_max_drawdown,
+                recent_green_1m_body_pcts=recent_green_1m_body_pcts,
+            )
             self.alert_score, self.alert_grade, self.alert_score_reasons = calculate_alert_rating(
                 price_history=list(self.price_history),
                 last_update=self.last_update,
@@ -316,7 +384,15 @@ class RealtimeSymbolMonitor:
                 squeeze_pct_threshold=SQUEEZE_PCT_THRESHOLD,
                 squeeze_time_minutes=SQUEEZE_TIME_MINUTES,
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
+                recent_green_1m_body_pcts=recent_green_1m_body_pcts,
             )
+            if self.alert_score < ALERT_MIN_SCORE_TO_NOTIFY:
+                self.triggered_conditions = []
+                self.alert_score = 0
+                self.alert_grade = "C"
+                self.alert_score_reasons = []
+                self.alert_drawdown_debug_info = None
+                return []
             self.triggered_conditions = [trigger_summary]
             self.last_alert_time = self.last_update
             return self.triggered_conditions
@@ -327,6 +403,7 @@ class RealtimeSymbolMonitor:
                 self.alert_score = 0
                 self.alert_grade = "C"
                 self.alert_score_reasons = []
+                self.alert_drawdown_debug_info = None
             return []
 
 class RealtimeBroadScanner:
@@ -566,14 +643,14 @@ def send_discord_alert(symbol, session, reasons, monitor):
     if monitor.day_start_price and monitor.day_start_price > 0:
         gain_pct = ((price - monitor.day_start_price) / monitor.day_start_price) * 100
 
-    # Construct the message - refined for concise notification
-    # Format: [SESSION] SYMBOL | PRICE (GAIN%) | SQUEEZE/TRIGGER
-    alert_icon = "🚀🚀" if monitor.alert_grade == "A" else "🚀"
-    grade_label = "QUALITY A" if monitor.alert_grade == "A" else f"Grade {monitor.alert_grade}"
+    # Put the most important fields first so iPhone banner notifications
+    # show grade, ticker, price, and daily gain before the rest.
+    alert_icon = "🚀🚀🚀" if monitor.alert_grade == "A" else "🚀🚀" if monitor.alert_grade == "B" else "🚀"
+    grade_label = f"Grade {monitor.alert_grade} ({monitor.alert_score})"
     message = (
-        f"{alert_icon} **{grade_label} ({monitor.alert_score})** | {reason_str}\n"
-        f"*{session}* |**{symbol}** | **${price:.2f}** ({gain_pct:+.2f}%) | **{grade_label} ({monitor.alert_score})** | {reason_str}\n"
-        f"*{session}* | VWAP: ${vwap:.2f} | RelVol: {rel_vol:.2f}x | Vol: {session_vol:,.0f}"
+        f"{alert_icon} {grade_label} | {symbol} | ${price:.2f} | {gain_pct:+.2f}%\n"
+        f"{session} | Price ${price:.2f} | VWAP ${vwap:.2f} | Trigger: {reason_str}\n"
+        f"{session} | RelVol: {rel_vol:.2f}x | Vol: {session_vol:,.0f}"
     )
     if monitor.alert_score_reasons:
         message += f"\nScore factors: {', '.join(monitor.alert_score_reasons)}"

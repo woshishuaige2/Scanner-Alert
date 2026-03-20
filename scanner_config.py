@@ -23,6 +23,15 @@ HIGH_RVOL_MIN = 3.0         # 300% of daily average
 SQUEEZE_PCT_THRESHOLD = 5.0   # Percentage increase required
 SQUEEZE_TIME_MINUTES = 5       # Time window in minutes
 
+# ALERT RATING DRAWDOWN QUALITY (Used by alert_rating.py and realtime_multi_session_scanner.py)
+ALERT_MIN_SCORE_TO_NOTIFY = 3            # Suppress alerts that score below this threshold
+ALERT_DRAWDOWN_LOOKBACK_MINUTES = 60        # Rolling 1-minute candle lookback
+ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT = 3   # Average the strongest green bodies in the lookback
+ALERT_DRAWDOWN_UPPER_BASE_PCT = 10.0        # Base threshold for the first drawdown quality point
+ALERT_DRAWDOWN_LOWER_BASE_PCT = 5.0         # Base threshold for the second drawdown quality point
+ALERT_DRAWDOWN_UPPER_VOL_MULTIPLIER = 0.70  # Multiplier applied to avg top green 1m body %
+ALERT_DRAWDOWN_LOWER_VOL_MULTIPLIER = 0.35  # Multiplier applied to avg top green 1m body %
+
 # FAST IGNITION CONDITIONS (Used by realtime_multi_session_scanner.py)
 FAST_IGNITION_PCT_5S = 0.8              # Minimum move over last 5 seconds
 FAST_IGNITION_PCT_15S = 1.5             # Minimum move over last 15 seconds
