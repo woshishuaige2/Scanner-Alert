@@ -3,9 +3,12 @@ Alert rating utilities for triggered scanner setups.
 
 Scoring rules (additive points):
 - Relative volume: +1 if RelVol >= 5x, and +1 extra if RelVol >= 20x.
-- Fresh high: +1 if current 1-minute candle high is at/above prior high.
+- Local breakout: +1 if current 1-minute candle high is above the highest completed
+  1-minute candle high from the prior configured rolling lookback window.
+- Session HOD breakout: +1 if current 1-minute candle high is above the highest
+  completed 1-minute candle high seen earlier in the current session.
 - Float size: +1 if float < 20M shares.
-- Squeeze strength (lookback window): +3 if >= 20%, +2 if >= 15%, +1 if >= configured threshold.
+- Squeeze strength (lookback window): +2 if >= 20%, +1 if >= configured threshold.
 - Hold move quality: +1 if current price holds at least 50% of the move from base to peak.
 - Intraday drawdown quality (1-minute candles):
     Build a volatility reference from the average of the top configured number of green
@@ -16,35 +19,59 @@ Scoring rules (additive points):
     +1 if no candle has high-to-low drawdown >= lower threshold.
 - News catalyst: +2 if there is meaningful company-specific news today.
 
-Grade mapping (max score 12):
-- A: score >= 9
-- B: score >= 6
-- C: score 3-5
-- Below alert threshold: score < 3
+Temporary grade mapping while news catalyst scoring is unimplemented:
+- A: score >= 7
+- B: score >= 4
+- C: score 1-3
+- Below alert threshold: score < 1
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from scanner_config import (
+    ALERT_BREAKOUT_LOOKBACK_MINUTES,
     ALERT_DRAWDOWN_LOOKBACK_MINUTES,
     ALERT_DRAWDOWN_LOWER_BASE_PCT,
     ALERT_DRAWDOWN_LOWER_VOL_MULTIPLIER,
     ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT,
     ALERT_DRAWDOWN_UPPER_BASE_PCT,
     ALERT_DRAWDOWN_UPPER_VOL_MULTIPLIER,
+    ALERT_GRADE_A_MIN_SCORE,
+    ALERT_GRADE_B_MIN_SCORE,
 )
 
 
-def _is_current_minute_new_high(price_history, last_update) -> bool:
-    """Return True when the current 1-minute candle high is a new high vs prior data."""
-    current_minute_start = last_update.replace(second=0, microsecond=0)
-    current_minute_prices = [p for ts, p in price_history if ts >= current_minute_start]
-    prior_prices = [p for ts, p in price_history if ts < current_minute_start]
+def get_breakout_debug_info(
+    current_minute_high: Optional[float],
+    current_minute_bucket: Optional[datetime],
+    completed_1m_highs: Optional[List[Tuple[datetime, float]]],
+) -> Optional[Dict[str, Any]]:
+    """Return local and session breakout debug data derived from completed 1-minute highs."""
+    if current_minute_high is None or current_minute_bucket is None:
+        return None
 
-    if not current_minute_prices or not prior_prices:
-        return False
+    completed_highs = [
+        (bucket, high)
+        for bucket, high in (completed_1m_highs or [])
+        if bucket is not None and high is not None
+    ]
+    local_lookback_start = current_minute_bucket - timedelta(minutes=ALERT_BREAKOUT_LOOKBACK_MINUTES)
+    prior_local_highs = [high for bucket, high in completed_highs if bucket >= local_lookback_start]
+    prior_session_highs = [high for _, high in completed_highs]
 
-    return max(current_minute_prices) >= max(prior_prices)
+    prior_local_high = max(prior_local_highs) if prior_local_highs else None
+    prior_session_high = max(prior_session_highs) if prior_session_highs else None
+
+    return {
+        "lookback_minutes": ALERT_BREAKOUT_LOOKBACK_MINUTES,
+        "current_minute_high": current_minute_high,
+        "prior_local_high": prior_local_high,
+        "prior_session_high": prior_session_high,
+        "prior_local_high_count": len(prior_local_highs),
+        "prior_session_high_count": len(prior_session_highs),
+        "passed_local_breakout": prior_local_high is not None and current_minute_high > prior_local_high,
+        "passed_session_hod_breakout": prior_session_high is not None and current_minute_high > prior_session_high,
+    }
 
 
 def _compute_dynamic_drawdown_thresholds(
@@ -103,12 +130,13 @@ def calculate_alert_rating(
     current_price: float,
     squeeze_pct_threshold: float,
     squeeze_time_minutes: int,
+    breakout_debug_info: Optional[Dict[str, Any]] = None,
     max_intraday_1m_drawdown_pct: Optional[float] = None,
     recent_green_1m_body_pcts: Optional[List[float]] = None,
     has_meaningful_news_today: bool = False,
 ) -> Tuple[int, str, List[str]]:
     if not price_history or last_update is None:
-        return 0, "C", []
+        return 0, "Below Threshold", []
 
     score = 0
     reasons: List[str] = []
@@ -119,9 +147,12 @@ def calculate_alert_rating(
         score += 1
         reasons.append(f"RelVol {relative_volume:.2f}x (+1)")
 
-    if _is_current_minute_new_high(price_history, last_update):
+    if breakout_debug_info and breakout_debug_info["passed_local_breakout"]:
         score += 1
-        reasons.append("Fresh high 1m (+1)")
+        reasons.append(f"Local {ALERT_BREAKOUT_LOOKBACK_MINUTES}m breakout (+1)")
+    if breakout_debug_info and breakout_debug_info["passed_session_hod_breakout"]:
+        score += 1
+        reasons.append("Session HOD breakout (+1)")
 
     if float_shares is not None and float_shares < 20_000_000:
         score += 1
@@ -135,9 +166,6 @@ def calculate_alert_rating(
         if base_price > 0:
             squeeze_pct = ((peak_price - base_price) / base_price) * 100
             if squeeze_pct >= 20:
-                score += 3
-                reasons.append(f"Squeeze {squeeze_pct:.1f}% (+3)")
-            elif squeeze_pct >= 15:
                 score += 2
                 reasons.append(f"Squeeze {squeeze_pct:.1f}% (+2)")
             elif squeeze_pct >= squeeze_pct_threshold:
@@ -170,9 +198,9 @@ def calculate_alert_rating(
         score += 2
         reasons.append("Meaningful news (+2)")
 
-    if score >= 9:
+    if score >= ALERT_GRADE_A_MIN_SCORE:
         grade = "A"
-    elif score >= 6:
+    elif score >= ALERT_GRADE_B_MIN_SCORE:
         grade = "B"
     elif score >= 3:
         grade = "C"

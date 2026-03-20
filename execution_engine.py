@@ -78,33 +78,44 @@ class ExecutionEngine:
                 return
                 
             pos = self.positions[symbol]
+            is_parent = orderId == pos['parent_id']
+            is_exit = orderId in [pos['tp_id'], pos['sl_id']]
+            filled_qty = float(filled) if filled is not None else 0.0
             
-            # If parent order is filled, position is officially OPEN
-            if orderId == pos['parent_id'] and status == 'Filled':
+            # Parent fill can arrive as partial first; treat any positive fill as OPEN.
+            if is_parent and (status == 'Filled' or filled_qty > 0):
                 if pos['status'] != 'OPEN':
                     pos['status'] = 'OPEN'
-                    pos['actual_entry_price'] = avgFillPrice
-                    print(f"[EXEC] >>> POSITION OPEN: {symbol} at ${avgFillPrice:.2f} <<<")
+                    pos['actual_entry_price'] = avgFillPrice if avgFillPrice > 0 else pos['entry_price']
+                    print(f"[EXEC] >>> POSITION OPEN: {symbol} at ${pos['actual_entry_price']:.2f} <<<")
             
-            # If any order is rejected or cancelled
+            # Handle cancelled/inactive states carefully.
+            # Child bracket orders can be Inactive before parent fill; this is normal and
+            # must not be treated as a failed trade.
             if status in ['Inactive', 'Cancelled', 'ApiCancelled']:
-                if pos['status'] == 'SUBMITTED':
-                    # Trade failed before opening
-                    self.trade_history.append({
-                        'symbol': symbol,
-                        'type': 'FAILED',
-                        'reason': status,
-                        'entry_price': pos['entry_price'],
-                        'time': datetime.now()
-                    })
-                    print(f"[EXEC] Order {orderId} for {symbol} FAILED ({status}).")
-                    self._cleanup_position(symbol)
-                elif pos['status'] == 'OPEN':
-                    # This might happen if an exit order is cancelled manually
-                    print(f"[EXEC] Warning: Exit order {orderId} for {symbol} was {status}.")
+                if is_parent:
+                    if pos['status'] == 'SUBMITTED':
+                        # Parent never opened; treat as failed entry.
+                        self.trade_history.append({
+                            'symbol': symbol,
+                            'type': 'FAILED',
+                            'reason': status,
+                            'entry_price': pos['entry_price'],
+                            'time': datetime.now()
+                        })
+                        print(f"[EXEC] Parent order {orderId} for {symbol} FAILED ({status}).")
+                        self._cleanup_position(symbol)
+                    elif pos['status'] == 'OPEN':
+                        # Parent cancelled after being open should not usually happen.
+                        print(f"[EXEC] Warning: Parent order {orderId} for {symbol} was {status} after open.")
+                elif is_exit:
+                    if pos['status'] == 'OPEN':
+                        # One exit leg cancellation is expected after the other leg fills.
+                        pass
+                    # Ignore child inactive/cancelled while still SUBMITTED.
 
             # If any of the exit orders (TP or SL) are filled, position is CLOSED
-            if orderId in [pos['tp_id'], pos['sl_id']] and status == 'Filled':
+            if is_exit and status == 'Filled':
                 exit_type = 'TP' if orderId == pos['tp_id'] else 'SL'
                 print(f"[EXEC] >>> POSITION CLOSED: {symbol} via {exit_type} at ${avgFillPrice:.2f} <<<")
                 

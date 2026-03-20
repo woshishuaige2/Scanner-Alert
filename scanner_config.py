@@ -23,8 +23,11 @@ HIGH_RVOL_MIN = 3.0         # 300% of daily average
 SQUEEZE_PCT_THRESHOLD = 5.0   # Percentage increase required
 SQUEEZE_TIME_MINUTES = 5       # Time window in minutes
 
-# ALERT RATING DRAWDOWN QUALITY (Used by alert_rating.py and realtime_multi_session_scanner.py)
-ALERT_MIN_SCORE_TO_NOTIFY = 3            # Suppress alerts that score below this threshold
+# ALERT RATING / QUALITY SCORING (Used by alert_rating.py and realtime_multi_session_scanner.py)
+ALERT_MIN_SCORE_TO_NOTIFY = 1               # Temporary floor while news catalyst scoring is unimplemented
+ALERT_GRADE_A_MIN_SCORE = 7                 # Temporary A cutoff with news catalyst currently unavailable
+ALERT_GRADE_B_MIN_SCORE = 4                 # Temporary B cutoff with news catalyst currently unavailable
+ALERT_BREAKOUT_LOOKBACK_MINUTES = 10        # Rolling 1-minute candle lookback for local breakout scoring
 ALERT_DRAWDOWN_LOOKBACK_MINUTES = 60        # Rolling 1-minute candle lookback
 ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT = 3   # Average the strongest green bodies in the lookback
 ALERT_DRAWDOWN_UPPER_BASE_PCT = 10.0        # Base threshold for the first drawdown quality point

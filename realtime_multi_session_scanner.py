@@ -26,7 +26,7 @@ from scanner_config import (
 )
 import requests
 from top_gainers_fetcher import get_top_gainers
-from alert_rating import calculate_alert_rating, get_drawdown_debug_info
+from alert_rating import calculate_alert_rating, get_breakout_debug_info, get_drawdown_debug_info
 
 # Market session times (Eastern Time)
 PREMARKET_START = (4, 0)   # 4:00 AM ET
@@ -51,6 +51,7 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
     """Append one triggered alert with point-by-point factors to the temp audit file."""
     trigger_str = ", ".join(trigger_reasons) if trigger_reasons else "Unknown"
     factors = monitor.alert_score_reasons if monitor.alert_score_reasons else []
+    breakout_debug = monitor.alert_breakout_debug_info if monitor.alert_breakout_debug_info else None
     drawdown_debug = monitor.alert_drawdown_debug_info if monitor.alert_drawdown_debug_info else None
 
     lines = [
@@ -64,6 +65,22 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
             lines.append(f"- {factor}")
     else:
         lines.append("- None")
+
+    if breakout_debug:
+        prior_local_high_str = (
+            f"{breakout_debug['prior_local_high']:.4f}" if breakout_debug["prior_local_high"] is not None else "None"
+        )
+        prior_session_high_str = (
+            f"{breakout_debug['prior_session_high']:.4f}" if breakout_debug["prior_session_high"] is not None else "None"
+        )
+        lines.extend(
+            [
+                "Breakout debug:",
+                f"- Current 1m high: {breakout_debug['current_minute_high']:.4f}",
+                f"- Prior {breakout_debug['lookback_minutes']}m high: {prior_local_high_str} | count={breakout_debug['prior_local_high_count']} | pass={breakout_debug['passed_local_breakout']}",
+                f"- Prior session high: {prior_session_high_str} | count={breakout_debug['prior_session_high_count']} | pass={breakout_debug['passed_session_hod_breakout']}",
+            ]
+        )
 
     if drawdown_debug:
         top_green_body_str = ", ".join(f"{pct:.2f}%" for pct in drawdown_debug["top_green_1m_body_pcts"]) or "None"
@@ -171,6 +188,7 @@ class RealtimeSymbolMonitor:
         self.current_minute_close = None
         self.max_intraday_1m_drawdown_pct = None
         self.green_1m_body_history = deque(maxlen=max(ALERT_DRAWDOWN_LOOKBACK_MINUTES * 3, 180))
+        self.completed_1m_high_history = deque()
         
         # Screening results
         self.triggered_conditions = []
@@ -178,6 +196,7 @@ class RealtimeSymbolMonitor:
         self.alert_score = 0
         self.alert_grade = "C"
         self.alert_score_reasons = []
+        self.alert_breakout_debug_info = None
         self.alert_drawdown_debug_info = None
         
         # Initialize Preliminary Condition Set (same thresholds for all sessions)
@@ -221,6 +240,7 @@ class RealtimeSymbolMonitor:
             self.current_minute_close = None
             self.max_intraday_1m_drawdown_pct = None
             self.green_1m_body_history.clear()
+            self.completed_1m_high_history.clear()
         
         # Set day start price ONLY if not yet set (will use historical close if available)
         if self.day_start_price is None:
@@ -235,6 +255,8 @@ class RealtimeSymbolMonitor:
                     self.max_intraday_1m_drawdown_pct = minute_drawdown_pct
                 else:
                     self.max_intraday_1m_drawdown_pct = max(self.max_intraday_1m_drawdown_pct, minute_drawdown_pct)
+            if self.current_minute_bucket is not None and self.current_minute_high is not None:
+                self.completed_1m_high_history.append((self.current_minute_bucket, self.current_minute_high))
             if (
                 self.current_minute_bucket is not None
                 and self.current_minute_open is not None
@@ -272,6 +294,7 @@ class RealtimeSymbolMonitor:
             self.current_minute_close = price
             self.max_intraday_1m_drawdown_pct = None
             self.green_1m_body_history.clear()
+            self.completed_1m_high_history.clear()
         
         self.price_history.append((now, price))
         self.volume_history.append((now, volume))
@@ -329,6 +352,10 @@ class RealtimeSymbolMonitor:
                 recent_green_body_pcts.append(current_minute_body_pct)
         return recent_green_body_pcts
 
+    def _get_completed_1m_highs(self) -> List[tuple]:
+        """Return completed session-local 1-minute highs for breakout scoring."""
+        return list(self.completed_1m_high_history)
+
     def check_screening_conditions(self) -> List[str]:
         if not self.price_history:
             return []
@@ -371,6 +398,12 @@ class RealtimeSymbolMonitor:
             
             # Cooldown passed or first alert - trigger it
             recent_green_1m_body_pcts = self._get_recent_green_1m_body_pcts()
+            completed_1m_highs = self._get_completed_1m_highs()
+            self.alert_breakout_debug_info = get_breakout_debug_info(
+                current_minute_high=self.current_minute_high,
+                current_minute_bucket=self.current_minute_bucket,
+                completed_1m_highs=completed_1m_highs,
+            )
             self.alert_drawdown_debug_info = get_drawdown_debug_info(
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
@@ -383,6 +416,7 @@ class RealtimeSymbolMonitor:
                 current_price=self.price_history[-1][1],
                 squeeze_pct_threshold=SQUEEZE_PCT_THRESHOLD,
                 squeeze_time_minutes=SQUEEZE_TIME_MINUTES,
+                breakout_debug_info=self.alert_breakout_debug_info,
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
             )
@@ -391,6 +425,7 @@ class RealtimeSymbolMonitor:
                 self.alert_score = 0
                 self.alert_grade = "C"
                 self.alert_score_reasons = []
+                self.alert_breakout_debug_info = None
                 self.alert_drawdown_debug_info = None
                 return []
             self.triggered_conditions = [trigger_summary]
@@ -403,6 +438,7 @@ class RealtimeSymbolMonitor:
                 self.alert_score = 0
                 self.alert_grade = "C"
                 self.alert_score_reasons = []
+                self.alert_breakout_debug_info = None
                 self.alert_drawdown_debug_info = None
             return []
 

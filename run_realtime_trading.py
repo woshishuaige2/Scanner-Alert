@@ -12,7 +12,7 @@ from datetime import datetime
 from collections import deque
 from typing import List, Dict
 
-from realtime_scanner_premarket import RealtimeBroadScanner
+from realtime_multi_session_scanner import RealtimeBroadScanner
 from execution_engine import ExecutionEngine
 from tws_data_fetcher import create_tws_data_app
 from top_gainers_fetcher import get_top_gainers
@@ -192,7 +192,7 @@ def update_symbol_list(scanner, tws_app, current_symbols: List[str]) -> List[str
         return lambda s, p, v, vw, ts, b, a: scanner.update(s, price=p, volume=v, vwap=vw, bid=b, ask=a)
     
     for symbol in symbols_to_add:
-        from realtime_scanner_premarket import RealtimeSymbolMonitor
+        from realtime_multi_session_scanner import RealtimeSymbolMonitor
         scanner.monitors[symbol] = RealtimeSymbolMonitor(symbol)
         scanner.symbols.append(symbol)
         tws_app.subscribe_market_data(symbol, create_callback(symbol))
@@ -230,8 +230,10 @@ def run_trading_bot():
     unique_symbols = list(set(SYMBOLS))
     print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
     
-    print("[INIT] Connecting to TWS...")
-    tws_app = create_tws_data_app(host="127.0.0.1", port=7497, client_id=888)
+    tws_client_id = int(os.getenv("TRADING_TWS_CLIENT_ID", "11"))
+    tws_port = int(os.getenv("TRADING_TWS_PORT", str(config.TWS_PORT)))
+    print(f"[INIT] Connecting to TWS on port {tws_port} with client ID {tws_client_id}...")
+    tws_app = create_tws_data_app(host="127.0.0.1", port=tws_port, client_id=tws_client_id)
     if not tws_app:
         print("[ERROR] Could not connect to TWS.")
         return
