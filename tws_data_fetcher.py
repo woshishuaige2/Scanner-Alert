@@ -62,6 +62,19 @@ class TWSDataApp(EClient, EWrapper):
         self.fundamental_data = {} # symbol -> XML string
         self.fundamental_events = {} # reqId -> threading.Event
 
+        # Contract detail storage
+        self.contract_details_data = {} # reqId -> list of ContractDetails
+        self.contract_details_events = {} # reqId -> threading.Event
+        self.contract_con_ids = {} # symbol -> conId
+
+        # News storage
+        self.news_provider_codes = []
+        self.news_provider_event = threading.Event()
+        self.news_provider_requested = False
+        self.historical_news_data = {} # reqId -> list of headlines
+        self.historical_news_events = {} # reqId -> threading.Event
+        self.news_cache = {} # symbol -> list of headlines
+
     @staticmethod
     def normalize_stock_volume(value) -> float:
         """
@@ -100,6 +113,49 @@ class TWSDataApp(EClient, EWrapper):
             self.fundamental_data[reqId] = data
             if reqId in self.fundamental_events:
                 self.fundamental_events[reqId].set()
+
+    def contractDetails(self, reqId, contractDetails):
+        """Receive contract details used to resolve conId for news requests."""
+        with self.lock:
+            if reqId not in self.contract_details_data:
+                self.contract_details_data[reqId] = []
+            self.contract_details_data[reqId].append(contractDetails)
+
+    def contractDetailsEnd(self, reqId):
+        """Called when contract details request is complete."""
+        with self.lock:
+            if reqId in self.contract_details_events:
+                self.contract_details_events[reqId].set()
+
+    def newsProviders(self, newsProviders):
+        """Receive available IBKR news provider codes."""
+        provider_codes = []
+        for provider in newsProviders:
+            code = getattr(provider, "code", None) or getattr(provider, "providerCode", None)
+            if code:
+                provider_codes.append(code)
+        with self.lock:
+            self.news_provider_codes = provider_codes
+            self.news_provider_requested = True
+            self.news_provider_event.set()
+
+    def historicalNews(self, reqId, time, providerCode, articleId, headline):
+        """Receive one historical news headline row."""
+        with self.lock:
+            if reqId not in self.historical_news_data:
+                self.historical_news_data[reqId] = []
+            self.historical_news_data[reqId].append({
+                "time": time,
+                "provider_code": providerCode,
+                "article_id": articleId,
+                "headline": headline,
+            })
+
+    def historicalNewsEnd(self, reqId, hasMore):
+        """Called when historical news request is complete."""
+        with self.lock:
+            if reqId in self.historical_news_events:
+                self.historical_news_events[reqId].set()
         
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson="", *args):
         """Error handler - accepts variable arguments for compatibility across ibapi versions"""
@@ -127,6 +183,15 @@ class TWSDataApp(EClient, EWrapper):
         if errorCode == 10167:  # Displaying delayed market data
             print(f"[TWS] Using delayed market data (live subscription may be needed)")
             return
+
+        with self.lock:
+            if reqId in self.fundamental_events:
+                self.fundamental_events[reqId].set()
+            if reqId in self.contract_details_events:
+                self.contract_details_events[reqId].set()
+            if reqId in self.historical_news_events:
+                self.historical_news_events[reqId].set()
+
         # Only show actual errors (code >= 500) or important warnings
         if errorCode >= 500 or errorCode in [1100, 1101, 1102, 1300, 201]:
             # Try to find the symbol associated with this reqId
@@ -427,14 +492,114 @@ class TWSDataApp(EClient, EWrapper):
         self.reqFundamentalData(req_id, contract, report_type, [])
         if event.wait(timeout=10.0):
             with self.lock:
-                data = self.fundamental_data.get(req_id)
-                del self.fundamental_data[req_id]
-                del self.fundamental_events[req_id]
+                data = self.fundamental_data.pop(req_id, None)
+                self.fundamental_events.pop(req_id, None)
                 return data
         else:
             with self.lock:
-                if req_id in self.fundamental_events: del self.fundamental_events[req_id]
+                self.fundamental_data.pop(req_id, None)
+                self.fundamental_events.pop(req_id, None)
             return None
+
+    def fetch_contract_con_id(self, symbol: str) -> Optional[int]:
+        """Resolve and cache IBKR conId for a symbol."""
+        with self.lock:
+            cached_con_id = self.contract_con_ids.get(symbol)
+        if cached_con_id:
+            return cached_con_id
+
+        contract = Contract()
+        contract.symbol = symbol
+        contract.secType = "STK"
+        contract.exchange = "SMART"
+        contract.currency = "USD"
+
+        req_id = self.get_next_req_id()
+        event = threading.Event()
+        with self.lock:
+            self.contract_details_data[req_id] = []
+            self.contract_details_events[req_id] = event
+
+        self.reqContractDetails(req_id, contract)
+        if not event.wait(timeout=10.0):
+            with self.lock:
+                self.contract_details_data.pop(req_id, None)
+                self.contract_details_events.pop(req_id, None)
+            return None
+
+        with self.lock:
+            details = self.contract_details_data.pop(req_id, [])
+            self.contract_details_events.pop(req_id, None)
+
+        if not details:
+            return None
+
+        con_id = details[0].contract.conId
+        with self.lock:
+            self.contract_con_ids[symbol] = con_id
+        return con_id
+
+    def fetch_news_provider_codes(self) -> List[str]:
+        """Fetch and cache available IBKR news provider codes."""
+        with self.lock:
+            if self.news_provider_codes:
+                return list(self.news_provider_codes)
+            already_requested = self.news_provider_requested
+
+        if not already_requested:
+            self.news_provider_event.clear()
+            self.reqNewsProviders()
+            with self.lock:
+                self.news_provider_requested = True
+
+        self.news_provider_event.wait(timeout=5.0)
+        with self.lock:
+            return list(self.news_provider_codes)
+
+    def fetch_today_news_headlines(self, symbol: str, max_results: int = 10) -> List[Dict]:
+        """
+        Fetch recent IBKR headlines for a symbol using historical news.
+
+        We intentionally keep this headline-only for a cautious first pass.
+        """
+        with self.lock:
+            cached = self.news_cache.get(symbol)
+        if cached is not None:
+            return list(cached)
+
+        provider_codes = self.fetch_news_provider_codes()
+        con_id = self.fetch_contract_con_id(symbol)
+        if not provider_codes or not con_id:
+            return []
+
+        req_id = self.get_next_req_id()
+        event = threading.Event()
+        with self.lock:
+            self.historical_news_data[req_id] = []
+            self.historical_news_events[req_id] = event
+
+        self.reqHistoricalNews(
+            reqId=req_id,
+            conId=con_id,
+            providerCodes="+".join(provider_codes),
+            startDateTime="",
+            endDateTime="",
+            totalResults=max_results,
+            historicalNewsOptions=[],
+        )
+
+        if not event.wait(timeout=10.0):
+            with self.lock:
+                self.historical_news_data.pop(req_id, None)
+                self.historical_news_events.pop(req_id, None)
+            return []
+
+        with self.lock:
+            headlines = self.historical_news_data.pop(req_id, [])
+            self.historical_news_events.pop(req_id, None)
+            self.news_cache[symbol] = list(headlines)
+
+        return headlines
         
     def fetch_last_close(self, symbol: str) -> Optional[float]:
         """Fetch the last closing price for a symbol (from the previous regular trading session)."""

@@ -21,6 +21,11 @@ from scanner_config import (
     FAST_IGNITION_PCT_15S,
     FAST_IGNITION_VOLUME_MULTIPLIER,
     FAST_IGNITION_MAX_RETRACEMENT_PCT,
+    NEWS_CATALYST_ENABLED,
+    NEWS_CATALYST_IGNORE_KEYWORDS,
+    NEWS_CATALYST_MAX_HEADLINES,
+    NEWS_CATALYST_NEGATIVE_KEYWORDS,
+    NEWS_CATALYST_POSITIVE_KEYWORDS,
     DISCORD_WEBHOOK_URL,
     TWS_PORT,
 )
@@ -45,6 +50,40 @@ def format_compact_volume(value: float) -> str:
     return f"{value:.0f}"
 
 
+def parse_ibkr_news_timestamp(raw_value: str) -> Optional[datetime]:
+    """Parse IBKR historical news timestamps into Eastern-aware datetimes when possible."""
+    if not raw_value:
+        return None
+
+    normalized = raw_value.replace("  ", " ").strip()
+    for fmt in ("%Y%m%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+        try:
+            parsed = datetime.strptime(normalized, fmt)
+            return pytz.timezone('US/Eastern').localize(parsed)
+        except ValueError:
+            continue
+    return None
+
+
+def classify_news_headline(headline: str) -> tuple[bool, str]:
+    """Return whether a headline qualifies as a cautious positive catalyst."""
+    headline_lower = headline.lower()
+
+    for keyword in NEWS_CATALYST_NEGATIVE_KEYWORDS:
+        if keyword in headline_lower:
+            return False, f"Excluded keyword: {keyword}"
+
+    for keyword in NEWS_CATALYST_IGNORE_KEYWORDS:
+        if keyword in headline_lower:
+            return False, f"Ignored keyword: {keyword}"
+
+    for keyword in NEWS_CATALYST_POSITIVE_KEYWORDS:
+        if keyword in headline_lower:
+            return True, f"Matched keyword: {keyword}"
+
+    return False, "No configured catalyst keyword matched"
+
+
 def initialize_alert_score_audit_file():
     """Initialize (truncate) the per-run score audit file in the project folder."""
     header = (
@@ -62,6 +101,7 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
     factors = monitor.alert_score_reasons if monitor.alert_score_reasons else []
     breakout_debug = monitor.alert_breakout_debug_info if monitor.alert_breakout_debug_info else None
     drawdown_debug = monitor.alert_drawdown_debug_info if monitor.alert_drawdown_debug_info else None
+    news_debug = monitor.alert_news_debug_info if monitor.alert_news_debug_info else None
     header_line = f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {symbol} | Session={session} | Grade={monitor.alert_grade} | Score={monitor.alert_score}"
     separator = "=" * max(len(header_line), 100)
 
@@ -109,6 +149,22 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
                 f"- Lower threshold: max({drawdown_debug['lower_base_threshold_pct']:.2f}%, dynamic) = {drawdown_debug['lower_dynamic_threshold_pct']:.2f}% | pass={drawdown_debug['passed_lower_threshold']}",
             ]
         )
+
+    if news_debug:
+        lines.extend(
+            [
+                "News debug:",
+                f"- Enabled: {news_debug['enabled']}",
+                f"- Headlines fetched: {news_debug['fetched_count']}",
+                f"- Same-day headlines: {news_debug['same_day_count']}",
+                f"- Meaningful match found: {news_debug['has_meaningful_news_today']}",
+                f"- Match reason: {news_debug['match_reason']}",
+            ]
+        )
+        if news_debug["same_day_headlines"]:
+            lines.append("- Same-day headlines:")
+            for headline in news_debug["same_day_headlines"]:
+                lines.append(f"  * {headline}")
 
     lines.extend(["", "-" * len(separator), ""])
 
@@ -212,6 +268,12 @@ class RealtimeSymbolMonitor:
         self.alert_is_suppressed = False
         self.alert_breakout_debug_info = None
         self.alert_drawdown_debug_info = None
+        self.alert_news_debug_info = None
+        
+        # News catalyst tracking
+        self.has_meaningful_news_today = False
+        self.news_headlines_today = []
+        self.news_match_reason = "News not checked yet"
         
         # Initialize Preliminary Condition Set (same thresholds for all sessions)
         self.fast_condition_set = AlertConditionSet("Fast Ignition")
@@ -433,7 +495,16 @@ class RealtimeSymbolMonitor:
                 breakout_debug_info=self.alert_breakout_debug_info,
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
+                has_meaningful_news_today=self.has_meaningful_news_today,
             )
+            self.alert_news_debug_info = {
+                "enabled": NEWS_CATALYST_ENABLED,
+                "fetched_count": len(self.news_headlines_today),
+                "same_day_count": len(self.news_headlines_today),
+                "has_meaningful_news_today": self.has_meaningful_news_today,
+                "match_reason": self.news_match_reason,
+                "same_day_headlines": [item["headline"] for item in self.news_headlines_today],
+            }
             self.alert_is_suppressed = (
                 self.alert_grade == "Below Threshold" or self.alert_score < ALERT_MIN_SCORE_TO_NOTIFY
             )
@@ -454,6 +525,7 @@ class RealtimeSymbolMonitor:
                 self.alert_is_suppressed = False
                 self.alert_breakout_debug_info = None
                 self.alert_drawdown_debug_info = None
+                self.alert_news_debug_info = None
             return []
 
 class RealtimeBroadScanner:
@@ -527,6 +599,55 @@ class RealtimeBroadScanner:
                     print(f"[SCANNER] {symbol} Avg Vol (10-day): {format_compact_volume(avg_vol)}")
                 else:
                     print(f"[SCANNER] {symbol} Could not calculate avg volume")
+
+    def _load_symbol_news(self, symbol: str, monitor, tws_app):
+        """Load and classify same-day IBKR headlines for one symbol."""
+        if not NEWS_CATALYST_ENABLED:
+            monitor.has_meaningful_news_today = False
+            monitor.news_headlines_today = []
+            monitor.news_match_reason = "News catalyst disabled in config"
+            return
+
+        raw_headlines = tws_app.fetch_today_news_headlines(symbol, max_results=NEWS_CATALYST_MAX_HEADLINES)
+        et_tz = pytz.timezone('US/Eastern')
+        today_et = datetime.now(et_tz).date()
+        same_day_headlines = []
+        match_reason = "No same-day headlines"
+        has_meaningful_news = False
+
+        for item in raw_headlines:
+            headline_dt = parse_ibkr_news_timestamp(item.get("time", ""))
+            if headline_dt is None:
+                continue
+            if headline_dt.astimezone(et_tz).date() != today_et:
+                continue
+
+            same_day_headlines.append(item)
+            is_meaningful, reason = classify_news_headline(item.get("headline", ""))
+            if is_meaningful and not has_meaningful_news:
+                has_meaningful_news = True
+                match_reason = f"{reason} | {item.get('headline', '')}"
+
+        if not same_day_headlines and raw_headlines:
+            match_reason = "Fetched headlines, but none were from today"
+        elif same_day_headlines and not has_meaningful_news:
+            match_reason = "Same-day headlines found, but none matched cautious catalyst rules"
+
+        monitor.news_headlines_today = same_day_headlines
+        monitor.has_meaningful_news_today = has_meaningful_news
+        monitor.news_match_reason = match_reason
+
+    def load_news(self, tws_app):
+        """Load cautious headline-based news catalyst data for all monitored symbols."""
+        print("[SCANNER] Loading news headlines for catalyst scoring...")
+        for symbol, monitor in self.monitors.items():
+            try:
+                self._load_symbol_news(symbol, monitor, tws_app)
+            except Exception as e:
+                monitor.has_meaningful_news_today = False
+                monitor.news_headlines_today = []
+                monitor.news_match_reason = f"News load failed: {e}"
+                print(f"[SCANNER] Error loading news for {symbol}: {e}")
     
     def load_previous_closes(self, tws_app):
         """Load previous day's closing prices for all symbols"""
@@ -663,6 +784,8 @@ def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbo
                 avg_vol = tws_app.fetch_avg_daily_volume(s, days=10)
                 if avg_vol:
                     scanner.monitors[s].avg_daily_volume = avg_vol
+
+            scanner._load_symbol_news(s, scanner.monitors[s], tws_app)
             
             # Load prev close
             close = tws_app.fetch_last_close(s)
@@ -781,6 +904,9 @@ def run_standalone_scanner():
     
     # Load Fundamentals
     scanner.load_fundamentals(tws_app)
+
+    # Load cautious news headlines for catalyst scoring
+    scanner.load_news(tws_app)
     
     # Load Previous Day's Closing Prices
     scanner.load_previous_closes(tws_app)

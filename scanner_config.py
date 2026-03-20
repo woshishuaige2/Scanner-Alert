@@ -31,9 +31,9 @@ VWAP_BUFFER_UNDER_3_PCT = 3.0            # Require price to clear VWAP by 3% fro
 VWAP_BUFFER_OVER_3_PCT = 1.0             # Require price to clear VWAP by 1% at $3 and above
 
 # ALERT RATING / QUALITY SCORING (Used by alert_rating.py and realtime_multi_session_scanner.py)
-ALERT_MIN_SCORE_TO_NOTIFY = 1               # Temporary floor while news catalyst scoring is unimplemented
-ALERT_GRADE_A_MIN_SCORE = 7                 # Temporary A cutoff with news catalyst currently unavailable
-ALERT_GRADE_B_MIN_SCORE = 4                 # Temporary B cutoff with news catalyst currently unavailable
+ALERT_MIN_SCORE_TO_NOTIFY = 3               # Suppress low-quality setups below C
+ALERT_GRADE_A_MIN_SCORE = 9                 # Tightened A cutoff after validating cautious news scoring
+ALERT_GRADE_B_MIN_SCORE = 6                 # Tightened B cutoff after validating cautious news scoring
 ALERT_BREAKOUT_LOOKBACK_MINUTES = 10        # Rolling 1-minute candle lookback for local breakout scoring
 ALERT_DRAWDOWN_LOOKBACK_MINUTES = 60        # Rolling 1-minute candle lookback
 ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT = 3   # Average the strongest green bodies in the lookback
@@ -41,6 +41,52 @@ ALERT_DRAWDOWN_UPPER_BASE_PCT = 10.0        # Base threshold for the first drawd
 ALERT_DRAWDOWN_LOWER_BASE_PCT = 5.0         # Base threshold for the second drawdown quality point
 ALERT_DRAWDOWN_UPPER_VOL_MULTIPLIER = 0.70  # Multiplier applied to avg top green 1m body %
 ALERT_DRAWDOWN_LOWER_VOL_MULTIPLIER = 0.35  # Multiplier applied to avg top green 1m body %
+NEWS_CATALYST_ENABLED = True                # Enable cautious headline-based news catalyst scoring
+NEWS_CATALYST_MAX_HEADLINES = 10            # Limit IBKR headline fetch size per symbol
+NEWS_CATALYST_POSITIVE_KEYWORDS = [
+    "approval",
+    "authorizes",
+    "award",
+    "buyout",
+    "contract",
+    "data",
+    "earnings",
+    "fda",
+    "guidance",
+    "merger",
+    "order",
+    "orders",
+    "partnership",
+    "patent",
+    "phase",
+    "results",
+    "trial",
+]
+NEWS_CATALYST_NEGATIVE_KEYWORDS = [
+    "at-the-market",
+    "atm",
+    "bankruptcy",
+    "chapter 11",
+    "delisting",
+    "dilution",
+    "non-compliance",
+    "offering",
+    "prospectus",
+    "registered direct",
+    "resale",
+    "shelf",
+    "warrant",
+    "warrants",
+]
+NEWS_CATALYST_IGNORE_KEYWORDS = [
+    "conference",
+    "fireside chat",
+    "investor day",
+    "participation",
+    "presentation",
+    "price target",
+    "webcast",
+]
 
 # FAST IGNITION CONDITIONS (Used by realtime_multi_session_scanner.py)
 FAST_IGNITION_PCT_5S = 0.8              # Minimum move over last 5 seconds

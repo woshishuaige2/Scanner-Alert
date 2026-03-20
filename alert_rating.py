@@ -2,7 +2,7 @@
 Alert rating utilities for triggered scanner setups.
 
 Scoring rules (additive points):
-- Relative volume: +1 if RelVol >= 5x, and +1 extra if RelVol >= 20x.
+- Relative volume: +1 if RelVol >= 5x, and +1 extra if RelVol >= 50x.
 - Local breakout: +1 if current 1-minute candle high is above the highest completed
   1-minute candle high from the prior configured rolling lookback window.
 - Session HOD breakout: +1 if current 1-minute candle high is above the highest
@@ -17,13 +17,13 @@ Scoring rules (additive points):
     Lower threshold = max(configured base lower %, configured lower multiplier * vol reference).
     +1 if no candle has high-to-low drawdown >= upper threshold.
     +1 if no candle has high-to-low drawdown >= lower threshold.
-- News catalyst: +2 if there is meaningful company-specific news today.
+- News catalyst: +1 if there is meaningful company-specific news today.
 
-Temporary grade mapping while news catalyst scoring is unimplemented:
-- A: score >= 7
-- B: score >= 4
-- C: score 1-3
-- Below alert threshold: score < 1
+Current grade mapping (Max 12):
+- A: score >= 9
+- B: score >= 6
+- C: score 3-5
+- Below alert threshold: score < 3
 """
 
 from datetime import datetime, timedelta
@@ -196,8 +196,8 @@ def calculate_alert_rating(
             reasons.append(f"No 1m H-L drawdown >={lower_drawdown_threshold_pct:.1f}% (+1)")
 
     if has_meaningful_news_today:
-        score += 2
-        reasons.append("Meaningful news (+2)")
+        score += 1
+        reasons.append("Meaningful news (+1)")
 
     if score >= ALERT_GRADE_A_MIN_SCORE:
         grade = "A"
