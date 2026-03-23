@@ -186,14 +186,15 @@ def calculate_alert_rating(
             max_intraday_1m_drawdown_pct=max_intraday_1m_drawdown_pct,
             recent_green_1m_body_pcts=recent_green_1m_body_pcts,
         )
-        upper_drawdown_threshold_pct = drawdown_debug_info["upper_dynamic_threshold_pct"]
-        lower_drawdown_threshold_pct = drawdown_debug_info["lower_dynamic_threshold_pct"]
-        if max_intraday_1m_drawdown_pct < upper_drawdown_threshold_pct:
-            score += 1
-            reasons.append(f"No 1m H-L drawdown >={upper_drawdown_threshold_pct:.1f}% (+1)")
-        if max_intraday_1m_drawdown_pct < lower_drawdown_threshold_pct:
-            score += 1
-            reasons.append(f"No 1m H-L drawdown >={lower_drawdown_threshold_pct:.1f}% (+1)")
+        if drawdown_debug_info["recent_green_body_count"] > 0:
+            upper_drawdown_threshold_pct = drawdown_debug_info["upper_dynamic_threshold_pct"]
+            lower_drawdown_threshold_pct = drawdown_debug_info["lower_dynamic_threshold_pct"]
+            if max_intraday_1m_drawdown_pct < upper_drawdown_threshold_pct:
+                score += 1
+                reasons.append(f"No 1m H-L drawdown >={upper_drawdown_threshold_pct:.1f}% (+1)")
+            if max_intraday_1m_drawdown_pct < lower_drawdown_threshold_pct:
+                score += 1
+                reasons.append(f"No 1m H-L drawdown >={lower_drawdown_threshold_pct:.1f}% (+1)")
 
     if has_meaningful_news_today:
         score += 1

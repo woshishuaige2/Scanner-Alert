@@ -5,6 +5,7 @@ Enhanced with market session awareness and premarket-specific features.
 """
 import time
 import os
+import re
 from datetime import datetime, timedelta
 from typing import List, Dict, Callable, Optional
 from collections import deque
@@ -39,6 +40,7 @@ MARKET_OPEN = (9, 30)      # 9:30 AM ET
 MARKET_CLOSE = (16, 0)     # 4:00 PM ET
 AFTERHOURS_END = (20, 0)   # 8:00 PM ET
 ALERT_SCORE_AUDIT_FILE = os.path.join(os.path.dirname(__file__), "temp_alert_score_audit.log")
+SIGNAL_STATE_RESET_GAP_SECONDS = max(SQUEEZE_TIME_MINUTES * 60, 300)
 
 
 def format_compact_volume(value: float) -> str:
@@ -55,13 +57,60 @@ def parse_ibkr_news_timestamp(raw_value: str) -> Optional[datetime]:
     if not raw_value:
         return None
 
+    et_tz = pytz.timezone('US/Eastern')
     normalized = raw_value.replace("  ", " ").strip()
-    for fmt in ("%Y%m%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+    compact = " ".join(normalized.split())
+
+    for fmt in (
+        "%Y%m%d %H:%M:%S",
+        "%Y%m%d-%H:%M:%S",
+        "%Y%m%d  %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%a, %d %b %Y %H:%M:%S",
+    ):
         try:
-            parsed = datetime.strptime(normalized, fmt)
-            return pytz.timezone('US/Eastern').localize(parsed)
+            parsed = datetime.strptime(compact, fmt)
+            if parsed.tzinfo is not None:
+                return parsed.astimezone(et_tz)
+            return et_tz.localize(parsed)
         except ValueError:
             continue
+
+    iso_candidate = compact.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(iso_candidate)
+        if parsed.tzinfo is not None:
+            return parsed.astimezone(et_tz)
+        return et_tz.localize(parsed)
+    except ValueError:
+        pass
+
+    # IBKR and some providers append timezone names or extra tokens after a parseable timestamp.
+    prefix_match = re.match(r"^(\d{8}[- ]\d{2}:\d{2}:\d{2})", compact)
+    if prefix_match:
+        prefix = prefix_match.group(1)
+        for fmt in ("%Y%m%d %H:%M:%S", "%Y%m%d-%H:%M:%S"):
+            try:
+                return et_tz.localize(datetime.strptime(prefix, fmt))
+            except ValueError:
+                continue
+
+    text_match = re.match(r"^([A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2}(?: [+-]\d{4})?)", compact)
+    if text_match:
+        text_prefix = text_match.group(1)
+        for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S"):
+            try:
+                parsed = datetime.strptime(text_prefix, fmt)
+                if parsed.tzinfo is not None:
+                    return parsed.astimezone(et_tz)
+                return et_tz.localize(parsed)
+            except ValueError:
+                continue
+
     return None
 
 
@@ -293,10 +342,33 @@ class RealtimeSymbolMonitor:
             SqueezeCondition(pct_threshold=SQUEEZE_PCT_THRESHOLD, minutes=SQUEEZE_TIME_MINUTES)
         )
 
+    def _reset_short_horizon_signal_state(self, price: float, now: datetime):
+        """Drop short-horizon state after long inactivity gaps so delayed ticks cannot fabricate momentum."""
+        self.price_history.clear()
+        self.volume_history.clear()
+        self.minute_volumes.clear()
+        self.current_minute_bucket = now.replace(second=0, microsecond=0)
+        self.current_minute_open = price
+        self.current_minute_high = price
+        self.current_minute_low = price
+        self.current_minute_close = price
+        self.max_intraday_1m_drawdown_pct = None
+        self.green_1m_body_history.clear()
+        self.completed_1m_high_history.clear()
+
     def update_market_data(self, price: float, volume: float, vwap: float, bid: float = 0, ask: float = 0):
         now = datetime.now()
         current_session = get_market_session()
-        
+
+        if self.last_update is not None:
+            gap_seconds = (now - self.last_update).total_seconds()
+            if gap_seconds > SIGNAL_STATE_RESET_GAP_SECONDS:
+                print(
+                    f"[STATE] {self.symbol}: Resetting short-horizon signal state after "
+                    f"{gap_seconds:.0f}s inactivity gap"
+                )
+                self._reset_short_horizon_signal_state(price, now)
+
         # Get current date for day tracking
         et_tz = pytz.timezone('US/Eastern')
         now_et = datetime.now(et_tz)
@@ -600,7 +672,7 @@ class RealtimeBroadScanner:
                 else:
                     print(f"[SCANNER] {symbol} Could not calculate avg volume")
 
-    def _load_symbol_news(self, symbol: str, monitor, tws_app):
+    def _load_symbol_news(self, symbol: str, monitor, tws_app, force_refresh: bool = False):
         """Load and classify same-day IBKR headlines for one symbol."""
         if not NEWS_CATALYST_ENABLED:
             monitor.has_meaningful_news_today = False
@@ -608,7 +680,11 @@ class RealtimeBroadScanner:
             monitor.news_match_reason = "News catalyst disabled in config"
             return
 
-        raw_headlines = tws_app.fetch_today_news_headlines(symbol, max_results=NEWS_CATALYST_MAX_HEADLINES)
+        raw_headlines = tws_app.fetch_today_news_headlines(
+            symbol,
+            max_results=NEWS_CATALYST_MAX_HEADLINES,
+            force_refresh=force_refresh,
+        )
         et_tz = pytz.timezone('US/Eastern')
         today_et = datetime.now(et_tz).date()
         same_day_headlines = []
@@ -637,12 +713,13 @@ class RealtimeBroadScanner:
         monitor.has_meaningful_news_today = has_meaningful_news
         monitor.news_match_reason = match_reason
 
-    def load_news(self, tws_app):
+    def load_news(self, tws_app, force_refresh: bool = False):
         """Load cautious headline-based news catalyst data for all monitored symbols."""
-        print("[SCANNER] Loading news headlines for catalyst scoring...")
+        action = "Refreshing" if force_refresh else "Loading"
+        print(f"[SCANNER] {action} news headlines for catalyst scoring...")
         for symbol, monitor in self.monitors.items():
             try:
-                self._load_symbol_news(symbol, monitor, tws_app)
+                self._load_symbol_news(symbol, monitor, tws_app, force_refresh=force_refresh)
             except Exception as e:
                 monitor.has_meaningful_news_today = False
                 monitor.news_headlines_today = []
@@ -793,7 +870,10 @@ def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbo
             
             # Subscribe to data
             tws_app.subscribe_market_data(s, lambda sym, p, v, vw, ts, b, a: scanner.update(sym, p, v, vw, b, a))
-            
+
+    if NEWS_CATALYST_ENABLED:
+        scanner.load_news(tws_app, force_refresh=True)
+
     return list(set(current_symbols + unique_new))
 
 def send_discord_alert(symbol, session, reasons, monitor):

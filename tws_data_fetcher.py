@@ -556,13 +556,15 @@ class TWSDataApp(EClient, EWrapper):
         with self.lock:
             return list(self.news_provider_codes)
 
-    def fetch_today_news_headlines(self, symbol: str, max_results: int = 10) -> List[Dict]:
+    def fetch_today_news_headlines(self, symbol: str, max_results: int = 10, force_refresh: bool = False) -> List[Dict]:
         """
         Fetch recent IBKR headlines for a symbol using historical news.
 
         We intentionally keep this headline-only for a cautious first pass.
         """
         with self.lock:
+            if force_refresh:
+                self.news_cache.pop(symbol, None)
             cached = self.news_cache.get(symbol)
         if cached is not None:
             return list(cached)

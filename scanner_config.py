@@ -44,13 +44,22 @@ ALERT_DRAWDOWN_LOWER_VOL_MULTIPLIER = 0.35  # Multiplier applied to avg top gree
 NEWS_CATALYST_ENABLED = True                # Enable cautious headline-based news catalyst scoring
 NEWS_CATALYST_MAX_HEADLINES = 10            # Limit IBKR headline fetch size per symbol
 NEWS_CATALYST_POSITIVE_KEYWORDS = [
+    "acquisition",
+    "acquires",
     "approval",
     "authorizes",
     "award",
     "buyout",
+    "collaboration",
+    "commercial launch",
+    "completed merger",
+    "completes merger",
     "contract",
     "data",
+    "definitive agreement",
     "earnings",
+    "expands",
+    "expansion",
     "fda",
     "guidance",
     "merger",
@@ -60,6 +69,7 @@ NEWS_CATALYST_POSITIVE_KEYWORDS = [
     "patent",
     "phase",
     "results",
+    "strategic merger",
     "trial",
 ]
 NEWS_CATALYST_NEGATIVE_KEYWORDS = [
@@ -79,13 +89,20 @@ NEWS_CATALYST_NEGATIVE_KEYWORDS = [
     "warrants",
 ]
 NEWS_CATALYST_IGNORE_KEYWORDS = [
+    "after-market session",
     "conference",
     "fireside chat",
+    "intraday session",
     "investor day",
+    "market-moving news",
     "participation",
+    "pre-market session",
     "presentation",
     "price target",
+    "shares are trading higher",
+    "stocks moving",
     "webcast",
+    "why is",
 ]
 
 # FAST IGNITION CONDITIONS (Used by realtime_multi_session_scanner.py)
