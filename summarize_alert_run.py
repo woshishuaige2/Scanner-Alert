@@ -3,7 +3,7 @@ Usage:
 python .\summarize_alert_run.py
 python .\summarize_alert_run.py --symbol BIAF
 python .\summarize_alert_run.py --date 2026-03-23 --start 08:00 --end 13:00
-python .\summarize_alert_run.py --date 2026-03-23 --start 08:00 --end 13:00 --symbol BIAF
+python .\summarize_alert_run.py --date 2026-03-23 --log .\alert_history\alert_score_audit_2026-03-23_07-49-11_backfill.log
 """
 
 import argparse

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Callable, Optional
 from collections import deque
 import xml.etree.ElementTree as ET
-from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, SqueezeCondition, FastIgnitionCondition
+from conditions import MarketData, AlertConditionSet, PriceAboveVWAPCondition, FastIgnitionCondition
 import platform
 import pytz
 from scanner_config import (
@@ -40,6 +40,8 @@ MARKET_OPEN = (9, 30)      # 9:30 AM ET
 MARKET_CLOSE = (16, 0)     # 4:00 PM ET
 AFTERHOURS_END = (20, 0)   # 8:00 PM ET
 ALERT_SCORE_AUDIT_FILE = os.path.join(os.path.dirname(__file__), "temp_alert_score_audit.log")
+ALERT_SCORE_HISTORY_DIR = os.path.join(os.path.dirname(__file__), "alert_history")
+CURRENT_RUN_AUDIT_FILE = None
 SIGNAL_STATE_RESET_GAP_SECONDS = max(SQUEEZE_TIME_MINUTES * 60, 300)
 
 
@@ -134,14 +136,28 @@ def classify_news_headline(headline: str) -> tuple[bool, str]:
 
 
 def initialize_alert_score_audit_file():
-    """Initialize (truncate) the per-run score audit file in the project folder."""
+    """Initialize the temp audit log and a permanent per-run history log."""
+    global CURRENT_RUN_AUDIT_FILE
+    start_time = datetime.now()
+    os.makedirs(ALERT_SCORE_HISTORY_DIR, exist_ok=True)
+    CURRENT_RUN_AUDIT_FILE = os.path.join(
+        ALERT_SCORE_HISTORY_DIR,
+        f"alert_score_audit_{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
+    )
     header = (
         "# Alert Score Audit Log (temp)\n"
-        f"# Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"# Started: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        "# One block per triggered alert with scoring factor breakdown.\n\n"
+    )
+    history_header = (
+        "# Alert Score Audit Log (history)\n"
+        f"# Started: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         "# One block per triggered alert with scoring factor breakdown.\n\n"
     )
     with open(ALERT_SCORE_AUDIT_FILE, "w", encoding="utf-8") as f:
         f.write(header)
+    with open(CURRENT_RUN_AUDIT_FILE, "w", encoding="utf-8") as f:
+        f.write(history_header)
 
 
 def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, trigger_reasons: List[str], monitor):
@@ -217,8 +233,12 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
 
     lines.extend(["", "-" * len(separator), ""])
 
+    block = "\n".join(lines)
     with open(ALERT_SCORE_AUDIT_FILE, "a", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+        f.write(block)
+    if CURRENT_RUN_AUDIT_FILE:
+        with open(CURRENT_RUN_AUDIT_FILE, "a", encoding="utf-8") as f:
+            f.write(block)
 
 def get_market_session() -> str:
     """Determine current market session (PREMARKET, REGULAR, AFTERHOURS, CLOSED)"""
@@ -324,7 +344,7 @@ class RealtimeSymbolMonitor:
         self.news_headlines_today = []
         self.news_match_reason = "News not checked yet"
         
-        # Initialize Preliminary Condition Set (same thresholds for all sessions)
+        # Initialize the live alert trigger set.
         self.fast_condition_set = AlertConditionSet("Fast Ignition")
         self.fast_condition_set.add_condition(PriceAboveVWAPCondition())
         self.fast_condition_set.add_condition(
@@ -334,12 +354,6 @@ class RealtimeSymbolMonitor:
                 volume_multiplier=FAST_IGNITION_VOLUME_MULTIPLIER,
                 max_retracement_pct=FAST_IGNITION_MAX_RETRACEMENT_PCT,
             )
-        )
-
-        self.confirmation_condition_set = AlertConditionSet("Preliminary")
-        self.confirmation_condition_set.add_condition(PriceAboveVWAPCondition())
-        self.confirmation_condition_set.add_condition(
-            SqueezeCondition(pct_threshold=SQUEEZE_PCT_THRESHOLD, minutes=SQUEEZE_TIME_MINUTES)
         )
 
     def _reset_short_horizon_signal_state(self, price: float, now: datetime):
@@ -524,8 +538,6 @@ class RealtimeSymbolMonitor:
         trigger_summary = None
         if self.fast_condition_set.check_all(data):
             trigger_summary = self.fast_condition_set.get_trigger_summary()
-        elif self.confirmation_condition_set.check_all(data):
-            trigger_summary = self.confirmation_condition_set.get_trigger_summary()
 
         if trigger_summary:
             # Check 60-second cooldown before triggering new alert

@@ -106,7 +106,7 @@ NEWS_CATALYST_IGNORE_KEYWORDS = [
 ]
 
 # FAST IGNITION CONDITIONS (Used by realtime_multi_session_scanner.py)
-FAST_IGNITION_PCT_5S = 0.8              # Minimum move over last 5 seconds
+FAST_IGNITION_PCT_5S = 0.8                # Minimum move over last 5 seconds
 FAST_IGNITION_PCT_15S = 1.5             # Minimum move over last 15 seconds
 FAST_IGNITION_VOLUME_MULTIPLIER = 2.0   # 5s burst volume vs trailing average
 FAST_IGNITION_MAX_RETRACEMENT_PCT = 0.7 # Allowed pullback from local high
