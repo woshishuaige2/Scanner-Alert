@@ -57,6 +57,7 @@ class TWSDataApp(EClient, EWrapper):
         
         # Order tracking
         self.order_status_callbacks = [] # List of callbacks for order updates
+        self.error_callbacks = [] # List of callbacks for order / API errors
         
         # Fundamental data storage
         self.fundamental_data = {} # symbol -> XML string
@@ -200,6 +201,12 @@ class TWSDataApp(EClient, EWrapper):
                 if reqId in self.realtime_callbacks:
                     symbol_info = f" ({self.realtime_callbacks[reqId][0]})"
             print(f"[TWS Error] ReqId: {reqId}{symbol_info}, Code: {errorCode}, Msg: {errorString}")
+
+        for callback in list(getattr(self, "error_callbacks", [])):
+            try:
+                callback(reqId, errorCode, errorString)
+            except Exception:
+                pass
         
     def historicalData(self, reqId: int, bar: BarData):
         """Receive historical bar data"""

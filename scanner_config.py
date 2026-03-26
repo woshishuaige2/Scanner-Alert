@@ -46,11 +46,11 @@ ALERT_MOMENTUM_PRICE_MIN_PCT_5S = 0.8       # Minimum 5-second price move for mu
 ALERT_MOMENTUM_PRICE_MIN_PCT_15S = 1.5      # Minimum 15-second price move for multi-timeframe acceleration
 ALERT_MOMENTUM_PRICE_MIN_PCT_30S = 2.3      # Minimum 30-second price move for multi-timeframe acceleration
 ALERT_MOMENTUM_PRICE_MIN_PCT_60S = 3.2      # Minimum 60-second price move for multi-timeframe acceleration
-ALERT_MOMENTUM_PRICE_RATE_5S_OVER_15S = 1.1   # 5s rate must exceed 15s rate by at least 5%
-ALERT_MOMENTUM_PRICE_RATE_15S_OVER_30S = 1.03  # 15s rate must exceed 30s rate by at least 3%
+ALERT_MOMENTUM_PRICE_RATE_5S_OVER_15S = 1.2   # 5s rate must exceed 15s rate by at least 20%
+ALERT_MOMENTUM_PRICE_RATE_15S_OVER_30S = 1.05  # 15s rate must exceed 30s rate by at least 5%
 ALERT_MOMENTUM_MIN_VOL_15S = 15000          # Minimum 15-second volume to avoid low-activity noise
-ALERT_MOMENTUM_VOL_RATE_5S_OVER_15S = 1.1  # 5s volume rate must exceed 15s rate by at least 5%
-ALERT_MOMENTUM_VOL_RATE_15S_OVER_30S = 1.03 # 15s volume rate must exceed 30s rate by at least 3%
+ALERT_MOMENTUM_VOL_RATE_5S_OVER_15S = 1.2  # 5s volume rate must exceed 15s rate by at least 20%
+ALERT_MOMENTUM_VOL_RATE_15S_OVER_30S = 1.05 # 15s volume rate must exceed 30s rate by at least 5%
 NEWS_CATALYST_ENABLED = True                # Enable cautious headline-based news catalyst scoring
 NEWS_CATALYST_MAX_HEADLINES = 10            # Limit IBKR headline fetch size per symbol
 NEWS_CATALYST_POSITIVE_KEYWORDS = [
@@ -133,3 +133,23 @@ STRICT_MOMENTUM_REQUIRED = True
 MIN_PRICE_SURGE_10S = 1.5   # 1.5% surge in 10s
 MAX_DRAWDOWN_10S = 0.5      # 0.5% max drawdown
 MIN_TREND_30S = 1.0         # 1.0% trend in 30s
+
+# REAL-TIME TRADING ENTRY (Used in run_realtime_trading.py)
+REALTIME_TRADE_MIN_ALERT_GRADE = "B"             # Only queue entries for B/A/A+ scanner alerts
+REALTIME_BREAKOUT_MIN_ALERT_GRADE = "A"          # A and A+ can enter on continuation breakouts
+REALTIME_TRADE_REGULAR_HOURS_ONLY = True         # Restrict new entries to the regular market session
+REALTIME_ENTRY_BREAKOUT_BUFFER_PCT = 0.10        # Require price to clear the tracked high by a small buffer
+REALTIME_ENTRY_MIN_EXTENSION_PCT = 0.20          # Require the setup to extend beyond the alert price before entry
+REALTIME_ENTRY_BASE_LOOKBACK_SECONDS = 12        # Recent window used to detect a short base for grade-B setups
+REALTIME_ENTRY_BASE_MIN_SECONDS = 5              # Minimum age of the setup before allowing a base-breakout entry
+REALTIME_ENTRY_BASE_MAX_WIDTH_PCT = 0.80         # Base must stay relatively tight
+REALTIME_ENTRY_BASE_MAX_DISTANCE_FROM_PEAK_PCT = 0.75  # Base must form close to the setup high
+REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT = 3.0         # Cancel setups that fade too far off the high
+REALTIME_ENTRY_MAX_WAIT_SECONDS = 90             # Cancel stale setups that do not resolve quickly
+REALTIME_TRADE_SYMBOL_COOLDOWN_SECONDS = 120     # Avoid immediate re-queue churn after an attempt
+
+# DYNAMIC EXIT MANAGEMENT (Used by execution_engine.py)
+DYNAMIC_EXIT_PARTIAL_FRACTION = 0.5              # Fraction to sell at the first target before trailing the runner
+DYNAMIC_EXIT_BREAKEVEN_OFFSET_PCT = 0.10         # After the partial, move the stop slightly above breakeven
+DYNAMIC_EXIT_TRAIL_OFFSET_PCT = 2.0              # Trail the runner this far below the best price seen since entry
+DYNAMIC_EXIT_MIN_STOP_UPDATE_PCT = 0.20          # Minimum improvement required before modifying the live stop

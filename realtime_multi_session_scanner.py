@@ -1033,7 +1033,7 @@ def send_discord_alert(symbol, session, reasons, monitor):
 def run_standalone_scanner():
     # Setup TWS App
     from tws_data_fetcher import create_tws_data_app
-    client_id = int(os.getenv("SCANNER_TWS_CLIENT_ID", "11"))
+    client_id = int(os.getenv("SCANNER_TWS_CLIENT_ID", "10"))
     print(f"[INIT] Connecting to TWS on port {TWS_PORT} with client ID {client_id}...")
     tws_app = create_tws_data_app("127.0.0.1", TWS_PORT, client_id=client_id)
     
