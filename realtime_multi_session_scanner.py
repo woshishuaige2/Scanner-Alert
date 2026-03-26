@@ -32,7 +32,7 @@ from scanner_config import (
 )
 import requests
 from top_gainers_fetcher import get_top_gainers
-from alert_rating import calculate_alert_rating, get_breakout_debug_info, get_drawdown_debug_info
+from alert_rating import calculate_alert_rating, get_breakout_debug_info, get_drawdown_debug_info, get_momentum_debug_info, get_alert_grade_rank
 
 # Market session times (Eastern Time)
 PREMARKET_START = (4, 0)   # 4:00 AM ET
@@ -166,6 +166,7 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
     factors = monitor.alert_score_reasons if monitor.alert_score_reasons else []
     breakout_debug = monitor.alert_breakout_debug_info if monitor.alert_breakout_debug_info else None
     drawdown_debug = monitor.alert_drawdown_debug_info if monitor.alert_drawdown_debug_info else None
+    momentum_debug = monitor.alert_momentum_debug_info if monitor.alert_momentum_debug_info else None
     news_debug = monitor.alert_news_debug_info if monitor.alert_news_debug_info else None
     header_line = f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {symbol} | Session={session} | Grade={monitor.alert_grade} | Score={monitor.alert_score}"
     separator = "=" * max(len(header_line), 100)
@@ -214,6 +215,63 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
                 f"- Lower threshold: max({drawdown_debug['lower_base_threshold_pct']:.2f}%, dynamic) = {drawdown_debug['lower_dynamic_threshold_pct']:.2f}% | pass={drawdown_debug['passed_lower_threshold']}",
             ]
         )
+
+    if momentum_debug:
+        lines.extend(
+            [
+                "Momentum debug:",
+                f"- Dense recent coverage: {momentum_debug['has_dense_coverage']}",
+                f"- Price recent samples 60s: {momentum_debug['price_recent_samples_60s']}",
+                f"- Volume recent samples 60s: {momentum_debug['volume_recent_samples_60s']}",
+                f"- Price accel pass: {momentum_debug['price_accel_pass']}",
+            ]
+        )
+        if all(momentum_debug["price_windows_pct"][label] is not None for label in ("5s", "15s", "30s", "60s")):
+            lines.append(
+                "- Price windows: "
+                f"5s={momentum_debug['price_windows_pct']['5s']:.2f}% | "
+                f"15s={momentum_debug['price_windows_pct']['15s']:.2f}% | "
+                f"30s={momentum_debug['price_windows_pct']['30s']:.2f}% | "
+                f"60s={momentum_debug['price_windows_pct']['60s']:.2f}%"
+            )
+            lines.append(
+                "- Price rates: "
+                f"5s={momentum_debug['price_rates_pct_per_sec']['5s']:.4f}%/s | "
+                f"15s={momentum_debug['price_rates_pct_per_sec']['15s']:.4f}%/s | "
+                f"30s={momentum_debug['price_rates_pct_per_sec']['30s']:.4f}%/s | "
+                f"60s={momentum_debug['price_rates_pct_per_sec']['60s']:.4f}%/s"
+            )
+        else:
+            lines.extend(
+                [
+                    "- Price windows: insufficient history",
+                    "- Price rates: insufficient history",
+                ]
+            )
+        lines.append(f"- Volume accel pass: {momentum_debug['volume_accel_pass']}")
+        if all(momentum_debug["volume_windows"][label] is not None for label in ("5s", "15s", "30s", "60s")):
+            lines.append(
+                "- Volume windows: "
+                f"5s={momentum_debug['volume_windows']['5s']:.0f} | "
+                f"15s={momentum_debug['volume_windows']['15s']:.0f} | "
+                f"30s={momentum_debug['volume_windows']['30s']:.0f} | "
+                f"60s={momentum_debug['volume_windows']['60s']:.0f}"
+            )
+            lines.append(
+                "- Volume rates: "
+                f"5s={momentum_debug['volume_rates_per_sec']['5s']:.2f}/s | "
+                f"15s={momentum_debug['volume_rates_per_sec']['15s']:.2f}/s | "
+                f"30s={momentum_debug['volume_rates_per_sec']['30s']:.2f}/s | "
+                f"60s={momentum_debug['volume_rates_per_sec']['60s']:.2f}/s"
+            )
+        else:
+            lines.extend(
+                [
+                    "- Volume windows: insufficient history",
+                    "- Volume rates: insufficient history",
+                ]
+            )
+        lines.append(f"- Combined momentum pass: {momentum_debug['combined_momentum_pass']}")
 
     if news_debug:
         lines.extend(
@@ -300,6 +358,8 @@ class RealtimeSymbolMonitor:
         self.symbol = symbol
         self.price_history = deque(maxlen=600)  # 10 mins of data at 1s intervals
         self.volume_history = deque(maxlen=600)
+        self.signal_volume_history = deque(maxlen=600)
+        self.signal_volume_history_seeded = False
         self.last_update = None
         self.bid = 0.0
         self.ask = 0.0
@@ -331,12 +391,14 @@ class RealtimeSymbolMonitor:
         # Screening results
         self.triggered_conditions = []
         self.last_alert_time = None  # Track when last alert triggered
+        self.last_emitted_grade = None
         self.alert_score = 0
-        self.alert_grade = "C"
+        self.alert_grade = "Below Threshold"
         self.alert_score_reasons = []
         self.alert_is_suppressed = False
         self.alert_breakout_debug_info = None
         self.alert_drawdown_debug_info = None
+        self.alert_momentum_debug_info = None
         self.alert_news_debug_info = None
         
         # News catalyst tracking
@@ -360,6 +422,8 @@ class RealtimeSymbolMonitor:
         """Drop short-horizon state after long inactivity gaps so delayed ticks cannot fabricate momentum."""
         self.price_history.clear()
         self.volume_history.clear()
+        self.signal_volume_history.clear()
+        self.signal_volume_history_seeded = False
         self.minute_volumes.clear()
         self.current_minute_bucket = now.replace(second=0, microsecond=0)
         self.current_minute_open = price
@@ -369,6 +433,27 @@ class RealtimeSymbolMonitor:
         self.max_intraday_1m_drawdown_pct = None
         self.green_1m_body_history.clear()
         self.completed_1m_high_history.clear()
+
+    def seed_signal_volume_history_from_bars(self, bars) -> None:
+        """Warm short-horizon signal volume history from recent bars without affecting live session accounting."""
+        self.signal_volume_history.clear()
+        running_cumulative_volume = 0.0
+        for bar in bars:
+            running_cumulative_volume += max(0.0, float(bar.volume))
+            self.signal_volume_history.append((bar.date, running_cumulative_volume))
+        self.signal_volume_history_seeded = bool(bars)
+
+    def _append_signal_volume(self, timestamp: datetime, live_cumulative_volume: float) -> None:
+        """Maintain a cumulative volume series for signal logic, aligning historical warmup to the first live tick."""
+        if self.signal_volume_history_seeded and self.signal_volume_history:
+            offset = live_cumulative_volume - self.signal_volume_history[-1][1]
+            self.signal_volume_history = deque(
+                ((ts, value + offset) for ts, value in self.signal_volume_history),
+                maxlen=self.signal_volume_history.maxlen,
+            )
+            self.signal_volume_history_seeded = False
+
+        self.signal_volume_history.append((timestamp, live_cumulative_volume))
 
     def update_market_data(self, price: float, volume: float, vwap: float, bid: float = 0, ask: float = 0):
         now = datetime.now()
@@ -395,6 +480,8 @@ class RealtimeSymbolMonitor:
             if self.day_start_price is None:
                 self.day_start_price = price
             self.last_day = current_day
+            self.signal_volume_history.clear()
+            self.signal_volume_history_seeded = False
             self.current_minute_bucket = None
             self.current_minute_open = None
             self.current_minute_high = None
@@ -449,6 +536,8 @@ class RealtimeSymbolMonitor:
             # Clear price history on session transition to avoid cross-session comparisons.
             self.price_history.clear()
             self.volume_history.clear()
+            self.signal_volume_history.clear()
+            self.signal_volume_history_seeded = False
             self.current_minute_bucket = minute_bucket
             self.current_minute_open = price
             self.current_minute_high = price
@@ -457,9 +546,10 @@ class RealtimeSymbolMonitor:
             self.max_intraday_1m_drawdown_pct = None
             self.green_1m_body_history.clear()
             self.completed_1m_high_history.clear()
-        
+
         self.price_history.append((now, price))
         self.volume_history.append((now, volume))
+        self._append_signal_volume(now, volume)
         self.last_update = now
         self.bid = bid
         self.ask = ask
@@ -532,7 +622,7 @@ class RealtimeSymbolMonitor:
             bid=self.bid,
             ask=self.ask,
             price_history=list(self.price_history),
-            volume_history=list(self.volume_history),
+            volume_history=list(self.signal_volume_history),
         )
         
         trigger_summary = None
@@ -540,13 +630,6 @@ class RealtimeSymbolMonitor:
             trigger_summary = self.fast_condition_set.get_trigger_summary()
 
         if trigger_summary:
-            # Check 60-second cooldown before triggering new alert
-            if self.last_alert_time:
-                seconds_since_last_alert = (self.last_update - self.last_alert_time).total_seconds()
-                if seconds_since_last_alert < 60:
-                    # Still in cooldown period, don't trigger new alert
-                    return []
-
             # Include the in-progress current minute candle in drawdown quality scoring.
             effective_max_drawdown = self.max_intraday_1m_drawdown_pct
             if self.current_minute_high is not None and self.current_minute_low is not None and self.current_minute_high > 0:
@@ -568,8 +651,14 @@ class RealtimeSymbolMonitor:
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
             )
+            self.alert_momentum_debug_info = get_momentum_debug_info(
+                price_history=list(self.price_history),
+                volume_history=list(self.signal_volume_history),
+                last_update=self.last_update,
+            )
             self.alert_score, self.alert_grade, self.alert_score_reasons = calculate_alert_rating(
                 price_history=list(self.price_history),
+                volume_history=list(self.signal_volume_history),
                 last_update=self.last_update,
                 relative_volume=self.relative_volume,
                 float_shares=self.float_shares,
@@ -580,6 +669,7 @@ class RealtimeSymbolMonitor:
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
                 has_meaningful_news_today=self.has_meaningful_news_today,
+                momentum_debug_info=self.alert_momentum_debug_info,
             )
             self.alert_news_debug_info = {
                 "enabled": NEWS_CATALYST_ENABLED,
@@ -592,11 +682,23 @@ class RealtimeSymbolMonitor:
             self.alert_is_suppressed = (
                 self.alert_grade == "Below Threshold" or self.alert_score < ALERT_MIN_SCORE_TO_NOTIFY
             )
+            should_emit = True
+            if self.last_alert_time:
+                seconds_since_last_alert = (self.last_update - self.last_alert_time).total_seconds()
+                if seconds_since_last_alert < 60:
+                    current_rank = get_alert_grade_rank(self.alert_grade)
+                    prior_rank = get_alert_grade_rank(self.last_emitted_grade)
+                    should_emit = current_rank > prior_rank
+
+            if not should_emit:
+                return []
             if self.alert_is_suppressed:
                 self.triggered_conditions = []
+                self.last_emitted_grade = self.alert_grade
                 self.last_alert_time = self.last_update
                 return [trigger_summary]
             self.triggered_conditions = [trigger_summary]
+            self.last_emitted_grade = self.alert_grade
             self.last_alert_time = self.last_update
             return self.triggered_conditions
         else:
@@ -604,12 +706,14 @@ class RealtimeSymbolMonitor:
             if self.last_alert_time and (self.last_update - self.last_alert_time) > timedelta(minutes=5):
                 self.triggered_conditions = []
                 self.alert_score = 0
-                self.alert_grade = "C"
+                self.alert_grade = "Below Threshold"
                 self.alert_score_reasons = []
                 self.alert_is_suppressed = False
                 self.alert_breakout_debug_info = None
                 self.alert_drawdown_debug_info = None
+                self.alert_momentum_debug_info = None
                 self.alert_news_debug_info = None
+                self.last_emitted_grade = None
             return []
 
 class RealtimeBroadScanner:
@@ -759,10 +863,10 @@ class RealtimeBroadScanner:
                 # Request last 15 minutes of 1-minute bars
                 bars = tws_app.fetch_historical_bars(symbol, duration="15 M", bar_size="1 min")
                 for bar in bars:
-                    # Add bar data to monitor history
-                    # We'll use the bar time and close price
+                    # Warm only the price history. Volume history is live cumulative volume,
+                    # so keep it live-only for session accounting and warm signal math separately.
                     monitor.price_history.append((bar.date, bar.close))
-                    monitor.volume_history.append((bar.date, bar.volume))
+                monitor.seed_signal_volume_history_from_bars(bars)
                 if bars:
                     print(f"[SCANNER] {symbol} Loaded {len(bars)} historical bars")
             except Exception as e:
@@ -908,7 +1012,7 @@ def send_discord_alert(symbol, session, reasons, monitor):
 
     # Put the most important fields first so iPhone banner notifications
     # show grade, ticker, price, and daily gain before the rest.
-    alert_icon = "🚀🚀🚀" if monitor.alert_grade == "A" else "🚀🚀" if monitor.alert_grade == "B" else "🚀"
+    alert_icon = "🚀🚀🚀🚀" if monitor.alert_grade == "A+" else "🚀🚀🚀" if monitor.alert_grade == "A" else "🚀🚀" if monitor.alert_grade == "B" else "🚀"
     grade_label = f"Grade {monitor.alert_grade} ({monitor.alert_score})"
     message = (
         f"{alert_icon} {grade_label} | {symbol} | ${price:.2f} | {gain_pct:+.2f}%\n"

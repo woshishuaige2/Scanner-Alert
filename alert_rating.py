@@ -8,6 +8,8 @@ Scoring rules (additive points):
 - Session HOD breakout: +1 if current 1-minute candle high is above the highest
   completed 1-minute candle high seen earlier in the current session.
 - Float size: +1 if float < 20M shares.
+- Multi-timeframe momentum expansion: +2 if rolling 5s/15s/30s/60s price acceleration
+  and volume acceleration both confirm a steepening move.
 - Squeeze strength (lookback window): +2 if >= 20%, +1 if >= configured threshold.
 - Hold move quality: +1 if current price holds at least 50% of the move from base to peak.
 - Intraday drawdown quality (1-minute candles):
@@ -19,7 +21,8 @@ Scoring rules (additive points):
     +1 if no candle has high-to-low drawdown >= lower threshold.
 - News catalyst: +1 if there is meaningful company-specific news today.
 
-Current grade mapping (Max 12):
+Current grade mapping (Max 14):
+- A+: score >= 12
 - A: score >= 9
 - B: score >= 6
 - C: score 3-5
@@ -39,6 +42,16 @@ from scanner_config import (
     ALERT_DRAWDOWN_UPPER_VOL_MULTIPLIER,
     ALERT_GRADE_A_MIN_SCORE,
     ALERT_GRADE_B_MIN_SCORE,
+    ALERT_MOMENTUM_MIN_SAMPLES_60S,
+    ALERT_MOMENTUM_MIN_VOL_15S,
+    ALERT_MOMENTUM_PRICE_MIN_PCT_5S,
+    ALERT_MOMENTUM_PRICE_MIN_PCT_15S,
+    ALERT_MOMENTUM_PRICE_MIN_PCT_30S,
+    ALERT_MOMENTUM_PRICE_MIN_PCT_60S,
+    ALERT_MOMENTUM_PRICE_RATE_5S_OVER_15S,
+    ALERT_MOMENTUM_PRICE_RATE_15S_OVER_30S,
+    ALERT_MOMENTUM_VOL_RATE_5S_OVER_15S,
+    ALERT_MOMENTUM_VOL_RATE_15S_OVER_30S,
 )
 
 
@@ -123,8 +136,144 @@ def get_drawdown_debug_info(
     }
 
 
+def get_alert_grade_rank(grade: Optional[str]) -> int:
+    grade_order = {
+        "Below Threshold": 0,
+        "C": 1,
+        "B": 2,
+        "A": 3,
+        "A+": 4,
+    }
+    return grade_order.get(grade or "", -1)
+
+
+def _find_first_value_at_or_after(
+    history: List[Tuple[datetime, float]],
+    target_ts: datetime,
+) -> Optional[float]:
+    for ts, value in history:
+        if ts >= target_ts:
+            return value
+    return None
+
+
+def _compute_price_change_pct(
+    price_history: List[Tuple[datetime, float]],
+    last_update: datetime,
+    window_seconds: int,
+) -> Optional[float]:
+    if not price_history:
+        return None
+    target_ts = last_update - timedelta(seconds=window_seconds)
+    if price_history[0][0] > target_ts:
+        return None
+    baseline_price = _find_first_value_at_or_after(price_history, target_ts)
+    current_price = price_history[-1][1]
+    if baseline_price is None or baseline_price <= 0 or current_price <= 0:
+        return None
+    return ((current_price - baseline_price) / baseline_price) * 100
+
+
+def _compute_window_volume(
+    volume_history: List[Tuple[datetime, float]],
+    last_update: datetime,
+    window_seconds: int,
+) -> Optional[float]:
+    if not volume_history:
+        return None
+    target_ts = last_update - timedelta(seconds=window_seconds)
+    if volume_history[0][0] > target_ts:
+        return None
+    baseline_volume = _find_first_value_at_or_after(volume_history, target_ts)
+    current_volume = volume_history[-1][1]
+    if baseline_volume is None or current_volume is None:
+        return None
+    return max(0.0, current_volume - baseline_volume)
+
+
+def get_momentum_debug_info(
+    price_history: List[Tuple[datetime, float]],
+    volume_history: List[Tuple[datetime, float]],
+    last_update: Optional[datetime],
+) -> Optional[Dict[str, Any]]:
+    """Return multi-timeframe price and volume acceleration data used for the momentum score."""
+    if not price_history or not volume_history or last_update is None:
+        return None
+
+    price_recent_samples_60s = sum(1 for ts, _ in price_history if ts >= last_update - timedelta(seconds=60))
+    volume_recent_samples_60s = sum(1 for ts, _ in volume_history if ts >= last_update - timedelta(seconds=60))
+    has_dense_coverage = (
+        price_recent_samples_60s >= ALERT_MOMENTUM_MIN_SAMPLES_60S
+        and volume_recent_samples_60s >= ALERT_MOMENTUM_MIN_SAMPLES_60S
+    )
+
+    price_windows = {
+        "5s": _compute_price_change_pct(price_history, last_update, 5),
+        "15s": _compute_price_change_pct(price_history, last_update, 15),
+        "30s": _compute_price_change_pct(price_history, last_update, 30),
+        "60s": _compute_price_change_pct(price_history, last_update, 60),
+    }
+    price_rates = {
+        "5s": price_windows["5s"] / 5 if price_windows["5s"] is not None else None,
+        "15s": price_windows["15s"] / 15 if price_windows["15s"] is not None else None,
+        "30s": price_windows["30s"] / 30 if price_windows["30s"] is not None else None,
+        "60s": price_windows["60s"] / 60 if price_windows["60s"] is not None else None,
+    }
+
+    volume_windows = {
+        "5s": _compute_window_volume(volume_history, last_update, 5),
+        "15s": _compute_window_volume(volume_history, last_update, 15),
+        "30s": _compute_window_volume(volume_history, last_update, 30),
+        "60s": _compute_window_volume(volume_history, last_update, 60),
+    }
+    volume_rates = {
+        "5s": volume_windows["5s"] / 5 if volume_windows["5s"] is not None else None,
+        "15s": volume_windows["15s"] / 15 if volume_windows["15s"] is not None else None,
+        "30s": volume_windows["30s"] / 30 if volume_windows["30s"] is not None else None,
+        "60s": volume_windows["60s"] / 60 if volume_windows["60s"] is not None else None,
+    }
+
+    has_price_windows = all(price_windows[label] is not None for label in ("5s", "15s", "30s", "60s"))
+    has_volume_windows = all(volume_windows[label] is not None for label in ("5s", "15s", "30s", "60s"))
+
+    price_accel_pass = False
+    if has_dense_coverage and has_price_windows:
+        price_accel_pass = (
+            price_windows["5s"] >= ALERT_MOMENTUM_PRICE_MIN_PCT_5S
+            and price_windows["15s"] >= ALERT_MOMENTUM_PRICE_MIN_PCT_15S
+            and price_windows["30s"] >= ALERT_MOMENTUM_PRICE_MIN_PCT_30S
+            and price_windows["60s"] >= ALERT_MOMENTUM_PRICE_MIN_PCT_60S
+            and price_rates["5s"] > price_rates["15s"] * ALERT_MOMENTUM_PRICE_RATE_5S_OVER_15S
+            and price_rates["15s"] > price_rates["30s"] * ALERT_MOMENTUM_PRICE_RATE_15S_OVER_30S
+            and price_rates["30s"] > price_rates["60s"]
+        )
+
+    volume_accel_pass = False
+    if has_dense_coverage and has_volume_windows:
+        volume_accel_pass = (
+            volume_windows["15s"] > ALERT_MOMENTUM_MIN_VOL_15S
+            and volume_rates["5s"] > volume_rates["15s"] * ALERT_MOMENTUM_VOL_RATE_5S_OVER_15S
+            and volume_rates["15s"] > volume_rates["30s"] * ALERT_MOMENTUM_VOL_RATE_15S_OVER_30S
+            and volume_rates["30s"] > volume_rates["60s"]
+        )
+
+    return {
+        "price_recent_samples_60s": price_recent_samples_60s,
+        "volume_recent_samples_60s": volume_recent_samples_60s,
+        "has_dense_coverage": has_dense_coverage,
+        "price_windows_pct": price_windows,
+        "price_rates_pct_per_sec": price_rates,
+        "price_accel_pass": price_accel_pass,
+        "volume_windows": volume_windows,
+        "volume_rates_per_sec": volume_rates,
+        "volume_accel_pass": volume_accel_pass,
+        "combined_momentum_pass": price_accel_pass and volume_accel_pass,
+    }
+
+
 def calculate_alert_rating(
     price_history,
+    volume_history,
     last_update,
     relative_volume: float,
     float_shares,
@@ -135,6 +284,7 @@ def calculate_alert_rating(
     max_intraday_1m_drawdown_pct: Optional[float] = None,
     recent_green_1m_body_pcts: Optional[List[float]] = None,
     has_meaningful_news_today: bool = False,
+    momentum_debug_info: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, str, List[str]]:
     if not price_history or last_update is None:
         return 0, "Below Threshold", []
@@ -158,6 +308,16 @@ def calculate_alert_rating(
     if float_shares is not None and float_shares < 20_000_000:
         score += 1
         reasons.append(f"Float {float_shares/1e6:.1f}M (+1)")
+
+    if momentum_debug_info is None:
+        momentum_debug_info = get_momentum_debug_info(
+            price_history=price_history,
+            volume_history=volume_history or [],
+            last_update=last_update,
+        )
+    if momentum_debug_info and momentum_debug_info["combined_momentum_pass"]:
+        score += 2
+        reasons.append("Multi-timeframe accel + volume expansion (+2)")
 
     lookback_start = last_update - timedelta(minutes=squeeze_time_minutes)
     window_prices = [(ts, p) for ts, p in price_history if ts >= lookback_start]
@@ -200,7 +360,9 @@ def calculate_alert_rating(
         score += 1
         reasons.append("Meaningful news (+1)")
 
-    if score >= ALERT_GRADE_A_MIN_SCORE:
+    if score >= 12:
+        grade = "A+"
+    elif score >= ALERT_GRADE_A_MIN_SCORE:
         grade = "A"
     elif score >= ALERT_GRADE_B_MIN_SCORE:
         grade = "B"

@@ -235,6 +235,20 @@ class TWSDataApp(EClient, EWrapper):
         with self.lock:
             self.historical_complete[reqId] = True
         print(f"[TWS] Historical data complete for reqId {reqId}")
+
+    def _emit_realtime_callback_if_ready(self, symbol: str, callback: Callable):
+        """Emit a scanner update once we have a usable live price and cumulative volume."""
+        with self.lock:
+            data = self.realtime_data.get(symbol, {})
+            price = data.get('price', 0.0)
+            volume = data.get('volume', 0.0)
+            if price <= 0 or volume <= 0:
+                return
+            vwap = data.get('vwap', 0.0)
+            bid = data.get('bid', 0.0)
+            ask = data.get('ask', 0.0)
+
+        callback(symbol, price, volume, vwap, datetime.now(), bid, ask)
     
     def tickPrice(self, reqId: TickerId, tickType: int, price: float, attrib: TickAttrib):
         """Handle price ticks"""
@@ -255,6 +269,7 @@ class TWSDataApp(EClient, EWrapper):
         if tt == 'LAST':
             with self.lock:
                 self.realtime_data[symbol]['price'] = price
+            self._emit_realtime_callback_if_ready(symbol, callback)
         elif tt == 'BID':
             with self.lock:
                 self.realtime_data[symbol]['bid'] = price
