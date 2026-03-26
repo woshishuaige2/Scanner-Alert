@@ -133,6 +133,7 @@ class ExecutionEngine:
             if role == 'parent' and (status == 'Filled' or filled_qty > 0):
                 if pos['status'] != 'OPEN':
                     pos['status'] = 'OPEN'
+                    pos['filled_at'] = datetime.now()
                     pos['actual_entry_price'] = avgFillPrice if avgFillPrice > 0 else pos['entry_price']
                     pos['shares'] = int(filled_qty) if filled_qty > 0 else pos['shares']
                     pos['remaining_shares'] = pos['shares']
@@ -307,7 +308,8 @@ class ExecutionEngine:
                 'parent_id': parent_id,
                 'stop_id': stop_id,
                 'status': 'SUBMITTED',
-                'time': datetime.now(),
+                'submitted_at': datetime.now(),
+                'filled_at': None,
                 'actual_entry_price': None,
                 'highest_price': entry_price,
                 'last_price': entry_price,
@@ -432,7 +434,7 @@ class ExecutionEngine:
                     'tp': pos['partial_target_price'],
                     'sl': pos['current_stop_price'],
                     'shares': pos['remaining_shares'],
-                    'time': pos['time']
+                    'time': pos.get('filled_at') or pos.get('submitted_at')
                 })
             return details
 
