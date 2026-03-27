@@ -4,7 +4,9 @@ Runs the scanner and execution logic in one process so one trading_bot runtime
 folder captures the full workflow.
 """
 import os
+import platform
 import signal
+import subprocess
 import threading
 import time
 from collections import deque
@@ -17,10 +19,13 @@ from alert_rating import get_alert_grade_rank
 from execution_engine import ExecutionEngine
 from realtime_multi_session_scanner import (
     RealtimeBroadScanner,
+    append_alert_score_audit,
     build_scanner_runtime_state,
+    build_voice_announcement,
     get_market_session,
     get_next_10_minute_mark,
     initialize_alert_score_audit_file,
+    send_discord_alert,
     update_scanner_symbols,
 )
 from runtime_feedback import RuntimeTelemetry
@@ -109,6 +114,45 @@ class BreakoutEntryManager:
             return False
         return (now - last_attempt).total_seconds() < config.REALTIME_TRADE_SYMBOL_COOLDOWN_SECONDS
 
+    def _build_recent_prices(self, symbol_state: Optional[TradeSymbolState]) -> deque:
+        recent_prices = deque(maxlen=64)
+        if symbol_state:
+            for ts, price in list(symbol_state.price_history)[-64:]:
+                recent_prices.append((ts, price))
+        return recent_prices
+
+    def _determine_entry_mode(self, grade: Optional[str], score: Optional[int]) -> str:
+        grade_rank = get_alert_grade_rank(grade)
+        if grade_rank >= self.breakout_grade_rank:
+            return "continuation_breakout"
+        if score is not None and score >= config.REALTIME_MOMENTUM_OVERWRITE_MIN_SCORE:
+            return "continuation_breakout"
+        return "base_breakout"
+
+    def _should_replace_pending_candidate(
+        self,
+        existing: Dict[str, Any],
+        grade: Optional[str],
+        score: Optional[int],
+        entry_mode: str,
+    ) -> bool:
+        existing_grade_rank = get_alert_grade_rank(existing.get("alert_grade"))
+        new_grade_rank = get_alert_grade_rank(grade)
+        existing_score = existing.get("alert_score") or 0
+        new_score = score or 0
+
+        if entry_mode == "continuation_breakout" and existing.get("entry_mode") != "continuation_breakout":
+            return new_grade_rank > existing_grade_rank or new_score >= max(
+                existing_score + 1,
+                config.REALTIME_MOMENTUM_OVERWRITE_MIN_SCORE,
+            )
+
+        if new_grade_rank > existing_grade_rank:
+            return True
+        if new_grade_rank == existing_grade_rank and new_score > existing_score:
+            return True
+        return False
+
     def get_pending_symbols(self) -> List[str]:
         with self.lock:
             return list(self.pending_entries.keys())
@@ -155,26 +199,53 @@ class BreakoutEntryManager:
                 self._log_event("entry_skipped", symbol=symbol, reason="symbol_cooldown")
                 return
 
-            entry_mode = (
-                "continuation_breakout"
-                if get_alert_grade_rank(grade) >= self.breakout_grade_rank
-                else "base_breakout"
-            )
+            entry_mode = self._determine_entry_mode(grade, score)
             existing = self.pending_entries.get(symbol)
             if existing:
+                if self._should_replace_pending_candidate(existing, grade, score, entry_mode):
+                    prior_mode = existing.get("entry_mode")
+                    prior_grade = existing.get("alert_grade")
+                    prior_score = existing.get("alert_score")
+                    self.pending_entries[symbol] = {
+                        "queued_at": now,
+                        "alert_price": alert_price,
+                        "high_watermark": max(
+                            alert_price,
+                            symbol_state.price if symbol_state and symbol_state.price else alert_price,
+                        ),
+                        "alert_grade": grade,
+                        "alert_score": score,
+                        "reasons": list(reasons),
+                        "entry_mode": entry_mode,
+                        "recent_prices": self._build_recent_prices(symbol_state),
+                    }
+                    filtered_alerts.appendleft(
+                        f"{symbol} replaced [{prior_grade} {prior_score}] {prior_mode.replace('_', ' ')} "
+                        f"with [{grade} {score}] {entry_mode.replace('_', ' ')} at ${alert_price:.2f}"
+                    )
+                    self._log_event(
+                        "entry_replaced",
+                        symbol=symbol,
+                        prior_grade=prior_grade,
+                        prior_score=prior_score,
+                        prior_entry_mode=prior_mode,
+                        grade=grade,
+                        score=score,
+                        alert_price=alert_price,
+                        entry_mode=entry_mode,
+                        reasons=list(reasons),
+                    )
+                    return
+
                 existing["queued_at"] = now
                 existing["alert_price"] = alert_price
                 existing["high_watermark"] = max(existing["high_watermark"], alert_price)
                 existing["alert_grade"] = grade
                 existing["alert_score"] = score
                 existing["reasons"] = list(reasons)
-                existing["entry_mode"] = entry_mode
                 return
 
-            recent_prices = deque(maxlen=64)
-            if symbol_state:
-                for ts, price in list(symbol_state.price_history)[-64:]:
-                    recent_prices.append((ts, price))
+            recent_prices = self._build_recent_prices(symbol_state)
 
             self.pending_entries[symbol] = {
                 "queued_at": now,
@@ -331,15 +402,18 @@ class BreakoutEntryManager:
 def _compute_recent_price_change_pct(price_history: deque, now: datetime, window_seconds: int) -> Optional[float]:
     if not price_history:
         return None
+    price_points = list(price_history)
+    if not price_points:
+        return None
     target_ts = now - timedelta(seconds=window_seconds)
     baseline_price = None
-    for ts, price in price_history:
+    for ts, price in price_points:
         if ts >= target_ts:
             baseline_price = price
             break
     if baseline_price is None:
         return None
-    current_price = price_history[-1][1]
+    current_price = price_points[-1][1]
     if baseline_price <= 0 or current_price <= 0:
         return None
     return ((current_price - baseline_price) / baseline_price) * 100
@@ -724,8 +798,33 @@ def run_trading_bot():
             "relative_volume": monitor.relative_volume,
         }
         telemetry.log_event("scanner_alert", **alert_event)
+        append_alert_score_audit(symbol, timestamp, session, reasons, monitor)
         state = symbol_states.get(symbol)
         entry_manager.queue_candidate_from_scanner_alert(alert_event, state, executor, filtered_alerts)
+
+        if monitor.alert_is_suppressed:
+            return
+
+        send_discord_alert(symbol, session, reasons, monitor)
+
+        try:
+            voice_text = build_voice_announcement(symbol, session)
+            if platform.system() == "Windows":
+                escaped_text = voice_text.replace('"', '`"')
+                ps_script = (
+                    "Add-Type -AssemblyName System.Speech; "
+                    "$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                    f'$synth.Speak("{escaped_text}")'
+                )
+                subprocess.run(
+                    ["powershell", "-Command", ps_script],
+                    capture_output=True,
+                    timeout=5,
+                )
+            else:
+                os.system(f'espeak "{voice_text}" 2>/dev/null')
+        except Exception as e:
+            print(f"[WARNING] Voice announcement failed: {e}")
 
     scanner.on_preliminary_alert(handle_scanner_alert)
 

@@ -51,6 +51,7 @@ ALERT_MOMENTUM_PRICE_RATE_15S_OVER_30S = 1.05  # 15s rate must exceed 30s rate b
 ALERT_MOMENTUM_MIN_VOL_15S = 15000          # Minimum 15-second volume to avoid low-activity noise
 ALERT_MOMENTUM_VOL_RATE_5S_OVER_15S = 1.2  # 5s volume rate must exceed 15s rate by at least 20%
 ALERT_MOMENTUM_VOL_RATE_15S_OVER_30S = 1.05 # 15s volume rate must exceed 30s rate by at least 5%
+MIN_AVG_DAILY_DOLLAR_VOLUME = 2_000_000    # Loose liquidity gate to avoid extremely thin symbols
 NEWS_CATALYST_ENABLED = True                # Enable cautious headline-based news catalyst scoring
 NEWS_CATALYST_MAX_HEADLINES = 10            # Limit IBKR headline fetch size per symbol
 NEWS_CATALYST_POSITIVE_KEYWORDS = [
@@ -81,6 +82,9 @@ NEWS_CATALYST_POSITIVE_KEYWORDS = [
     "results",
     "strategic merger",
     "trial",
+    "withdrawal of sec filing",
+    "withdraws sec filing",
+    "withdrawing sec filing",
 ]
 NEWS_CATALYST_NEGATIVE_KEYWORDS = [
     "at-the-market",
@@ -91,7 +95,9 @@ NEWS_CATALYST_NEGATIVE_KEYWORDS = [
     "dilution",
     "non-compliance",
     "offering",
+    "private placement",
     "prospectus",
+    "priced at-the-market",
     "registered direct",
     "resale",
     "shelf",
@@ -137,6 +143,7 @@ MIN_TREND_30S = 1.0         # 1.0% trend in 30s
 # REAL-TIME TRADING ENTRY (Used in run_realtime_trading.py)
 REALTIME_TRADE_MIN_ALERT_GRADE = "B"             # Only queue entries for B/A/A+ scanner alerts
 REALTIME_BREAKOUT_MIN_ALERT_GRADE = "A"          # A and A+ can enter on continuation breakouts
+REALTIME_MOMENTUM_OVERWRITE_MIN_SCORE = 8        # High-conviction alerts at or above this score can upgrade into momentum entry mode
 REALTIME_TRADE_REGULAR_HOURS_ONLY = True         # Restrict new entries to the regular market session
 REALTIME_ENTRY_BREAKOUT_BUFFER_PCT = 0.10        # Require price to clear the tracked high by a small buffer
 REALTIME_ENTRY_MIN_EXTENSION_PCT = 0.20          # Require the setup to extend beyond the alert price before entry

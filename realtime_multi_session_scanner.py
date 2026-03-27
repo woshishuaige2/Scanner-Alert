@@ -28,6 +28,7 @@ from scanner_config import (
     NEWS_CATALYST_MAX_HEADLINES,
     NEWS_CATALYST_NEGATIVE_KEYWORDS,
     NEWS_CATALYST_POSITIVE_KEYWORDS,
+    MIN_AVG_DAILY_DOLLAR_VOLUME,
     DISCORD_WEBHOOK_URL,
     TWS_PORT,
 )
@@ -611,6 +612,16 @@ class RealtimeSymbolMonitor:
         """Return completed session-local 1-minute highs for breakout scoring."""
         return list(self.completed_1m_high_history)
 
+    def _passes_liquidity_prefilter(self) -> bool:
+        """Block obviously thin names before alert scoring."""
+        if self.avg_daily_volume is None or not self.price_history:
+            return True
+        current_price = self.price_history[-1][1]
+        if current_price is None or current_price <= 0:
+            return True
+        avg_daily_dollar_volume = self.avg_daily_volume * current_price
+        return avg_daily_dollar_volume >= MIN_AVG_DAILY_DOLLAR_VOLUME
+
     def check_screening_conditions(self) -> List[str]:
         if not self.price_history:
             return []
@@ -633,6 +644,20 @@ class RealtimeSymbolMonitor:
             trigger_summary = self.fast_condition_set.get_trigger_summary()
 
         if trigger_summary:
+            if not self._passes_liquidity_prefilter():
+                self.triggered_conditions = []
+                self.alert_score = 0
+                self.alert_grade = "Below Threshold"
+                self.alert_score_reasons = [
+                    f"Liquidity prefilter failed: avg daily dollar volume below ${MIN_AVG_DAILY_DOLLAR_VOLUME:,.0f}"
+                ]
+                self.alert_is_suppressed = True
+                self.alert_breakout_debug_info = None
+                self.alert_drawdown_debug_info = None
+                self.alert_momentum_debug_info = None
+                self.alert_news_debug_info = None
+                return []
+
             # Include the in-progress current minute candle in drawdown quality scoring.
             effective_max_drawdown = self.max_intraday_1m_drawdown_pct
             if self.current_minute_high is not None and self.current_minute_low is not None and self.current_minute_high > 0:
@@ -1080,7 +1105,8 @@ def send_discord_alert(symbol, session, reasons, monitor):
 
 def build_voice_announcement(symbol: str, session: str) -> str:
     session_label = session.replace("_", " ").title()
-    return f"{session_label} alert. Symbol {symbol}."
+    spelled_symbol = " ".join(list(symbol.upper()))
+    return f"{session_label} alert. {spelled_symbol}."
 
 def run_standalone_scanner():
     telemetry = RuntimeTelemetry(component="scanner", base_dir=RUNTIME_FEEDBACK_DIR)
