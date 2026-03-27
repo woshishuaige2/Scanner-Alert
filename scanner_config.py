@@ -153,3 +153,16 @@ DYNAMIC_EXIT_PARTIAL_FRACTION = 0.5              # Fraction to sell at the first
 DYNAMIC_EXIT_BREAKEVEN_OFFSET_PCT = 0.10         # After the partial, move the stop slightly above breakeven
 DYNAMIC_EXIT_TRAIL_OFFSET_PCT = 2.0              # Trail the runner this far below the best price seen since entry
 DYNAMIC_EXIT_MIN_STOP_UPDATE_PCT = 0.20          # Minimum improvement required before modifying the live stop
+DYNAMIC_EXIT_MAX_HOLD_SECONDS = 300              # Maximum regular-hours hold time after fill before forcing a bot-managed exit
+DYNAMIC_EXIT_VOLUME_FADE_MIN_HOLD_SECONDS = 20   # Ignore early noise; only evaluate volume fade after this many seconds from fill
+DYNAMIC_EXIT_VOLUME_FADE_WINDOW_SECONDS = 15     # Measure recent live volume over this trailing window
+DYNAMIC_EXIT_VOLUME_FADE_FRACTION_OF_PEAK = 0.35 # Exit if recent volume rate falls below this fraction of the trade's post-entry peak rate
+DYNAMIC_EXIT_VOLUME_FADE_MIN_RETRACE_PCT = 1.0   # Require some giveback from the high so volume fade alone does not cut strong trend holds
+
+# RUNTIME FEEDBACK / TELEMETRY
+RUNTIME_FEEDBACK_DIR_NAME = "runtime_feedback"   # Folder for structured event logs and live state snapshots
+RUNTIME_FEEDBACK_TOP_SYMBOLS = 15                # Limit large state snapshots to the most relevant symbols
+TRADE_TRACE_SNAPSHOT_INTERVAL_SECONDS = 1.0      # Snapshot cadence for trade-centered feedback traces
+TRADE_TRACE_PRE_ENTRY_SECONDS = 5                # Include this many seconds before a trade opens
+TRADE_TRACE_POST_EXIT_SECONDS = 5                # Keep tracing this many seconds after a trade closes
+TRADE_TRACE_BUFFER_SECONDS = 30                  # Rolling per-symbol buffer retained in memory for pre-entry context

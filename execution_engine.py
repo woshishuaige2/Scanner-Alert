@@ -3,6 +3,7 @@ Execution Engine for IBKR Paper Trading
 Handles order placement, position tracking, and risk management (TP/SL).
 """
 import threading
+from collections import deque
 from datetime import datetime
 from typing import Dict, List, Set
 from ibapi.contract import Contract
@@ -10,12 +11,13 @@ from ibapi.order import Order
 import scanner_config as config
 
 class ExecutionEngine:
-    def __init__(self, tws_app, account: str, tp_pct: float = 1.0, sl_pct: float = 10.0, investment_per_trade: float = 1000.0):
+    def __init__(self, tws_app, account: str, tp_pct: float = 1.0, sl_pct: float = 10.0, investment_per_trade: float = 1000.0, telemetry=None):
         self.tws_app = tws_app
         self.account = account
         self.tp_pct = tp_pct
         self.sl_pct = sl_pct
         self.investment_per_trade = investment_per_trade
+        self.telemetry = telemetry
         
         # Position tracking: symbol -> position state
         self.positions: Dict[str, Dict] = {}
@@ -25,6 +27,7 @@ class ExecutionEngine:
         self.trade_history: List[Dict] = []
         # Blacklisted symbols: symbols rejected by TWS due to permissions/margin
         self.blacklist: Set[str] = set()
+        self.position_event_callbacks = []
         
         self.lock = threading.Lock()
         
@@ -52,6 +55,41 @@ class ExecutionEngine:
             'role': role,
             'reported_filled': 0.0,
         }
+
+    @staticmethod
+    def _compute_recent_volume_rate(volume_history: deque, window_seconds: int):
+        if len(volume_history) < 2 or window_seconds <= 0:
+            return None
+
+        latest_time, latest_volume = volume_history[-1]
+        cutoff = latest_time.timestamp() - float(window_seconds)
+        baseline_time, baseline_volume = volume_history[0]
+
+        for ts, cumulative_volume in reversed(volume_history):
+            if ts.timestamp() <= cutoff:
+                baseline_time, baseline_volume = ts, cumulative_volume
+                break
+
+        elapsed_seconds = (latest_time - baseline_time).total_seconds()
+        if elapsed_seconds <= 0:
+            return None
+
+        volume_delta = max(0.0, latest_volume - baseline_volume)
+        return volume_delta / elapsed_seconds
+
+    def _log_event(self, event_type: str, **payload):
+        if self.telemetry:
+            self.telemetry.log_event(event_type, **payload)
+
+    def _emit_position_event(self, event_type: str, **payload):
+        for callback in list(self.position_event_callbacks):
+            try:
+                callback(event_type, payload)
+            except Exception:
+                pass
+
+    def register_position_event_callback(self, callback):
+        self.position_event_callbacks.append(callback)
 
     def _build_stop_order(self, order_id: int, parent_id: int, quantity: int, stop_price: float) -> Order:
         stop_order = Order()
@@ -94,6 +132,13 @@ class ExecutionEngine:
                     symbol = meta['symbol']
                     print(f"[EXEC] CRITICAL: {symbol} rejected by TWS ({errorString}). Blacklisting for this session.")
                     self.blacklist.add(symbol)
+                    self._log_event(
+                        "order_rejected",
+                        symbol=symbol,
+                        order_id=reqId,
+                        error_code=errorCode,
+                        error_string=errorString,
+                    )
                     
                     # If we had a pending position, move it to history as FAILED
                     if symbol in self.positions and self.positions[symbol]['status'] == 'SUBMITTED':
@@ -141,6 +186,20 @@ class ExecutionEngine:
                     pos['current_stop_price'] = self._round_price(pos['actual_entry_price'] * (1 - self.sl_pct / 100))
                     pos['highest_price'] = pos['actual_entry_price']
                     print(f"[EXEC] >>> POSITION OPEN: {symbol} at ${pos['actual_entry_price']:.2f} <<<")
+                    self._log_event(
+                        "position_opened",
+                        symbol=symbol,
+                        order_id=orderId,
+                        actual_entry_price=pos['actual_entry_price'],
+                        shares=pos['shares'],
+                    )
+                    self._emit_position_event(
+                        "position_opened",
+                        symbol=symbol,
+                        order_id=orderId,
+                        actual_entry_price=pos['actual_entry_price'],
+                        shares=pos['shares'],
+                    )
                     self._submit_stop_update_locked(symbol, pos['current_stop_price'], pos['remaining_shares'])
             
             # Handle cancelled/inactive states carefully.
@@ -155,13 +214,20 @@ class ExecutionEngine:
                             'time': datetime.now()
                         })
                         print(f"[EXEC] Parent order {orderId} for {symbol} FAILED ({status}).")
+                        self._log_event(
+                            "entry_failed",
+                            symbol=symbol,
+                            order_id=orderId,
+                            reason=status,
+                            entry_price=pos['entry_price'],
+                        )
                         self._cleanup_position(symbol)
-                elif role in ['partial_exit', 'final_exit']:
+                elif role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'volume_fade_exit']:
                     if pos.get('active_exit_order_id') == orderId:
                         pos['exit_pending'] = False
                         pos['active_exit_order_id'] = None
 
-            if delta_filled > 0 and role in ['partial_exit', 'final_exit']:
+            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'volume_fade_exit']:
                 exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('last_price', pos.get('actual_entry_price', pos['entry_price']))
                 exit_shares = min(int(delta_filled), pos['remaining_shares'])
                 pos['remaining_shares'] = max(0, pos['remaining_shares'] - exit_shares)
@@ -181,6 +247,22 @@ class ExecutionEngine:
                         'time': datetime.now()
                     })
                     print(f"[EXEC] >>> PARTIAL EXIT: {symbol} sold {exit_shares} at ${exit_price:.2f} <<<")
+                    self._log_event(
+                        "partial_exit_filled",
+                        symbol=symbol,
+                        order_id=orderId,
+                        exit_price=exit_price,
+                        shares=exit_shares,
+                        remaining_shares=pos['remaining_shares'],
+                    )
+                    self._emit_position_event(
+                        "partial_exit_filled",
+                        symbol=symbol,
+                        order_id=orderId,
+                        exit_price=exit_price,
+                        shares=exit_shares,
+                        remaining_shares=pos['remaining_shares'],
+                    )
                     if pos['remaining_shares'] > 0:
                         breakeven_stop = self._round_price(
                             pos['actual_entry_price'] * (1 + config.DYNAMIC_EXIT_BREAKEVEN_OFFSET_PCT / 100)
@@ -190,16 +272,40 @@ class ExecutionEngine:
                     else:
                         self._cleanup_position(symbol)
                 else:
+                    if role == 'eod_exit':
+                        exit_type = "EOD"
+                    elif role == 'time_exit':
+                        exit_type = "TIME"
+                    elif role == 'volume_fade_exit':
+                        exit_type = "VOL_FADE"
+                    else:
+                        exit_type = "BOT"
                     self.trade_history.append({
                         'symbol': symbol,
                         'type': 'CLOSED',
-                        'exit_type': 'BOT',
+                        'exit_type': exit_type,
                         'entry_price': pos.get('actual_entry_price', pos['entry_price']),
                         'exit_price': exit_price,
                         'shares': exit_shares,
                         'time': datetime.now()
                     })
-                    print(f"[EXEC] >>> POSITION CLOSED: {symbol} via BOT at ${exit_price:.2f} <<<")
+                    print(f"[EXEC] >>> POSITION CLOSED: {symbol} via {exit_type} at ${exit_price:.2f} <<<")
+                    self._log_event(
+                        "position_closed",
+                        symbol=symbol,
+                        order_id=orderId,
+                        exit_type=exit_type,
+                        exit_price=exit_price,
+                        shares=exit_shares,
+                    )
+                    self._emit_position_event(
+                        "position_closed",
+                        symbol=symbol,
+                        order_id=orderId,
+                        exit_type=exit_type,
+                        exit_price=exit_price,
+                        shares=exit_shares,
+                    )
                     self._cleanup_position(symbol)
 
             if role == 'stop' and status == 'Filled':
@@ -215,6 +321,22 @@ class ExecutionEngine:
                     'time': datetime.now()
                 })
                 print(f"[EXEC] >>> POSITION CLOSED: {symbol} via SL at ${exit_price:.2f} <<<")
+                self._log_event(
+                    "position_closed",
+                    symbol=symbol,
+                    order_id=orderId,
+                    exit_type="SL",
+                    exit_price=exit_price,
+                    shares=exit_shares,
+                )
+                self._emit_position_event(
+                    "position_closed",
+                    symbol=symbol,
+                    order_id=orderId,
+                    exit_type="SL",
+                    exit_price=exit_price,
+                    shares=exit_shares,
+                )
                 self._cleanup_position(symbol)
 
     def _cleanup_position(self, symbol: str):
@@ -239,6 +361,13 @@ class ExecutionEngine:
         )
         self.tws_app.placeOrder(stop_order.orderId, self._create_contract(symbol), stop_order)
         print(f"[EXEC] Updated disaster stop for {symbol}: {quantity} shares at ${new_stop_price:.2f}")
+        self._log_event(
+            "stop_updated",
+            symbol=symbol,
+            stop_order_id=stop_order.orderId,
+            stop_price=new_stop_price,
+            quantity=quantity,
+        )
 
     def _submit_market_exit_locked(self, symbol: str, quantity: int, role: str):
         pos = self.positions[symbol]
@@ -253,6 +382,13 @@ class ExecutionEngine:
         pos['active_exit_order_id'] = order_id
         self.tws_app.placeOrder(order.orderId, self._create_contract(symbol), order)
         print(f"[EXEC] Submitted {role} order {order_id} for {symbol}: {quantity} shares")
+        self._log_event(
+            "exit_order_submitted",
+            symbol=symbol,
+            order_id=order_id,
+            role=role,
+            quantity=quantity,
+        )
         return True
 
     def execute_trade(self, symbol: str, entry_price: float):
@@ -317,6 +453,8 @@ class ExecutionEngine:
                 'partial_taken': False,
                 'exit_pending': False,
                 'active_exit_order_id': None,
+                'volume_history': deque(maxlen=128),
+                'peak_volume_rate_15s': 0.0,
             }
             self._register_order(parent_id, symbol, 'parent')
             self._register_order(stop_id, symbol, 'stop')
@@ -327,20 +465,83 @@ class ExecutionEngine:
             print(f"[EXEC] Submitted disaster stop {stop_order.orderId} for {symbol}")
             
             print(f"[EXEC] Entry submitted for {symbol}: {shares} shares | first target ${partial_target_price:.2f} | stop ${stop_price:.2f}")
+            self._log_event(
+                "entry_submitted",
+                symbol=symbol,
+                parent_order_id=parent_id,
+                stop_order_id=stop_id,
+                entry_price=entry_price,
+                shares=shares,
+                first_target=partial_target_price,
+                stop_price=stop_price,
+            )
             return True
 
-    def on_market_update(self, symbol: str, price: float, vwap: float = 0.0, market_session: str = "REGULAR"):
+    def on_market_update(self, symbol: str, price: float, volume: float = 0.0, vwap: float = 0.0, market_session: str = "REGULAR"):
         with self.lock:
             pos = self.positions.get(symbol)
             if pos is None or pos['status'] != 'OPEN':
                 return
 
+            now = datetime.now()
             pos['last_price'] = price
             pos['last_vwap'] = vwap
             pos['highest_price'] = max(pos['highest_price'], price)
+            if volume > 0:
+                pos['volume_history'].append((now, volume))
 
             if market_session != "REGULAR" or pos.get('exit_pending'):
                 return
+
+            filled_at = pos.get('filled_at')
+            if (
+                filled_at is not None
+                and config.DYNAMIC_EXIT_MAX_HOLD_SECONDS > 0
+                and (now - filled_at).total_seconds() >= config.DYNAMIC_EXIT_MAX_HOLD_SECONDS
+            ):
+                if self._submit_market_exit_locked(symbol, pos['remaining_shares'], 'time_exit'):
+                    self._log_event(
+                        "time_exit_submitted",
+                        symbol=symbol,
+                        max_hold_seconds=config.DYNAMIC_EXIT_MAX_HOLD_SECONDS,
+                        held_seconds=round((now - filled_at).total_seconds(), 1),
+                        shares=pos['remaining_shares'],
+                    )
+                return
+
+            recent_volume_rate = self._compute_recent_volume_rate(
+                pos['volume_history'],
+                config.DYNAMIC_EXIT_VOLUME_FADE_WINDOW_SECONDS,
+            )
+            if recent_volume_rate is not None:
+                pos['peak_volume_rate_15s'] = max(pos.get('peak_volume_rate_15s', 0.0), recent_volume_rate)
+
+            if (
+                not pos['partial_taken']
+                and filled_at is not None
+                and recent_volume_rate is not None
+                and config.DYNAMIC_EXIT_VOLUME_FADE_MIN_HOLD_SECONDS > 0
+                and (now - filled_at).total_seconds() >= config.DYNAMIC_EXIT_VOLUME_FADE_MIN_HOLD_SECONDS
+            ):
+                peak_volume_rate = pos.get('peak_volume_rate_15s', 0.0)
+                high_price = pos.get('highest_price', 0.0)
+                fade_from_peak_pct = ((high_price - price) / high_price) * 100 if high_price > 0 else 0.0
+                if (
+                    peak_volume_rate > 0
+                    and recent_volume_rate <= peak_volume_rate * config.DYNAMIC_EXIT_VOLUME_FADE_FRACTION_OF_PEAK
+                    and fade_from_peak_pct >= config.DYNAMIC_EXIT_VOLUME_FADE_MIN_RETRACE_PCT
+                ):
+                    if self._submit_market_exit_locked(symbol, pos['remaining_shares'], 'volume_fade_exit'):
+                        self._log_event(
+                            "volume_fade_exit_submitted",
+                            symbol=symbol,
+                            held_seconds=round((now - filled_at).total_seconds(), 1),
+                            recent_volume_rate=recent_volume_rate,
+                            peak_volume_rate=peak_volume_rate,
+                            fade_from_peak_pct=fade_from_peak_pct,
+                            shares=pos['remaining_shares'],
+                        )
+                    return
 
             if not pos['partial_taken']:
                 partial_qty = int(round(pos['shares'] * config.DYNAMIC_EXIT_PARTIAL_FRACTION))
@@ -405,20 +606,21 @@ class ExecutionEngine:
                     
                     new_oid = self.tws_app.next_order_id
                     self.tws_app.next_order_id += 1
+                    self._register_order(new_oid, symbol, 'eod_exit')
+                    pos['exit_pending'] = True
+                    pos['active_exit_order_id'] = new_oid
                     
                     self.tws_app.placeOrder(new_oid, contract, close_order)
                     print(f"[EXEC] EOD: Submitted Market Sell for {symbol} ({pos['remaining_shares']} shares)")
-                
-                # 3. Move to history and cleanup
-                self.trade_history.append({
-                    'symbol': symbol,
-                    'type': 'CLOSED',
-                    'exit_type': 'EOD',
-                    'entry_price': pos.get('actual_entry_price', pos['entry_price']),
-                    'exit_price': 0.0, # Will be updated by fill if we tracked it, but EOD is final
-                    'shares': pos['remaining_shares'],
-                    'time': datetime.now()
-                })
+                    self._log_event(
+                        "eod_exit_submitted",
+                        symbol=symbol,
+                        order_id=new_oid,
+                        shares=pos['remaining_shares'],
+                    )
+                    continue
+
+                # Non-open positions can be cleaned up after pending orders are cancelled.
                 self._cleanup_position(symbol)
 
     def get_active_positions_detailed(self) -> List[Dict]:
@@ -442,6 +644,17 @@ class ExecutionEngine:
         """Returns the history of closed or failed trades"""
         with self.lock:
             return list(self.trade_history)
+
+    def get_active_position_symbols(self) -> Set[str]:
+        with self.lock:
+            return set(self.positions.keys())
+
+    def get_position_snapshot(self, symbol: str):
+        with self.lock:
+            pos = self.positions.get(symbol)
+            if pos is None:
+                return None
+            return dict(pos)
     
     def get_blacklist(self) -> Set[str]:
         """Returns the set of blacklisted symbols"""

@@ -16,6 +16,7 @@ import pytz
 from scanner_config import (
     ALERT_MIN_SCORE_TO_NOTIFY,
     ALERT_DRAWDOWN_LOOKBACK_MINUTES,
+    RUNTIME_FEEDBACK_TOP_SYMBOLS,
     SQUEEZE_PCT_THRESHOLD,
     SQUEEZE_TIME_MINUTES,
     FAST_IGNITION_PCT_5S,
@@ -33,6 +34,7 @@ from scanner_config import (
 import requests
 from top_gainers_fetcher import get_top_gainers
 from alert_rating import calculate_alert_rating, get_breakout_debug_info, get_drawdown_debug_info, get_momentum_debug_info, get_alert_grade_rank
+from runtime_feedback import RuntimeTelemetry
 
 # Market session times (Eastern Time)
 PREMARKET_START = (4, 0)   # 4:00 AM ET
@@ -43,6 +45,7 @@ ALERT_SCORE_AUDIT_FILE = os.path.join(os.path.dirname(__file__), "temp_alert_sco
 ALERT_SCORE_HISTORY_DIR = os.path.join(os.path.dirname(__file__), "alert_history")
 CURRENT_RUN_AUDIT_FILE = None
 SIGNAL_STATE_RESET_GAP_SECONDS = max(SQUEEZE_TIME_MINUTES * 60, 300)
+RUNTIME_FEEDBACK_DIR = os.path.join(os.path.dirname(__file__), "runtime_feedback")
 
 
 def format_compact_volume(value: float) -> str:
@@ -944,9 +947,48 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
     # Show last 10 alerts instead of 5
     for timestamp, symbol, reasons, grade, score in list(scanner.recent_alerts)[-10:]:
         print(f"[{timestamp.strftime('%H:%M:%S')}] {symbol} [{grade} {score}]: {', '.join(reasons)}")
-    print("="*125)
 
-def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbols: List[str]) -> List[str]:
+
+def build_scanner_runtime_state(scanner: RealtimeBroadScanner) -> Dict:
+    sorted_monitors = sorted(
+        scanner.monitors.items(),
+        key=lambda item: item[1].relative_volume if item[1].relative_volume else 0.0,
+        reverse=True,
+    )
+    top_symbols = []
+    for symbol, monitor in sorted_monitors[:RUNTIME_FEEDBACK_TOP_SYMBOLS]:
+        top_symbols.append({
+            "symbol": symbol,
+            "price": monitor.price_history[-1][1] if monitor.price_history else None,
+            "vwap": monitor.vwap,
+            "relative_volume": monitor.relative_volume,
+            "alert_grade": monitor.alert_grade,
+            "alert_score": monitor.alert_score,
+            "triggered_conditions": list(monitor.triggered_conditions),
+        })
+
+    return {
+        "session": get_market_session(),
+        "monitored_symbols": sorted(list(scanner.monitors.keys())),
+        "top_symbols": top_symbols,
+        "recent_alerts": [
+            {
+                "timestamp": timestamp,
+                "symbol": symbol,
+                "reasons": list(reasons),
+                "grade": grade,
+                "score": score,
+            }
+            for timestamp, symbol, reasons, grade, score in list(scanner.recent_alerts)[-10:]
+        ],
+    }
+
+def update_scanner_symbols(
+    scanner: RealtimeBroadScanner,
+    tws_app,
+    current_symbols: List[str],
+    market_data_callback: Optional[Callable] = None,
+) -> List[str]:
     """Fetch new top gainers and update the scanner's monitor list"""
     print("\n[SCANNER] Updating top gainers list...")
     new_symbols = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT, force_refresh=True)
@@ -959,6 +1001,8 @@ def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbo
         print(f"[SCANNER] Adding {len(added)} new symbols to monitor: {', '.join(added)}")
         for s in added:
             scanner.monitors[s] = RealtimeSymbolMonitor(s)
+            if s not in scanner.symbols:
+                scanner.symbols.append(s)
             # Load fundamentals for new symbol
             xml_data = tws_app.fetch_fundamental_data(s)
             if xml_data:
@@ -985,7 +1029,10 @@ def update_scanner_symbols(scanner: RealtimeBroadScanner, tws_app, current_symbo
             if close: scanner.monitors[s].day_start_price = close
             
             # Subscribe to data
-            tws_app.subscribe_market_data(s, lambda sym, p, v, vw, ts, b, a: scanner.update(sym, p, v, vw, b, a))
+            if market_data_callback is not None:
+                tws_app.subscribe_market_data(s, market_data_callback(s))
+            else:
+                tws_app.subscribe_market_data(s, lambda sym, p, v, vw, ts, b, a: scanner.update(sym, p, v, vw, b, a))
 
     if NEWS_CATALYST_ENABLED:
         scanner.load_news(tws_app, force_refresh=True)
@@ -1030,7 +1077,13 @@ def send_discord_alert(symbol, session, reasons, monitor):
     except Exception as e:
         print(f"[WARNING] Error sending Discord alert: {e}")
 
+
+def build_voice_announcement(symbol: str, session: str) -> str:
+    session_label = session.replace("_", " ").title()
+    return f"{session_label} alert. Symbol {symbol}."
+
 def run_standalone_scanner():
+    telemetry = RuntimeTelemetry(component="scanner", base_dir=RUNTIME_FEEDBACK_DIR)
     # Setup TWS App
     from tws_data_fetcher import create_tws_data_app
     client_id = int(os.getenv("SCANNER_TWS_CLIENT_ID", "10"))
@@ -1054,6 +1107,12 @@ def run_standalone_scanner():
     SYMBOLS = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT, force_refresh=True)
     unique_symbols = list(set(SYMBOLS))
     print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
+    telemetry.log_event(
+        "scanner_started",
+        symbols=unique_symbols,
+        client_id=client_id,
+        runtime_dir=telemetry.run_dir,
+    )
     
     print("[INIT] Connecting to TWS for standalone scanner...")
     print(f"[INIT] Current market session: {get_market_session()}")
@@ -1071,6 +1130,18 @@ def run_standalone_scanner():
         else:
             alert_msg = f"{session} Alert! {symbol} triggered {voice_reason}"
             print(f"[ALERT] {alert_msg}")
+        telemetry.log_event(
+            "scanner_alert",
+            symbol=symbol,
+            session=session,
+            reasons=list(reasons),
+            alert_grade=monitor.alert_grade,
+            alert_score=monitor.alert_score,
+            suppressed=monitor.alert_is_suppressed,
+            price=monitor.price_history[-1][1] if monitor.price_history else None,
+            vwap=monitor.vwap,
+            relative_volume=monitor.relative_volume,
+        )
 
         # Append a per-alert scoring breakdown for tuning and diagnostics.
         append_alert_score_audit(symbol, timestamp, session, reasons, monitor)
@@ -1083,16 +1154,21 @@ def run_standalone_scanner():
         
         # Voice announcement - platform-specific
         try:
+            voice_text = build_voice_announcement(symbol, session)
             if platform.system() == "Windows":
                 # Windows: Use PowerShell with SAPI
                 import subprocess
-                # Escape quotes for PowerShell
-                ps_script = f'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak("{symbol} {session} alert")'
+                escaped_text = voice_text.replace('"', '`"')
+                ps_script = (
+                    "Add-Type -AssemblyName System.Speech; "
+                    "$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                    f'$synth.Speak("{escaped_text}")'
+                )
                 subprocess.run(["powershell", "-Command", ps_script], 
                              capture_output=True, timeout=5)
             else:
                 # Linux/Mac: Use espeak
-                os.system(f'espeak "{alert_msg}" 2>/dev/null')
+                os.system(f'espeak \"{voice_text}\" 2>/dev/null')
         except Exception as e:
             print(f"[WARNING] Voice announcement failed: {e}")
 
@@ -1138,11 +1214,13 @@ def run_standalone_scanner():
                 unique_symbols = update_scanner_symbols(scanner, tws_app, unique_symbols)
                 next_symbol_update = get_next_10_minute_mark()
             
+            telemetry.write_state(build_scanner_runtime_state(scanner))
             display_broad_screening(scanner)
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n[INFO] Scanner stopped.")
     finally:
+        telemetry.log_event("scanner_stopped")
         tws_app.disconnect()
 
 if __name__ == "__main__":
