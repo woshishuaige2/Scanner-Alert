@@ -23,7 +23,6 @@ from realtime_multi_session_scanner import (
     build_scanner_runtime_state,
     build_voice_announcement,
     get_market_session,
-    get_next_10_minute_mark,
     initialize_alert_score_audit_file,
     send_discord_alert,
     update_scanner_symbols,
@@ -617,6 +616,16 @@ class TradeTraceRecorder:
         return summaries
 
 
+def _format_display_price(value: Optional[float]) -> str:
+    if value is None:
+        return "N/A"
+    if value < 0.1:
+        return f"${value:.4f}"
+    if value < 1:
+        return f"${value:.3f}"
+    return f"${value:.2f}"
+
+
 def unified_visualization(scanner_state, filtered_alerts, executor, entry_manager: BreakoutEntryManager):
     os.system('cls' if os.name == 'nt' else 'clear')
     current_session = get_market_session()
@@ -636,8 +645,8 @@ def unified_visualization(scanner_state, filtered_alerts, executor, entry_manage
         print("No scanner data available yet.")
     else:
         for item in top_symbols[:config.RUNTIME_FEEDBACK_TOP_SYMBOLS]:
-            price = f"${item['price']:.2f}" if item.get("price") is not None else "N/A"
-            vwap = f"${item['vwap']:.2f}" if item.get("vwap") else "N/A"
+            price = _format_display_price(item.get("price"))
+            vwap = _format_display_price(item.get("vwap")) if item.get("vwap") else "N/A"
             rvol = f"{item.get('relative_volume', 0.0):.2f}x"
             score = item.get("alert_score", 0)
             grade_value = item.get("alert_grade", "-")
@@ -733,6 +742,7 @@ def build_trading_runtime_state(
 def run_trading_bot():
     global tws_app
     telemetry = RuntimeTelemetry(component="trading_bot", base_dir=RUNTIME_FEEDBACK_DIR)
+    permanently_excluded_symbols = set()
 
     tws_client_id = int(os.getenv("TRADING_TWS_CLIENT_ID", "11"))
     tws_port = int(os.getenv("TRADING_TWS_PORT", str(config.TWS_PORT)))
@@ -745,8 +755,13 @@ def run_trading_bot():
     time.sleep(2)
 
     print("[INIT] Fetching top gainers for in-process scanner...")
-    symbols = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=tws_port, force_refresh=True)
-    unique_symbols = list(set(symbols))
+    symbols = get_top_gainers(
+        top_n=config.SCANNER_MONITOR_CAP,
+        use_ibkr=True,
+        ibkr_port=tws_port,
+        force_refresh=True,
+    )
+    unique_symbols = list(dict.fromkeys(symbols))
     print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
 
     scanner = RealtimeBroadScanner(unique_symbols)
@@ -844,15 +859,33 @@ def run_trading_bot():
     def create_market_data_callback(sym):
         return lambda s, p, v, vw, ts, b, a: handle_market_update(s, p, v, vw, b, a)
 
+    def remove_symbols_from_scanner(symbols_to_remove, reason: str):
+        nonlocal unique_symbols
+        removed_any = False
+        for symbol in sorted(set(symbols_to_remove)):
+            if symbol not in scanner.monitors:
+                continue
+            tws_app.unsubscribe_realtime_data(symbol)
+            scanner.monitors.pop(symbol, None)
+            if symbol in scanner.symbols:
+                scanner.symbols.remove(symbol)
+            entry_manager.discard_symbol(symbol)
+            symbol_states.pop(symbol, None)
+            unique_symbols = [tracked for tracked in unique_symbols if tracked != symbol]
+            telemetry.log_event("scanner_symbol_removed", symbol=symbol, reason=reason)
+            removed_any = True
+        return removed_any
+
     print("[INIT] Subscribing to scanner/trading market data...")
     for symbol in unique_symbols:
         tws_app.subscribe_market_data(symbol, create_market_data_callback(symbol))
         telemetry.log_event("market_data_subscribed", symbol=symbol)
 
     last_session_check = datetime.now()
-    next_symbol_update = get_next_10_minute_mark()
-    eod_triggered = False
     et_tz = pytz.timezone('US/Eastern')
+    next_symbol_update = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_REFRESH_INTERVAL_SECONDS)
+    next_news_refresh = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_NEWS_REFRESH_INTERVAL_SECONDS)
+    eod_triggered = False
 
     try:
         while not should_exit:
@@ -861,25 +894,54 @@ def run_trading_bot():
                     scanner.resync_vwap_all_symbols(tws_app)
                 last_session_check = datetime.now()
 
+            newly_blacklisted_symbols = executor.get_blacklist() - permanently_excluded_symbols
+            if newly_blacklisted_symbols:
+                permanently_excluded_symbols.update(newly_blacklisted_symbols)
+                if remove_symbols_from_scanner(newly_blacklisted_symbols, reason="tws_blacklist"):
+                    telemetry.log_event(
+                        "scanner_symbols_updated",
+                        monitored_symbols=sorted(scanner.monitors.keys()),
+                        added_symbols=[],
+                        removed_symbols=sorted(newly_blacklisted_symbols),
+                        excluded_symbols=sorted(permanently_excluded_symbols),
+                    )
+
             if datetime.now(et_tz) >= next_symbol_update:
                 prior_symbols = set(scanner.monitors.keys())
+                refresh_all_news = datetime.now(et_tz) >= next_news_refresh
                 unique_symbols = update_scanner_symbols(
                     scanner,
                     tws_app,
                     unique_symbols,
                     market_data_callback=create_market_data_callback,
+                    protected_symbols=sorted(
+                        executor.get_active_position_symbols() | set(entry_manager.get_pending_symbols())
+                    ),
+                    excluded_symbols=sorted(permanently_excluded_symbols),
+                    refresh_all_news=refresh_all_news,
+                    max_symbols=config.SCANNER_MONITOR_CAP,
+                    max_symbol_changes=config.SCANNER_MAX_SYMBOL_CHANGES_PER_REFRESH,
                 )
                 added_symbols = set(scanner.monitors.keys()) - prior_symbols
+                removed_symbols = prior_symbols - set(scanner.monitors.keys())
                 for symbol in sorted(added_symbols):
                     symbol_states.setdefault(symbol, TradeSymbolState(symbol))
                     telemetry.log_event("market_data_subscribed", symbol=symbol)
-                if added_symbols:
+                for symbol in sorted(removed_symbols):
+                    entry_manager.discard_symbol(symbol)
+                    symbol_states.pop(symbol, None)
+                    telemetry.log_event("market_data_unsubscribed", symbol=symbol)
+                if added_symbols or removed_symbols:
                     telemetry.log_event(
                         "scanner_symbols_updated",
                         monitored_symbols=sorted(scanner.monitors.keys()),
                         added_symbols=sorted(added_symbols),
+                        removed_symbols=sorted(removed_symbols),
+                        excluded_symbols=sorted(permanently_excluded_symbols),
                     )
-                next_symbol_update = get_next_10_minute_mark()
+                next_symbol_update = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_REFRESH_INTERVAL_SECONDS)
+                if refresh_all_news:
+                    next_news_refresh = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_NEWS_REFRESH_INTERVAL_SECONDS)
 
             now = datetime.now()
             if now.hour == 15 and now.minute == 59 and not eod_triggered:

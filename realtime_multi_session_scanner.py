@@ -17,6 +17,8 @@ from scanner_config import (
     ALERT_MIN_SCORE_TO_NOTIFY,
     ALERT_DRAWDOWN_LOOKBACK_MINUTES,
     RUNTIME_FEEDBACK_TOP_SYMBOLS,
+    SCANNER_MONITOR_CAP,
+    SCANNER_MAX_SYMBOL_CHANGES_PER_REFRESH,
     SQUEEZE_PCT_THRESHOLD,
     SQUEEZE_TIME_MINUTES,
     FAST_IGNITION_PCT_5S,
@@ -975,9 +977,15 @@ def display_broad_screening(scanner: RealtimeBroadScanner):
 
 
 def build_scanner_runtime_state(scanner: RealtimeBroadScanner) -> Dict:
+    def get_gain_pct(monitor) -> float:
+        if monitor.price_history and monitor.day_start_price and monitor.day_start_price > 0:
+            price = monitor.price_history[-1][1]
+            return ((price - monitor.day_start_price) / monitor.day_start_price) * 100
+        return 0.0
+
     sorted_monitors = sorted(
         scanner.monitors.items(),
-        key=lambda item: item[1].relative_volume if item[1].relative_volume else 0.0,
+        key=lambda item: get_gain_pct(item[1]),
         reverse=True,
     )
     top_symbols = []
@@ -986,6 +994,7 @@ def build_scanner_runtime_state(scanner: RealtimeBroadScanner) -> Dict:
             "symbol": symbol,
             "price": monitor.price_history[-1][1] if monitor.price_history else None,
             "vwap": monitor.vwap,
+            "gain_pct": get_gain_pct(monitor),
             "relative_volume": monitor.relative_volume,
             "alert_grade": monitor.alert_grade,
             "alert_score": monitor.alert_score,
@@ -1008,19 +1017,75 @@ def build_scanner_runtime_state(scanner: RealtimeBroadScanner) -> Dict:
         ],
     }
 
+def _get_monitor_gain_pct(monitor) -> float:
+    if monitor.price_history and monitor.day_start_price and monitor.day_start_price > 0:
+        price = monitor.price_history[-1][1]
+        return ((price - monitor.day_start_price) / monitor.day_start_price) * 100
+    return 0.0
+
 def update_scanner_symbols(
     scanner: RealtimeBroadScanner,
     tws_app,
     current_symbols: List[str],
     market_data_callback: Optional[Callable] = None,
+    protected_symbols: Optional[List[str]] = None,
+    excluded_symbols: Optional[List[str]] = None,
+    refresh_all_news: bool = False,
+    max_symbols: int = SCANNER_MONITOR_CAP,
+    max_symbol_changes: int = SCANNER_MAX_SYMBOL_CHANGES_PER_REFRESH,
 ) -> List[str]:
     """Fetch new top gainers and update the scanner's monitor list"""
     print("\n[SCANNER] Updating top gainers list...")
-    new_symbols = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT, force_refresh=True)
-    unique_new = list(set(new_symbols))
-    
-    # Identify truly new symbols
-    added = [s for s in unique_new if s not in current_symbols]
+    new_symbols = get_top_gainers(top_n=max_symbols, use_ibkr=True, ibkr_port=TWS_PORT, force_refresh=True)
+    ranked_new = list(dict.fromkeys(new_symbols))
+    protected = set(protected_symbols or [])
+    excluded = set(excluded_symbols or [])
+
+    protected_kept = [s for s in current_symbols if s in protected and s not in excluded]
+    current_regular = [s for s in current_symbols if s not in protected and s not in excluded]
+    ranked_candidates = [s for s in ranked_new if s not in excluded and s not in protected]
+    regular_capacity = max(0, max_symbols - len(protected_kept))
+    target_regular = ranked_candidates[:regular_capacity]
+
+    add_candidates = [s for s in target_regular if s not in current_regular]
+    additions = []
+    removals = []
+
+    # If we have free regular slots, fill them first without forcing swaps.
+    available_slots = max(0, regular_capacity - len(current_regular))
+    if available_slots > 0 and add_candidates:
+        fill_count = min(max_symbol_changes, available_slots, len(add_candidates))
+        additions.extend(add_candidates[:fill_count])
+        add_candidates = add_candidates[fill_count:]
+
+    # Once regular slots are full, admit only a limited number of stronger newcomers
+    # and evict the weakest currently monitored regular symbols.
+    swap_budget = max(0, max_symbol_changes - len(additions))
+    if swap_budget > 0 and add_candidates and current_regular:
+        removable_pool = sorted(current_regular, key=lambda symbol: _get_monitor_gain_pct(scanner.monitors[symbol]))
+        swap_count = min(swap_budget, len(add_candidates), len(removable_pool))
+        removals.extend(removable_pool[:swap_count])
+        additions.extend(add_candidates[:swap_count])
+
+    # Enforce the configured cap even if the current list somehow drifted above it.
+    overflow = max(0, len(current_regular) - len(removals) + len(additions) - regular_capacity)
+    if overflow > 0:
+        removable_pool = [
+            symbol for symbol in sorted(current_regular, key=lambda s: _get_monitor_gain_pct(scanner.monitors[s]))
+            if symbol not in removals
+        ]
+        removals.extend(removable_pool[:overflow])
+
+    removed = [s for s in current_symbols if s in set(removals) or s in excluded]
+    if removed:
+        print(f"[SCANNER] Removing {len(removed)} symbols from monitor: {', '.join(sorted(removed))}")
+        for s in removed:
+            tws_app.unsubscribe_realtime_data(s)
+            scanner.monitors.pop(s, None)
+            if s in scanner.symbols:
+                scanner.symbols.remove(s)
+
+    added = [s for s in additions if s not in current_symbols]
     
     if added:
         print(f"[SCANNER] Adding {len(added)} new symbols to monitor: {', '.join(added)}")
@@ -1047,7 +1112,7 @@ def update_scanner_symbols(
                 if avg_vol:
                     scanner.monitors[s].avg_daily_volume = avg_vol
 
-            scanner._load_symbol_news(s, scanner.monitors[s], tws_app)
+            scanner._load_symbol_news(s, scanner.monitors[s], tws_app, force_refresh=True)
             
             # Load prev close
             close = tws_app.fetch_last_close(s)
@@ -1059,10 +1124,19 @@ def update_scanner_symbols(
             else:
                 tws_app.subscribe_market_data(s, lambda sym, p, v, vw, ts, b, a: scanner.update(sym, p, v, vw, b, a))
 
-    if NEWS_CATALYST_ENABLED:
+    if NEWS_CATALYST_ENABLED and refresh_all_news:
         scanner.load_news(tws_app, force_refresh=True)
 
-    return list(set(current_symbols + unique_new))
+    remaining_regular = [
+        symbol for symbol in current_regular
+        if symbol not in removed and symbol not in excluded
+    ]
+    final_regular = [s for s in target_regular if s in remaining_regular or s in additions]
+    final_regular.extend(
+        s for s in remaining_regular
+        if s not in final_regular
+    )
+    return protected_kept + final_regular[:regular_capacity]
 
 def send_discord_alert(symbol, session, reasons, monitor):
     """Send a simple text alert to Discord with price and volume info."""

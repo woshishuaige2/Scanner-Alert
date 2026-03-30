@@ -168,7 +168,11 @@ DYNAMIC_EXIT_VOLUME_FADE_MIN_RETRACE_PCT = 1.0   # Require some giveback from th
 
 # RUNTIME FEEDBACK / TELEMETRY
 RUNTIME_FEEDBACK_DIR_NAME = "runtime_feedback"   # Folder for structured event logs and live state snapshots
-RUNTIME_FEEDBACK_TOP_SYMBOLS = 15                # Limit large state snapshots to the most relevant symbols
+RUNTIME_FEEDBACK_TOP_SYMBOLS = 20                # Limit large state snapshots to the most relevant symbols
+SCANNER_MONITOR_CAP = 50                         # Cap the live scanner universe to the strongest day gainers
+SCANNER_REFRESH_INTERVAL_SECONDS = 30            # Refresh the gainer universe on this cadence
+SCANNER_MAX_SYMBOL_CHANGES_PER_REFRESH = 3       # Limit how many symbols can rotate in/out per refresh
+SCANNER_NEWS_REFRESH_INTERVAL_SECONDS = 300      # Refresh news for all monitored symbols on a slower cadence
 TRADE_TRACE_SNAPSHOT_INTERVAL_SECONDS = 1.0      # Snapshot cadence for trade-centered feedback traces
 TRADE_TRACE_PRE_ENTRY_SECONDS = 5                # Include this many seconds before a trade opens
 TRADE_TRACE_POST_EXIT_SECONDS = 5                # Keep tracing this many seconds after a trade closes
