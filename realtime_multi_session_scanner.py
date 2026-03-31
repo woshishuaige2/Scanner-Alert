@@ -565,7 +565,11 @@ class RealtimeSymbolMonitor:
         self.vwap = vwap
         
         # Track session volume and 1-minute relative volume
-        if len(self.volume_history) >= 2:
+        if current_session == "PREMARKET" and len(self.volume_history) == 1:
+            # Seed with the full premarket cumulative volume when we first attach
+            # mid-session so relative volume reflects activity since 4:00 AM ET.
+            self.session_volume = max(0.0, volume)
+        elif len(self.volume_history) >= 2:
             volume_delta = volume - self.volume_history[-2][1]
             if volume_delta > 0:
                 self.session_volume += volume_delta

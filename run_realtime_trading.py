@@ -120,6 +120,13 @@ class BreakoutEntryManager:
                 recent_prices.append((ts, price))
         return recent_prices
 
+    def _get_allowed_fade_pct(self, extension_pct: float) -> float:
+        if extension_pct >= 10.0:
+            return config.REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT_AT_10_EXTENSION
+        if extension_pct >= 5.0:
+            return config.REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT_AT_5_EXTENSION
+        return config.REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT
+
     def _determine_entry_mode(self, grade: Optional[str], score: Optional[int]) -> str:
         grade_rank = get_alert_grade_rank(grade)
         if grade_rank >= self.breakout_grade_rank:
@@ -217,6 +224,7 @@ class BreakoutEntryManager:
                         "reasons": list(reasons),
                         "entry_mode": entry_mode,
                         "recent_prices": self._build_recent_prices(symbol_state),
+                        "fade_breach_started_at": None,
                     }
                     filtered_alerts.appendleft(
                         f"{symbol} replaced [{prior_grade} {prior_score}] {prior_mode.replace('_', ' ')} "
@@ -242,6 +250,7 @@ class BreakoutEntryManager:
                 existing["alert_grade"] = grade
                 existing["alert_score"] = score
                 existing["reasons"] = list(reasons)
+                existing["fade_breach_started_at"] = None
                 return
 
             recent_prices = self._build_recent_prices(symbol_state)
@@ -255,6 +264,7 @@ class BreakoutEntryManager:
                 "reasons": list(reasons),
                 "entry_mode": entry_mode,
                 "recent_prices": recent_prices,
+                "fade_breach_started_at": None,
             }
 
         filtered_alerts.appendleft(
@@ -308,15 +318,34 @@ class BreakoutEntryManager:
 
                 extension_pct = ((high_watermark - candidate["alert_price"]) / candidate["alert_price"]) * 100 if candidate["alert_price"] > 0 else 0.0
                 fade_from_peak_pct = ((high_watermark - current_price) / high_watermark) * 100
+                allowed_fade_pct = self._get_allowed_fade_pct(extension_pct)
 
                 if current_vwap > 0 and current_price < current_vwap:
                     self.pending_entries.pop(symbol, None)
                     self._set_cooldown(symbol, now)
                     action = ("expired", f"{symbol} setup lost VWAP before entry")
-                elif fade_from_peak_pct > config.REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT:
-                    self.pending_entries.pop(symbol, None)
-                    self._set_cooldown(symbol, now)
-                    action = ("expired", f"{symbol} setup faded too far from the high")
+                elif fade_from_peak_pct > allowed_fade_pct:
+                    breach_started_at = candidate.get("fade_breach_started_at")
+                    if breach_started_at is None:
+                        candidate["fade_breach_started_at"] = now
+                        return
+                    if (
+                        now - breach_started_at
+                    ).total_seconds() >= config.REALTIME_ENTRY_FAIL_BELOW_PEAK_PERSIST_SECONDS:
+                        self.pending_entries.pop(symbol, None)
+                        self._set_cooldown(symbol, now)
+                        action = (
+                            "expired",
+                            f"{symbol} setup faded too far from the high "
+                            f"({fade_from_peak_pct:.2f}% > {allowed_fade_pct:.2f}% for "
+                            f"{config.REALTIME_ENTRY_FAIL_BELOW_PEAK_PERSIST_SECONDS:.0f}s)",
+                        )
+                    else:
+                        return
+                else:
+                    candidate["fade_breach_started_at"] = None
+                if action is not None:
+                    pass
                 elif extension_pct < config.REALTIME_ENTRY_MIN_EXTENSION_PCT:
                     return
                 elif candidate["entry_mode"] == "continuation_breakout":
@@ -619,10 +648,6 @@ class TradeTraceRecorder:
 def _format_display_price(value: Optional[float]) -> str:
     if value is None:
         return "N/A"
-    if value < 0.1:
-        return f"${value:.4f}"
-    if value < 1:
-        return f"${value:.3f}"
     return f"${value:.2f}"
 
 
@@ -633,26 +658,27 @@ def unified_visualization(scanner_state, filtered_alerts, executor, entry_manage
     scanner_session = scanner_state.get("session", "UNKNOWN")
     top_symbols = scanner_state.get("top_symbols", [])
 
-    print("=" * 115)
+    print("=" * 125)
     print(
         f" STAGE 1: IN-PROCESS SCANNER | {datetime.now().strftime('%H:%M:%S')} | "
         f"Local Session: {current_session} | Scanner Session: {scanner_session} | Entries: {entry_status} "
     )
-    print("=" * 115)
-    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'VWAP':<10} | {'RVOL':<10} | {'GRADE':<8} | {'ALERTS'}")
-    print("-" * 115)
+    print("=" * 125)
+    print(f"{'SYMBOL':<8} | {'PRICE':<10} | {'VWAP':<10} | {'GAIN%':<8} | {'RVOL':<10} | {'GRADE':<8} | {'ALERTS'}")
+    print("-" * 125)
     if not top_symbols:
         print("No scanner data available yet.")
     else:
         for item in top_symbols[:config.RUNTIME_FEEDBACK_TOP_SYMBOLS]:
             price = _format_display_price(item.get("price"))
             vwap = _format_display_price(item.get("vwap")) if item.get("vwap") else "N/A"
+            gain_pct = f"{item.get('gain_pct', 0.0):.2f}%"
             rvol = f"{item.get('relative_volume', 0.0):.2f}x"
             score = item.get("alert_score", 0)
             grade_value = item.get("alert_grade", "-")
             grade = f"{grade_value} ({score})" if score else "-"
             alerts = ", ".join(item.get("triggered_conditions", [])) or "--"
-            print(f"{item['symbol']:<8} | {price:<10} | {vwap:<10} | {rvol:<10} | {grade:<8} | {alerts}")
+            print(f"{item['symbol']:<8} | {price:<10} | {vwap:<10} | {gain_pct:<8} | {rvol:<10} | {grade:<8} | {alerts}")
 
     print("\n" + "=" * 115)
     print(" STAGE 2: GRADE B+ BREAKOUT ENTRY QUEUE")
@@ -854,7 +880,15 @@ def run_trading_bot():
         state.update_market_data(price=price, vwap=vwap, bid=bid, ask=ask)
         scanner.update(symbol, price=price, volume=volume, vwap=vwap, bid=bid, ask=ask)
         entry_manager.evaluate_symbol(symbol, state, executor, filtered_alerts)
-        executor.on_market_update(symbol, price=price, volume=volume, vwap=vwap, market_session=get_market_session())
+        executor.on_market_update(
+            symbol,
+            price=price,
+            volume=volume,
+            vwap=vwap,
+            market_session=get_market_session(),
+            bid=bid,
+            ask=ask,
+        )
 
     def create_market_data_callback(sym):
         return lambda s, p, v, vw, ts, b, a: handle_market_update(s, p, v, vw, b, a)

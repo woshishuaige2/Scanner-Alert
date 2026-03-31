@@ -157,8 +157,34 @@ REALTIME_ENTRY_BASE_MIN_SECONDS = 5              # Minimum age of the setup befo
 REALTIME_ENTRY_BASE_MAX_WIDTH_PCT = 0.80         # Base must stay relatively tight
 REALTIME_ENTRY_BASE_MAX_DISTANCE_FROM_PEAK_PCT = 0.75  # Base must form close to the setup high
 REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT = 3.0         # Cancel setups that fade too far off the high
+REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT_AT_5_EXTENSION = 4.0   # Allow more fade once the setup has extended meaningfully
+REALTIME_ENTRY_FAIL_BELOW_PEAK_PCT_AT_10_EXTENSION = 5.5  # Allow deeper pullbacks after very strong extensions
+REALTIME_ENTRY_FAIL_BELOW_PEAK_PERSIST_SECONDS = 2.0      # Fade breach must persist before the setup is canceled
 REALTIME_ENTRY_MAX_WAIT_SECONDS = 90             # Cancel stale setups that do not resolve quickly
 REALTIME_TRADE_SYMBOL_COOLDOWN_SECONDS = 120     # Avoid immediate re-queue churn after an attempt
+
+# CLEAN MOMENTUM SNIPER (Used in run_clean_momentum_sniper.py)
+SNIPER_MIN_ALERT_GRADE = "B"                     # Use scanner alerts as the stage-1 universe gate
+SNIPER_REGULAR_HOURS_ONLY = True                 # v1 only runs during regular hours
+SNIPER_SYMBOL_COOLDOWN_SECONDS = 120             # Avoid immediate re-entry churn after an attempt
+SNIPER_SETUP_MAX_WAIT_SECONDS = 90               # Drop stale sniper setups that stop progressing
+SNIPER_15S_WINDOW_CANDLES = 8                    # Clean-phase evaluation window on 15s candles
+SNIPER_30S_WINDOW_CANDLES = 5                    # Clean-phase evaluation window on 30s candles
+SNIPER_MIN_IMPULSE_15S_CANDLES = 3               # Require a minimum 15s impulse length before judging cleanliness
+SNIPER_MIN_IMPULSE_30S_CANDLES = 2               # Require at least some 30s confirmation for the active impulse
+SNIPER_15S_EMA_PERIOD = 9                        # EMA context on 15s candles
+SNIPER_15S_MAX_RED_FRACTION = 0.25               # 15s red-candle allowance inside the clean phase
+SNIPER_30S_MAX_RED_CANDLES = 1                   # 30s red-candle allowance inside the clean phase
+SNIPER_CLEAN_RETRACE_PREFERRED_PCT = 30.0        # Preferred max retracement vs prior impulse
+SNIPER_CLEAN_RETRACE_HARD_PCT = 40.0             # Hard cutoff for clean-trend invalidation
+SNIPER_MIN_15S_VOLUME_EXPANSION = 1.5            # Current 15s volume vs rolling 15s average
+SNIPER_PULLBACK_MIN_FROM_PEAK_PCT = 0.4          # Ignore ultra-shallow pullbacks that are still extended
+SNIPER_PULLBACK_MAX_FROM_PEAK_PCT = 3.0          # Pullback must stay controlled inside the trend
+SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT = 0.20       # Entry must stay near the current 5s pullback low
+SNIPER_STOP_BUFFER_PCT = 0.20                    # Small noise buffer below the chosen structure stop
+SNIPER_MIN_STOP_DISTANCE_PCT = 0.35              # Avoid stops that sit unrealistically close to entry
+SNIPER_MAX_STOP_DISTANCE_PCT = 3.0               # Skip setups whose valid structure stop is too far away
+SNIPER_STRUCTURE_BREAK_PERSIST_SECONDS = 1.0     # 15s structure break must persist to count as invalid
 
 # DYNAMIC EXIT MANAGEMENT (Used by execution_engine.py)
 DYNAMIC_EXIT_PARTIAL_FRACTION = 0.5              # Fraction to sell at the first target before trailing the runner
@@ -166,6 +192,12 @@ DYNAMIC_EXIT_BREAKEVEN_OFFSET_PCT = 0.10         # After the partial, move the s
 DYNAMIC_EXIT_TRAIL_OFFSET_PCT = 2.0              # Trail the runner this far below the best price seen since entry
 DYNAMIC_EXIT_MIN_STOP_UPDATE_PCT = 0.20          # Minimum improvement required before modifying the live stop
 DYNAMIC_EXIT_MAX_HOLD_SECONDS = 300              # Maximum regular-hours hold time after fill before forcing a bot-managed exit
+DYNAMIC_EXIT_MAX_WALL_CLOCK_HOLD_SECONDS = 1200  # Secondary max hold cap even if halts/pause detection freeze active-hold time
+DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS = 20   # Suspect a halt / market pause when updates stop for this long
+DYNAMIC_EXIT_MARKET_PAUSE_CONFIRM_SECONDS = 45   # Large gaps count as confirmed pauses even without quote anomalies
+DYNAMIC_EXIT_MARKET_PAUSE_ABNORMAL_SPREAD_PCT = 8.0  # Spread threshold used as a halt/market-pause signal
+DYNAMIC_EXIT_REOPEN_BUFFER_SECONDS = 10          # Ignore dynamic exits briefly after a confirmed market pause resumes
+DYNAMIC_EXIT_REOPEN_STRONG_BUFFER_PCT = 0.10     # Small cushion above the pre-pause price to classify a reopen as strong
 DYNAMIC_EXIT_VOLUME_FADE_MIN_HOLD_SECONDS = 20   # Ignore early noise; only evaluate volume fade after this many seconds from fill
 DYNAMIC_EXIT_VOLUME_FADE_WINDOW_SECONDS = 15     # Measure recent live volume over this trailing window
 DYNAMIC_EXIT_VOLUME_FADE_FRACTION_OF_PEAK = 0.35 # Exit if recent volume rate falls below this fraction of the trade's post-entry peak rate

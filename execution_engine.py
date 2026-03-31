@@ -4,8 +4,8 @@ Handles order placement, position tracking, and risk management (TP/SL).
 """
 import threading
 from collections import deque
-from datetime import datetime
-from typing import Dict, List, Set
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Set
 from ibapi.contract import Contract
 from ibapi.order import Order
 import scanner_config as config
@@ -55,6 +55,12 @@ class ExecutionEngine:
             'role': role,
             'reported_filled': 0.0,
         }
+
+    @staticmethod
+    def _compute_spread_pct(bid: float, ask: float, reference_price: float) -> Optional[float]:
+        if bid <= 0 or ask <= 0 or reference_price <= 0:
+            return None
+        return ((ask - bid) / reference_price) * 100.0
 
     @staticmethod
     def _compute_recent_volume_rate(volume_history: deque, window_seconds: int):
@@ -183,7 +189,10 @@ class ExecutionEngine:
                     pos['shares'] = int(filled_qty) if filled_qty > 0 else pos['shares']
                     pos['remaining_shares'] = pos['shares']
                     pos['partial_target_price'] = self._round_price(pos['actual_entry_price'] * (1 + self.tp_pct / 100))
-                    pos['current_stop_price'] = self._round_price(pos['actual_entry_price'] * (1 - self.sl_pct / 100))
+                    pos['current_stop_price'] = self._round_price(
+                        pos.get('current_stop_price')
+                        or (pos['actual_entry_price'] * (1 - self.sl_pct / 100))
+                    )
                     pos['highest_price'] = pos['actual_entry_price']
                     print(f"[EXEC] >>> POSITION OPEN: {symbol} at ${pos['actual_entry_price']:.2f} <<<")
                     self._log_event(
@@ -222,12 +231,12 @@ class ExecutionEngine:
                             entry_price=pos['entry_price'],
                         )
                         self._cleanup_position(symbol)
-                elif role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'volume_fade_exit']:
+                elif role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit']:
                     if pos.get('active_exit_order_id') == orderId:
                         pos['exit_pending'] = False
                         pos['active_exit_order_id'] = None
 
-            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'volume_fade_exit']:
+            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit']:
                 exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('last_price', pos.get('actual_entry_price', pos['entry_price']))
                 exit_shares = min(int(delta_filled), pos['remaining_shares'])
                 pos['remaining_shares'] = max(0, pos['remaining_shares'] - exit_shares)
@@ -276,8 +285,14 @@ class ExecutionEngine:
                         exit_type = "EOD"
                     elif role == 'time_exit':
                         exit_type = "TIME"
+                    elif role == 'wall_clock_exit':
+                        exit_type = "WALL_TIME"
                     elif role == 'volume_fade_exit':
                         exit_type = "VOL_FADE"
+                    elif role == 'structure_exit':
+                        exit_type = "STRUCTURE"
+                    elif role == 'reopen_weak_exit':
+                        exit_type = "REOPEN_WEAK"
                     else:
                         exit_type = "BOT"
                     self.trade_history.append({
@@ -391,7 +406,7 @@ class ExecutionEngine:
         )
         return True
 
-    def execute_trade(self, symbol: str, entry_price: float):
+    def execute_trade(self, symbol: str, entry_price: float, stop_price: float = None):
         """Execute a new trade with a broker-side disaster stop and bot-managed exits."""
         with self.lock:
             if symbol in self.positions:
@@ -408,7 +423,10 @@ class ExecutionEngine:
                 return False
                 
             partial_target_price = self._round_price(entry_price * (1 + self.tp_pct / 100))
-            stop_price = self._round_price(entry_price * (1 - self.sl_pct / 100))
+            if stop_price is None:
+                stop_price = self._round_price(entry_price * (1 - self.sl_pct / 100))
+            else:
+                stop_price = self._round_price(stop_price)
             
             parent_id = self.tws_app.next_order_id
             stop_id = parent_id + 1
@@ -450,6 +468,17 @@ class ExecutionEngine:
                 'highest_price': entry_price,
                 'last_price': entry_price,
                 'last_vwap': 0.0,
+                'last_bid': 0.0,
+                'last_ask': 0.0,
+                'last_market_update_at': None,
+                'active_hold_seconds': 0.0,
+                'market_pause_state': 'ACTIVE',
+                'market_pause_detected_at': None,
+                'market_pause_gap_seconds': 0.0,
+                'market_pause_reasons': [],
+                'reopen_grace_until': None,
+                'pre_pause_reference_price': None,
+                'post_halt_classification': None,
                 'partial_taken': False,
                 'exit_pending': False,
                 'active_exit_order_id': None,
@@ -477,15 +506,109 @@ class ExecutionEngine:
             )
             return True
 
-    def on_market_update(self, symbol: str, price: float, volume: float = 0.0, vwap: float = 0.0, market_session: str = "REGULAR"):
+    def submit_market_exit(self, symbol: str, role: str = 'final_exit'):
+        with self.lock:
+            pos = self.positions.get(symbol)
+            if pos is None or pos['status'] != 'OPEN':
+                return False
+            success = self._submit_market_exit_locked(symbol, pos['remaining_shares'], role)
+            if success:
+                self._log_event(
+                    "manual_exit_submitted",
+                    symbol=symbol,
+                    role=role,
+                    shares=pos['remaining_shares'],
+                )
+            return success
+
+    def _classify_reopen(self, price: float, vwap: float, reference_price: float) -> str:
+        if reference_price <= 0:
+            return "unknown"
+        strong_threshold = reference_price * (1 + config.DYNAMIC_EXIT_REOPEN_STRONG_BUFFER_PCT / 100.0)
+        if price >= strong_threshold and (vwap <= 0 or price >= vwap):
+            return "strong"
+        return "weak"
+
+    def _maybe_detect_market_pause_locked(
+        self,
+        symbol: str,
+        pos: Dict,
+        now: datetime,
+        price: float,
+        bid: float,
+        ask: float,
+        vwap: float,
+    ) -> bool:
+        last_update_at = pos.get('last_market_update_at')
+        if last_update_at is None:
+            return False
+
+        gap_seconds = (now - last_update_at).total_seconds()
+        if gap_seconds < config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS:
+            pos['active_hold_seconds'] = pos.get('active_hold_seconds', 0.0) + max(0.0, gap_seconds)
+            return False
+
+        prev_price = pos.get('last_price', price)
+        spread_pct = self._compute_spread_pct(bid, ask, price)
+        missing_quotes = bid <= 0 or ask <= 0
+        abnormal_spread = spread_pct is not None and spread_pct >= config.DYNAMIC_EXIT_MARKET_PAUSE_ABNORMAL_SPREAD_PCT
+        frozen_price = abs(price - prev_price) < max(0.0001, price * 0.0005)
+        confirmed_gap = gap_seconds >= config.DYNAMIC_EXIT_MARKET_PAUSE_CONFIRM_SECONDS
+
+        reasons = [f"gap {gap_seconds:.1f}s"]
+        if missing_quotes:
+            reasons.append("missing bid/ask")
+        if abnormal_spread:
+            reasons.append(f"spread {spread_pct:.2f}%")
+        if frozen_price:
+            reasons.append("frozen price")
+
+        confirmed_pause = confirmed_gap or missing_quotes or abnormal_spread or frozen_price
+        if not confirmed_pause:
+            pos['active_hold_seconds'] = pos.get('active_hold_seconds', 0.0) + max(0.0, gap_seconds)
+            return False
+
+        reference_price = pos.get('last_price', price)
+        pos['market_pause_state'] = 'HALT_CONFIRMED'
+        pos['market_pause_detected_at'] = now
+        pos['market_pause_gap_seconds'] = gap_seconds
+        pos['market_pause_reasons'] = reasons
+        pos['pre_pause_reference_price'] = reference_price
+        pos['post_halt_classification'] = self._classify_reopen(price, vwap, reference_price)
+        pos['reopen_grace_until'] = now + timedelta(seconds=config.DYNAMIC_EXIT_REOPEN_BUFFER_SECONDS)
+        self._log_event(
+            "market_pause_confirmed",
+            symbol=symbol,
+            gap_seconds=round(gap_seconds, 1),
+            reasons=list(reasons),
+            reference_price=reference_price,
+            reopen_classification=pos['post_halt_classification'],
+            reopen_buffer_seconds=config.DYNAMIC_EXIT_REOPEN_BUFFER_SECONDS,
+        )
+        return True
+
+    def on_market_update(
+        self,
+        symbol: str,
+        price: float,
+        volume: float = 0.0,
+        vwap: float = 0.0,
+        market_session: str = "REGULAR",
+        bid: float = 0.0,
+        ask: float = 0.0,
+    ):
         with self.lock:
             pos = self.positions.get(symbol)
             if pos is None or pos['status'] != 'OPEN':
                 return
 
             now = datetime.now()
+            pause_detected = self._maybe_detect_market_pause_locked(symbol, pos, now, price, bid, ask, vwap)
             pos['last_price'] = price
             pos['last_vwap'] = vwap
+            pos['last_bid'] = bid
+            pos['last_ask'] = ask
+            pos['last_market_update_at'] = now
             pos['highest_price'] = max(pos['highest_price'], price)
             if volume > 0:
                 pos['volume_history'].append((now, volume))
@@ -496,15 +619,62 @@ class ExecutionEngine:
             filled_at = pos.get('filled_at')
             if (
                 filled_at is not None
+                and config.DYNAMIC_EXIT_MAX_WALL_CLOCK_HOLD_SECONDS > 0
+                and (now - filled_at).total_seconds() >= config.DYNAMIC_EXIT_MAX_WALL_CLOCK_HOLD_SECONDS
+            ):
+                if self._submit_market_exit_locked(symbol, pos['remaining_shares'], 'wall_clock_exit'):
+                    self._log_event(
+                        "wall_clock_exit_submitted",
+                        symbol=symbol,
+                        wall_clock_hold_seconds=round((now - filled_at).total_seconds(), 1),
+                        max_wall_clock_hold_seconds=config.DYNAMIC_EXIT_MAX_WALL_CLOCK_HOLD_SECONDS,
+                        shares=pos['remaining_shares'],
+                    )
+                return
+
+            if pause_detected:
+                return
+
+            if pos.get('market_pause_state') == 'HALT_CONFIRMED':
+                reopen_grace_until = pos.get('reopen_grace_until')
+                if reopen_grace_until is not None and now < reopen_grace_until:
+                    return
+
+                classification = pos.get('post_halt_classification')
+                pos['market_pause_state'] = 'ACTIVE'
+                pos['market_pause_detected_at'] = None
+                pos['reopen_grace_until'] = None
+                self._log_event(
+                    "market_pause_resumed",
+                    symbol=symbol,
+                    reopen_classification=classification,
+                    price=price,
+                    vwap=vwap,
+                )
+                if classification == 'weak':
+                    if self._submit_market_exit_locked(symbol, pos['remaining_shares'], 'reopen_weak_exit'):
+                        self._log_event(
+                            "reopen_weak_exit_submitted",
+                            symbol=symbol,
+                            price=price,
+                            vwap=vwap,
+                            reference_price=pos.get('pre_pause_reference_price'),
+                            shares=pos['remaining_shares'],
+                        )
+                    return
+
+            if (
+                filled_at is not None
                 and config.DYNAMIC_EXIT_MAX_HOLD_SECONDS > 0
-                and (now - filled_at).total_seconds() >= config.DYNAMIC_EXIT_MAX_HOLD_SECONDS
+                and pos.get('active_hold_seconds', 0.0) >= config.DYNAMIC_EXIT_MAX_HOLD_SECONDS
             ):
                 if self._submit_market_exit_locked(symbol, pos['remaining_shares'], 'time_exit'):
                     self._log_event(
                         "time_exit_submitted",
                         symbol=symbol,
                         max_hold_seconds=config.DYNAMIC_EXIT_MAX_HOLD_SECONDS,
-                        held_seconds=round((now - filled_at).total_seconds(), 1),
+                        held_seconds=round(pos.get('active_hold_seconds', 0.0), 1),
+                        wall_clock_seconds=round((now - filled_at).total_seconds(), 1),
                         shares=pos['remaining_shares'],
                     )
                 return
