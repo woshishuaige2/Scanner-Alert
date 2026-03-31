@@ -8,18 +8,17 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from scanner_config import (
+    SPREAD_FILTER_OVER_3_MAX_PCT,
+    SPREAD_FILTER_UNDER_1_MAX_PCT,
+    SPREAD_FILTER_UNDER_1_PRICE_MAX,
+    SPREAD_FILTER_UNDER_3_MAX_PCT,
+    SPREAD_FILTER_UNDER_3_PRICE_MAX,
     VWAP_BUFFER_OVER_3_PCT,
     VWAP_BUFFER_UNDER_1_PCT,
     VWAP_BUFFER_UNDER_1_PRICE_MAX,
     VWAP_BUFFER_UNDER_3_PCT,
     VWAP_BUFFER_UNDER_3_PRICE_MAX,
 )
-
-
-# =============================================================================
-# CENTRALIZED ALERT CONFIGURATION
-# =============================================================================
-MAX_SPREAD_PCT = 0.5
 
 @dataclass
 class MarketData:
@@ -171,12 +170,31 @@ class FastIgnitionCondition(AlertCondition):
         )
         return True
 
+def get_max_spread_pct(price: float) -> float:
+    if price < SPREAD_FILTER_UNDER_1_PRICE_MAX:
+        return SPREAD_FILTER_UNDER_1_MAX_PCT
+    if price < SPREAD_FILTER_UNDER_3_PRICE_MAX:
+        return SPREAD_FILTER_UNDER_3_MAX_PCT
+    return SPREAD_FILTER_OVER_3_MAX_PCT
+
+
+def get_spread_filter_failure_reason(bid: float, ask: float, price: float) -> str:
+    """Return a human-readable failure reason when the spread is too wide."""
+    if bid <= 0 or ask <= 0 or price <= 0:
+        return ""
+    spread_pct = ((ask - bid) / price) * 100
+    max_spread_pct = get_max_spread_pct(price)
+    if spread_pct <= max_spread_pct:
+        return ""
+    return (
+        f"Spread {spread_pct:.2f}% > allowed {max_spread_pct:.2f}% "
+        f"(bid ${bid:.2f} ask ${ask:.2f} price ${price:.2f})"
+    )
+
+
 def passes_spread_filter(bid: float, ask: float, price: float) -> bool:
     """Check if the bid-ask spread is within acceptable limits."""
-    if bid <= 0 or ask <= 0 or price <= 0:
-        return True # Default to pass if data is missing
-    spread_pct = ((ask - bid) / price) * 100
-    return spread_pct <= MAX_SPREAD_PCT
+    return get_spread_filter_failure_reason(bid, ask, price) == ""
 
 class AlertConditionSet:
     """Container for conditions with AND logic for preliminary screening"""
@@ -184,6 +202,7 @@ class AlertConditionSet:
         self.name = name
         self.conditions: List[AlertCondition] = []
         self.triggered_reasons: List[str] = []
+        self.last_block_reason = ""
     
     def add_condition(self, condition: AlertCondition) -> 'AlertConditionSet':
         self.conditions.append(condition)
@@ -191,14 +210,18 @@ class AlertConditionSet:
     
     def check_all(self, data: MarketData) -> bool:
         self.triggered_reasons = []
+        self.last_block_reason = ""
         
         # 1. Mandatory Spread Filter
-        if not passes_spread_filter(data.bid, data.ask, data.price):
+        spread_failure_reason = get_spread_filter_failure_reason(data.bid, data.ask, data.price)
+        if spread_failure_reason:
+            self.last_block_reason = spread_failure_reason
             return False
             
         # 2. Check all registered conditions (AND logic)
         for condition in self.conditions:
             if not condition.check(data):
+                self.last_block_reason = condition.name
                 return False
             self.triggered_reasons.append(condition.get_trigger_reason())
         

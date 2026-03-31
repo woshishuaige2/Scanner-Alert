@@ -29,6 +29,11 @@ VWAP_BUFFER_UNDER_1_PCT = 5.0            # Require price to clear VWAP by 5% und
 VWAP_BUFFER_UNDER_3_PRICE_MAX = 3.0      # Price tier ceiling for the medium VWAP buffer
 VWAP_BUFFER_UNDER_3_PCT = 3.0            # Require price to clear VWAP by 3% from $1 to under $3
 VWAP_BUFFER_OVER_3_PCT = 1.0             # Require price to clear VWAP by 1% at $3 and above
+SPREAD_FILTER_UNDER_1_PRICE_MAX = 1.0    # Price tier ceiling for the widest spread allowance
+SPREAD_FILTER_UNDER_1_MAX_PCT = 2.0      # Allow wider spreads under $1 for fast movers
+SPREAD_FILTER_UNDER_3_PRICE_MAX = 3.0    # Price tier ceiling for the medium spread allowance
+SPREAD_FILTER_UNDER_3_MAX_PCT = 1.0      # Allow moderate spreads from $1 to under $3
+SPREAD_FILTER_OVER_3_MAX_PCT = 0.5       # Keep the tighter spread allowance at $3 and above
 
 # ALERT RATING / QUALITY SCORING (Used by alert_rating.py and realtime_multi_session_scanner.py)
 ALERT_MIN_SCORE_TO_NOTIFY = 3               # Suppress low-quality setups below C

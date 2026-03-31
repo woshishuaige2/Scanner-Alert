@@ -19,6 +19,8 @@ from scanner_config import (
     RUNTIME_FEEDBACK_TOP_SYMBOLS,
     SCANNER_MONITOR_CAP,
     SCANNER_MAX_SYMBOL_CHANGES_PER_REFRESH,
+    SCANNER_NEWS_REFRESH_INTERVAL_SECONDS,
+    SCANNER_REFRESH_INTERVAL_SECONDS,
     SQUEEZE_PCT_THRESHOLD,
     SQUEEZE_TIME_MINUTES,
     FAST_IGNITION_PCT_5S,
@@ -406,6 +408,7 @@ class RealtimeSymbolMonitor:
         self.alert_drawdown_debug_info = None
         self.alert_momentum_debug_info = None
         self.alert_news_debug_info = None
+        self.preliminary_block_reason = ""
         
         # News catalyst tracking
         self.has_meaningful_news_today = False
@@ -644,6 +647,9 @@ class RealtimeSymbolMonitor:
         trigger_summary = None
         if self.fast_condition_set.check_all(data):
             trigger_summary = self.fast_condition_set.get_trigger_summary()
+            self.preliminary_block_reason = ""
+        else:
+            self.preliminary_block_reason = self.fast_condition_set.last_block_reason
 
         if trigger_summary:
             if not self._passes_liquidity_prefilter():
@@ -658,6 +664,7 @@ class RealtimeSymbolMonitor:
                 self.alert_drawdown_debug_info = None
                 self.alert_momentum_debug_info = None
                 self.alert_news_debug_info = None
+                self.preliminary_block_reason = ""
                 return []
 
             # Include the in-progress current minute candle in drawdown quality scoring.
@@ -999,6 +1006,7 @@ def build_scanner_runtime_state(scanner: RealtimeBroadScanner) -> Dict:
             "alert_grade": monitor.alert_grade,
             "alert_score": monitor.alert_score,
             "triggered_conditions": list(monitor.triggered_conditions),
+            "preliminary_block_reason": monitor.preliminary_block_reason,
         })
 
     return {
@@ -1201,11 +1209,16 @@ def run_standalone_scanner():
     # Wait for connection
     time.sleep(2)
     
-    # Get dynamic top gainers list (updates every 10 minutes)
+    # Get dynamic top gainers list
     print("[INIT] Fetching top gainers list...")
     # Use IBKR scanner for most accurate gainers data
-    SYMBOLS = get_top_gainers(top_n=20, use_ibkr=True, ibkr_port=TWS_PORT, force_refresh=True)
-    unique_symbols = list(set(SYMBOLS))
+    SYMBOLS = get_top_gainers(
+        top_n=SCANNER_MONITOR_CAP,
+        use_ibkr=True,
+        ibkr_port=TWS_PORT,
+        force_refresh=True,
+    )
+    unique_symbols = list(dict.fromkeys(SYMBOLS))
     print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
     telemetry.log_event(
         "scanner_started",
@@ -1299,7 +1312,9 @@ def run_standalone_scanner():
     
     # Session transition check interval
     last_session_check = datetime.now()
-    next_symbol_update = get_next_10_minute_mark()
+    et_tz = pytz.timezone('US/Eastern')
+    next_symbol_update = datetime.now(et_tz) + timedelta(seconds=SCANNER_REFRESH_INTERVAL_SECONDS)
+    next_news_refresh = datetime.now(et_tz) + timedelta(seconds=SCANNER_NEWS_REFRESH_INTERVAL_SECONDS)
     
     try:
         while True:
@@ -1309,10 +1324,20 @@ def run_standalone_scanner():
                     scanner.resync_vwap_all_symbols(tws_app)
                 last_session_check = datetime.now()
             
-            # Update the scanner list on wall-clock 10-minute boundaries.
-            if datetime.now(pytz.timezone('US/Eastern')) >= next_symbol_update:
-                unique_symbols = update_scanner_symbols(scanner, tws_app, unique_symbols)
-                next_symbol_update = get_next_10_minute_mark()
+            # Refresh the scanner list on the shared scanner cadence.
+            if datetime.now(et_tz) >= next_symbol_update:
+                refresh_all_news = datetime.now(et_tz) >= next_news_refresh
+                unique_symbols = update_scanner_symbols(
+                    scanner,
+                    tws_app,
+                    unique_symbols,
+                    refresh_all_news=refresh_all_news,
+                    max_symbols=SCANNER_MONITOR_CAP,
+                    max_symbol_changes=SCANNER_MAX_SYMBOL_CHANGES_PER_REFRESH,
+                )
+                next_symbol_update = datetime.now(et_tz) + timedelta(seconds=SCANNER_REFRESH_INTERVAL_SECONDS)
+                if refresh_all_news:
+                    next_news_refresh = datetime.now(et_tz) + timedelta(seconds=SCANNER_NEWS_REFRESH_INTERVAL_SECONDS)
             
             telemetry.write_state(build_scanner_runtime_state(scanner))
             display_broad_screening(scanner)
