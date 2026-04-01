@@ -165,7 +165,7 @@ REALTIME_TRADE_SYMBOL_COOLDOWN_SECONDS = 120     # Avoid immediate re-queue chur
 
 # CLEAN MOMENTUM SNIPER (Used in run_clean_momentum_sniper.py)
 SNIPER_MIN_ALERT_GRADE = "B"                     # Use scanner alerts as the stage-1 universe gate
-SNIPER_REGULAR_HOURS_ONLY = True                 # v1 only runs during regular hours
+SNIPER_REGULAR_HOURS_ONLY = False                # False allows sniper entries during PREMARKET/REGULAR/AFTERHOURS
 SNIPER_SYMBOL_COOLDOWN_SECONDS = 120             # Avoid immediate re-entry churn after an attempt
 SNIPER_SETUP_MAX_WAIT_SECONDS = 90               # Drop stale sniper setups that stop progressing
 SNIPER_15S_WINDOW_CANDLES = 8                    # Clean-phase evaluation window on 15s candles
@@ -202,6 +202,10 @@ DYNAMIC_EXIT_VOLUME_FADE_MIN_HOLD_SECONDS = 20   # Ignore early noise; only eval
 DYNAMIC_EXIT_VOLUME_FADE_WINDOW_SECONDS = 15     # Measure recent live volume over this trailing window
 DYNAMIC_EXIT_VOLUME_FADE_FRACTION_OF_PEAK = 0.35 # Exit if recent volume rate falls below this fraction of the trade's post-entry peak rate
 DYNAMIC_EXIT_VOLUME_FADE_MIN_RETRACE_PCT = 1.0   # Require some giveback from the high so volume fade alone does not cut strong trend holds
+EXTENDED_HOURS_ENTRY_SPREAD_MAX_PCT = 5.0        # Skip new extended-hours entries if the live spread is wider than this
+EXTENDED_HOURS_ENTRY_LIMIT_BUFFER_PCT = 0.20     # Buy-limit cushion above ask/reference price for extended-hours entries
+EXTENDED_HOURS_ENTRY_MAX_WAIT_SECONDS = 20       # Cancel stale extended-hours limit entries that do not fill promptly
+EXTENDED_HOURS_PARTIAL_FILL_CLEANUP_SECONDS = 5  # After the first partial fill, cancel any unfilled remainder after this grace period
 
 # RUNTIME FEEDBACK / TELEMETRY
 RUNTIME_FEEDBACK_DIR_NAME = "runtime_feedback"   # Folder for structured event logs and live state snapshots

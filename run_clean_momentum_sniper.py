@@ -59,9 +59,20 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def entries_allowed_in_current_session() -> bool:
-    if not config.SNIPER_REGULAR_HOURS_ONLY:
-        return True
-    return get_market_session() == "REGULAR"
+    current_session = get_market_session()
+    if config.SNIPER_REGULAR_HOURS_ONLY:
+        return current_session == "REGULAR"
+    return current_session in {"PREMARKET", "REGULAR", "AFTERHOURS"}
+
+
+def _session_close_cleanup_marker(now_et: datetime) -> Optional[str]:
+    if now_et.hour == 9 and now_et.minute == 29:
+        return "PREMARKET_CLOSE"
+    if now_et.hour == 15 and now_et.minute == 59:
+        return "REGULAR_CLOSE"
+    if now_et.hour == 19 and now_et.minute == 59:
+        return "AFTERHOURS_CLOSE"
+    return None
 
 
 def _format_display_price(value: Optional[float]) -> str:
@@ -121,6 +132,24 @@ def _compute_volume_rate(volume_history: deque, window_seconds: int) -> Optional
 
     volume_delta = max(0.0, latest_volume - baseline_volume)
     return volume_delta / elapsed_seconds
+
+
+def _slice_contiguous_history(
+    history: deque,
+    max_gap_seconds: int,
+) -> List[Any]:
+    if not history:
+        return []
+
+    contiguous = [history[-1]]
+    for idx in range(len(history) - 2, -1, -1):
+        current_ts, _ = history[idx]
+        next_ts, _ = history[idx + 1]
+        if (next_ts - current_ts).total_seconds() > max_gap_seconds:
+            break
+        contiguous.append(history[idx])
+    contiguous.reverse()
+    return contiguous
 
 
 def _build_candles(
@@ -227,10 +256,13 @@ class SniperSymbolState:
         self.price_history = deque(maxlen=900)
         self.volume_history = deque(maxlen=900)
         self.price: Optional[float] = None
+        self.previous_price: Optional[float] = None
         self.vwap: float = 0.0
         self.bid: float = 0.0
         self.ask: float = 0.0
         self.last_update: Optional[datetime] = None
+        self.previous_update: Optional[datetime] = None
+        self.last_gap_seconds: float = 0.0
 
     def update_market_data(
         self,
@@ -241,6 +273,9 @@ class SniperSymbolState:
         ask: float = 0.0,
     ) -> None:
         now = datetime.now()
+        self.previous_price = self.price
+        self.previous_update = self.last_update
+        self.last_gap_seconds = (now - self.last_update).total_seconds() if self.last_update else 0.0
         self.price = price
         self.vwap = vwap
         self.bid = bid
@@ -271,15 +306,29 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
         analysis["reasons"].append("Waiting for more live history")
         return analysis
 
-    candles_15s = _build_candles(
+    contiguous_price_history = _slice_contiguous_history(
         state.price_history,
+        config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS,
+    )
+    contiguous_volume_history = _slice_contiguous_history(
         state.volume_history,
+        config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS,
+    )
+    if len(contiguous_price_history) < 20 or len(contiguous_volume_history) < 20:
+        analysis["reasons"].append("Waiting for post-gap history rebuild")
+        if contiguous_price_history:
+            analysis["impulse_start"] = contiguous_price_history[0][0]
+        return analysis
+
+    candles_15s = _build_candles(
+        contiguous_price_history,
+        contiguous_volume_history,
         timeframe_seconds=15,
         candle_count=config.SNIPER_15S_WINDOW_CANDLES,
     )
     candles_30s = _build_candles(
-        state.price_history,
-        state.volume_history,
+        contiguous_price_history,
+        contiguous_volume_history,
         timeframe_seconds=30,
         candle_count=config.SNIPER_30S_WINDOW_CANDLES,
     )
@@ -325,9 +374,10 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
     avg_15s_volume = (sum(prior_15s_volumes) / len(prior_15s_volumes)) if prior_15s_volumes else 0.0
     volume_expansion = (current_15s_volume / avg_15s_volume) if avg_15s_volume > 0 else 0.0
 
-    vol_rate_5s = _compute_volume_rate(state.volume_history, 5)
-    vol_rate_15s = _compute_volume_rate(state.volume_history, 15)
-    vol_rate_30s = _compute_volume_rate(state.volume_history, 30)
+    contiguous_volume_deque = deque(contiguous_volume_history, maxlen=len(contiguous_volume_history))
+    vol_rate_5s = _compute_volume_rate(contiguous_volume_deque, 5)
+    vol_rate_15s = _compute_volume_rate(contiguous_volume_deque, 15)
+    vol_rate_30s = _compute_volume_rate(contiguous_volume_deque, 30)
     volume_accel_pass = (
         vol_rate_5s is not None
         and vol_rate_15s is not None
@@ -374,7 +424,7 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
         and red_30_count == 0
     )
 
-    recent_prices_5s = [price for ts, price in state.price_history if ts >= state.last_update - timedelta(seconds=5)]
+    recent_prices_5s = [price for ts, price in contiguous_price_history if ts >= state.last_update - timedelta(seconds=5)]
     pullback_low = min(recent_prices_5s) if recent_prices_5s else current_price
     fade_from_peak_pct = ((recent_peak - current_price) / recent_peak) * 100 if recent_peak > 0 else 0.0
     near_pullback_low = current_price <= pullback_low * (1 + config.SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT / 100.0)
@@ -463,6 +513,100 @@ class CleanMomentumSniperManager:
     def _set_cooldown(self, symbol: str, now: datetime) -> None:
         self.cooldowns[symbol] = now
 
+    def _compute_spread_pct(self, price: float, bid: float, ask: float) -> Optional[float]:
+        if price <= 0 or bid <= 0 or ask <= 0:
+            return None
+        midpoint = (bid + ask) / 2.0
+        if midpoint <= 0:
+            return None
+        return abs(ask - bid) / midpoint * 100.0
+
+    def _classify_reopen(self, price: float, vwap: float, reference_price: float) -> str:
+        if reference_price <= 0:
+            return "unknown"
+        strong_threshold = reference_price * (1 + config.DYNAMIC_EXIT_REOPEN_STRONG_BUFFER_PCT / 100.0)
+        if price >= strong_threshold and (vwap <= 0 or price >= vwap):
+            return "strong"
+        return "weak"
+
+    def _reset_pending_pause_state(self, candidate: Dict[str, Any]) -> None:
+        candidate["paused_seconds"] = 0.0
+        candidate["market_pause_state"] = "ACTIVE"
+        candidate["market_pause_detected_at"] = None
+        candidate["market_pause_gap_seconds"] = 0.0
+        candidate["market_pause_reasons"] = []
+        candidate["reopen_grace_until"] = None
+        candidate["pre_pause_reference_price"] = None
+        candidate["post_halt_classification"] = None
+
+    def _get_effective_wait_seconds(self, candidate: Dict[str, Any], now: datetime) -> float:
+        return max(
+            0.0,
+            (now - candidate["queued_at"]).total_seconds() - float(candidate.get("paused_seconds", 0.0)),
+        )
+
+    def _maybe_detect_pending_market_pause(
+        self,
+        symbol: str,
+        candidate: Dict[str, Any],
+        symbol_state: SniperSymbolState,
+        now: datetime,
+        filtered_events: deque,
+    ) -> bool:
+        if candidate.get("market_pause_state") == "HALT_CONFIRMED":
+            return False
+
+        gap_seconds = float(symbol_state.last_gap_seconds or 0.0)
+        if gap_seconds < config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS:
+            return False
+
+        price = symbol_state.price or 0.0
+        bid = symbol_state.bid
+        ask = symbol_state.ask
+        prev_price = symbol_state.previous_price if symbol_state.previous_price and symbol_state.previous_price > 0 else price
+        spread_pct = self._compute_spread_pct(price, bid, ask)
+        missing_quotes = bid <= 0 or ask <= 0
+        abnormal_spread = (
+            spread_pct is not None and spread_pct >= config.DYNAMIC_EXIT_MARKET_PAUSE_ABNORMAL_SPREAD_PCT
+        )
+        frozen_price = prev_price > 0 and abs(price - prev_price) < max(0.0001, price * 0.0005)
+        confirmed_gap = gap_seconds >= config.DYNAMIC_EXIT_MARKET_PAUSE_CONFIRM_SECONDS
+        confirmed_pause = confirmed_gap or missing_quotes or abnormal_spread or frozen_price
+        if not confirmed_pause:
+            return False
+
+        reasons = [f"gap {gap_seconds:.1f}s"]
+        if missing_quotes:
+            reasons.append("missing bid/ask")
+        if abnormal_spread and spread_pct is not None:
+            reasons.append(f"spread {spread_pct:.2f}%")
+        if frozen_price:
+            reasons.append("frozen price")
+
+        candidate["paused_seconds"] = float(candidate.get("paused_seconds", 0.0)) + gap_seconds
+        candidate["market_pause_state"] = "HALT_CONFIRMED"
+        candidate["market_pause_detected_at"] = now
+        candidate["market_pause_gap_seconds"] = gap_seconds
+        candidate["market_pause_reasons"] = reasons
+        candidate["pre_pause_reference_price"] = prev_price
+        candidate["post_halt_classification"] = self._classify_reopen(price, symbol_state.vwap, prev_price)
+        candidate["reopen_grace_until"] = now + timedelta(seconds=config.DYNAMIC_EXIT_REOPEN_BUFFER_SECONDS)
+        append_sniper_event(
+            filtered_events,
+            f"{symbol} sniper pause detected ({', '.join(reasons)})",
+        )
+        self._log_event(
+            "sniper_market_pause_confirmed",
+            symbol=symbol,
+            gap_seconds=round(gap_seconds, 1),
+            reasons=list(reasons),
+            paused_seconds=round(candidate["paused_seconds"], 1),
+            reference_price=prev_price,
+            reopen_classification=candidate["post_halt_classification"],
+            reopen_buffer_seconds=config.DYNAMIC_EXIT_REOPEN_BUFFER_SECONDS,
+        )
+        return True
+
     def discard_symbol(self, symbol: str) -> None:
         self.pending_entries.pop(symbol, None)
         self.cooldowns.pop(symbol, None)
@@ -481,10 +625,16 @@ class CleanMomentumSniperManager:
                 "score": candidate.get("alert_score"),
                 "queued_at": candidate.get("queued_at"),
                 "alert_price": candidate.get("alert_price"),
+                "effective_wait_seconds": self._get_effective_wait_seconds(candidate, datetime.now()),
+                "paused_seconds": candidate.get("paused_seconds", 0.0),
                 "clean_passed": analysis.get("clean_passed", False),
                 "entry_ready": analysis.get("entry_ready", False),
                 "entry_reason": analysis.get("entry_reason", ""),
                 "first_failed_check": analysis.get("first_failed_check", ""),
+                "market_pause_state": candidate.get("market_pause_state", "ACTIVE"),
+                "reopen_grace_until": candidate.get("reopen_grace_until"),
+                "post_halt_classification": candidate.get("post_halt_classification"),
+                "market_pause_reasons": list(candidate.get("market_pause_reasons", [])),
             })
         return sorted(rows, key=lambda item: item["queued_at"], reverse=True)
 
@@ -522,6 +672,7 @@ class CleanMomentumSniperManager:
             existing["alert_score"] = score
             existing["reasons"] = list(alert_event.get("reasons", []))
             existing["latest_analysis"] = None
+            self._reset_pending_pause_state(existing)
             return
 
         self.pending_entries[symbol] = {
@@ -531,6 +682,14 @@ class CleanMomentumSniperManager:
             "alert_score": score,
             "reasons": list(alert_event.get("reasons", [])),
             "latest_analysis": None,
+            "paused_seconds": 0.0,
+            "market_pause_state": "ACTIVE",
+            "market_pause_detected_at": None,
+            "market_pause_gap_seconds": 0.0,
+            "market_pause_reasons": [],
+            "reopen_grace_until": None,
+            "pre_pause_reference_price": None,
+            "post_halt_classification": None,
         }
         append_sniper_event(filtered_events, f"{symbol} sniper queued [{grade} {score}] at ${alert_price:.2f}")
         self._log_event(
@@ -561,10 +720,50 @@ class CleanMomentumSniperManager:
             self.pending_entries.pop(symbol, None)
             self._set_cooldown(symbol, now)
             return
-        if (now - candidate["queued_at"]).total_seconds() > config.SNIPER_SETUP_MAX_WAIT_SECONDS:
+
+        if self._maybe_detect_pending_market_pause(symbol, candidate, symbol_state, now, filtered_events):
+            return
+
+        if candidate.get("market_pause_state") == "HALT_CONFIRMED":
+            reopen_grace_until = candidate.get("reopen_grace_until")
+            if reopen_grace_until is not None and now < reopen_grace_until:
+                return
+
+            classification = candidate.get("post_halt_classification")
+            candidate["market_pause_state"] = "ACTIVE"
+            candidate["market_pause_detected_at"] = None
+            candidate["reopen_grace_until"] = None
+            self._log_event(
+                "sniper_market_pause_resumed",
+                symbol=symbol,
+                reopen_classification=classification,
+                price=symbol_state.price,
+                vwap=symbol_state.vwap,
+                effective_wait_seconds=round(self._get_effective_wait_seconds(candidate, now), 1),
+            )
+            if classification == "weak":
+                self.pending_entries.pop(symbol, None)
+                self._set_cooldown(symbol, now)
+                append_sniper_event(filtered_events, f"{symbol} sniper setup canceled after weak reopen")
+                self._log_event(
+                    "sniper_setup_expired",
+                    symbol=symbol,
+                    reason="weak_reopen_after_halt",
+                    effective_wait_seconds=round(self._get_effective_wait_seconds(candidate, now), 1),
+                )
+                return
+
+        if self._get_effective_wait_seconds(candidate, now) > config.SNIPER_SETUP_MAX_WAIT_SECONDS:
             self.pending_entries.pop(symbol, None)
             self._set_cooldown(symbol, now)
             append_sniper_event(filtered_events, f"{symbol} sniper setup expired")
+            self._log_event(
+                "sniper_setup_expired",
+                symbol=symbol,
+                reason="setup_timeout",
+                effective_wait_seconds=round(self._get_effective_wait_seconds(candidate, now), 1),
+                paused_seconds=round(float(candidate.get("paused_seconds", 0.0)), 1),
+            )
             return
 
         analysis = analyze_clean_move(symbol_state)
@@ -585,7 +784,14 @@ class CleanMomentumSniperManager:
         if stop_price is None:
             return
 
-        success = executor.execute_trade(symbol, symbol_state.price, stop_price=stop_price)
+        success = executor.execute_trade(
+            symbol,
+            symbol_state.price,
+            stop_price=stop_price,
+            market_session=get_market_session(),
+            bid=symbol_state.bid,
+            ask=symbol_state.ask,
+        )
         if success:
             self.pending_entries.pop(symbol, None)
             self._set_cooldown(symbol, now)
@@ -705,7 +911,17 @@ def sniper_visualization(scanner_state, filtered_events, executor, sniper_manage
             queued_time = pending["queued_at"].strftime('%H:%M:%S')
             clean_tag = "CLEAN" if pending["clean_passed"] else "WAIT"
             ready_tag = "READY" if pending["entry_ready"] else "HOLD"
-            reason = pending["entry_reason"] or pending["first_failed_check"] or "--"
+            reopen_grace_until = pending.get("reopen_grace_until")
+            if pending.get("market_pause_state") == "HALT_CONFIRMED":
+                classification = pending.get("post_halt_classification") or "unknown"
+                grace_label = (
+                    f" until {reopen_grace_until.strftime('%H:%M:%S')}"
+                    if reopen_grace_until is not None
+                    else ""
+                )
+                reason = f"halt pause ({classification} reopen){grace_label}"
+            else:
+                reason = pending["entry_reason"] or pending["first_failed_check"] or "--"
             print(
                 f"  [{clean_tag}/{ready_tag}] {pending['symbol']} [{pending['grade']} {pending['score']}] "
                 f"alert ${pending['alert_price']:.2f} ({queued_time}) | {reason}"
@@ -964,13 +1180,14 @@ def run_clean_momentum_sniper():
                 if refresh_all_news:
                     next_news_refresh = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_NEWS_REFRESH_INTERVAL_SECONDS)
 
-            now = datetime.now()
-            if now.hour == 15 and now.minute == 59 and not eod_triggered:
-                print("[EOD] 3:59 PM reached. Triggering final cleanup...")
-                executor.close_all_positions()
-                eod_triggered = True
-            if now.hour == 16 and eod_triggered:
-                eod_triggered = False
+            now_et = datetime.now(et_tz)
+            cleanup_marker = _session_close_cleanup_marker(now_et)
+            if cleanup_marker is not None and cleanup_marker != eod_triggered:
+                print(f"[SESSION] {cleanup_marker} reached. Triggering final cleanup...")
+                executor.close_all_positions(market_session=get_market_session())
+                eod_triggered = cleanup_marker
+            elif cleanup_marker is None:
+                eod_triggered = None
 
             state_payload = build_sniper_runtime_state(
                 scanner,

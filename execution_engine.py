@@ -2,6 +2,7 @@
 Execution Engine for IBKR Paper Trading
 Handles order placement, position tracking, and risk management (TP/SL).
 """
+import math
 import threading
 from collections import deque
 from datetime import datetime, timedelta
@@ -97,14 +98,15 @@ class ExecutionEngine:
     def register_position_event_callback(self, callback):
         self.position_event_callbacks.append(callback)
 
-    def _build_stop_order(self, order_id: int, parent_id: int, quantity: int, stop_price: float) -> Order:
+    def _build_stop_order(self, order_id: int, parent_id: Optional[int], quantity: int, stop_price: float) -> Order:
         stop_order = Order()
         stop_order.orderId = order_id
         stop_order.action = "SELL"
         stop_order.orderType = "STP"
         stop_order.totalQuantity = quantity
         stop_order.auxPrice = self._round_price(stop_price)
-        stop_order.parentId = parent_id
+        if parent_id is not None and parent_id > 0:
+            stop_order.parentId = parent_id
         stop_order.account = self.account
         stop_order.tif = "DAY"
         stop_order.outsideRth = True
@@ -112,6 +114,36 @@ class ExecutionEngine:
         stop_order.eTradeOnly = False
         stop_order.firmQuoteOnly = False
         return stop_order
+
+    def _build_limit_buy_order(self, order_id: int, quantity: int, limit_price: float, outside_rth: bool) -> Order:
+        order = Order()
+        order.orderId = order_id
+        order.action = "BUY"
+        order.orderType = "LMT"
+        order.totalQuantity = quantity
+        order.lmtPrice = self._round_price(limit_price)
+        order.transmit = True
+        order.tif = "DAY"
+        order.account = self.account
+        order.outsideRth = outside_rth
+        order.eTradeOnly = False
+        order.firmQuoteOnly = False
+        return order
+
+    def _build_limit_sell_order(self, order_id: int, quantity: int, limit_price: float, outside_rth: bool) -> Order:
+        order = Order()
+        order.orderId = order_id
+        order.action = "SELL"
+        order.orderType = "LMT"
+        order.totalQuantity = quantity
+        order.lmtPrice = self._round_price(limit_price)
+        order.transmit = True
+        order.tif = "DAY"
+        order.account = self.account
+        order.outsideRth = outside_rth
+        order.eTradeOnly = False
+        order.firmQuoteOnly = False
+        return order
 
     def _build_market_sell_order(self, order_id: int, quantity: int) -> Order:
         order = Order()
@@ -126,6 +158,35 @@ class ExecutionEngine:
         order.eTradeOnly = False
         order.firmQuoteOnly = False
         return order
+
+    def _cancel_pending_entry_locked(self, symbol: str, pos: Dict, reason: str):
+        if pos.get('entry_cancel_requested'):
+            return False
+        parent_id = pos.get('parent_id')
+        if parent_id is None:
+            return False
+        pos['entry_cancel_requested'] = True
+        pos['pending_cancel_reason'] = reason
+        self.tws_app.cancelOrder(parent_id)
+        self._log_event(
+            "entry_cancel_requested",
+            symbol=symbol,
+            order_id=parent_id,
+            reason=reason,
+        )
+        return True
+
+    def _preferred_sell_limit_price(self, pos: Dict) -> float:
+        bid = pos.get('last_bid', 0.0)
+        ask = pos.get('last_ask', 0.0)
+        price = pos.get('last_price', 0.0)
+        if bid and bid > 0:
+            return self._round_price(bid)
+        if price and price > 0:
+            return self._round_price(price)
+        if ask and ask > 0:
+            return self._round_price(ask)
+        return self._round_price(pos.get('entry_price', 0.0))
 
     def _on_tws_error(self, reqId: int, errorCode: int, errorString: str):
         """Detect rejections and blacklist symbols"""
@@ -180,13 +241,17 @@ class ExecutionEngine:
             delta_filled = max(0.0, filled_qty - meta.get('reported_filled', 0.0))
             meta['reported_filled'] = filled_qty
             
-            # Parent fill can arrive as partial first; treat any positive fill as OPEN.
+            # Parent fill can arrive as partial first; keep remaining share/stop state in sync.
             if role == 'parent' and (status == 'Filled' or filled_qty > 0):
+                prior_shares = int(pos.get('filled_shares', 0))
+                total_filled_shares = int(math.floor(filled_qty)) if filled_qty > 0 else prior_shares
+                added_shares = max(0, total_filled_shares - prior_shares)
                 if pos['status'] != 'OPEN':
                     pos['status'] = 'OPEN'
                     pos['filled_at'] = datetime.now()
                     pos['actual_entry_price'] = avgFillPrice if avgFillPrice > 0 else pos['entry_price']
-                    pos['shares'] = int(filled_qty) if filled_qty > 0 else pos['shares']
+                    pos['filled_shares'] = total_filled_shares
+                    pos['shares'] = total_filled_shares if total_filled_shares > 0 else pos.get('requested_shares', pos['shares'])
                     pos['remaining_shares'] = pos['shares']
                     pos['partial_target_price'] = self._round_price(pos['actual_entry_price'] * (1 + self.tp_pct / 100))
                     pos['current_stop_price'] = self._round_price(
@@ -209,34 +274,64 @@ class ExecutionEngine:
                         actual_entry_price=pos['actual_entry_price'],
                         shares=pos['shares'],
                     )
+                    pos['entry_fill_started_at'] = datetime.now()
                     self._submit_stop_update_locked(symbol, pos['current_stop_price'], pos['remaining_shares'])
+                else:
+                    if avgFillPrice > 0:
+                        pos['actual_entry_price'] = avgFillPrice
+                        pos['partial_target_price'] = self._round_price(pos['actual_entry_price'] * (1 + self.tp_pct / 100))
+                    if added_shares > 0:
+                        pos['filled_shares'] = total_filled_shares
+                        pos['shares'] = total_filled_shares
+                        pos['remaining_shares'] = pos.get('remaining_shares', 0) + added_shares
+                        pos['entry_fill_started_at'] = pos.get('entry_fill_started_at') or datetime.now()
+                        self._submit_stop_update_locked(symbol, pos['current_stop_price'], pos['remaining_shares'])
+                        self._log_event(
+                            "entry_partial_fill_updated",
+                            symbol=symbol,
+                            order_id=orderId,
+                            total_filled_shares=pos['shares'],
+                            remaining_shares=pos['remaining_shares'],
+                            actual_entry_price=pos.get('actual_entry_price'),
+                        )
             
             # Handle cancelled/inactive states carefully.
             if status in ['Inactive', 'Cancelled', 'ApiCancelled']:
                 if role == 'parent':
                     if pos['status'] == 'SUBMITTED':
+                        failure_reason = pos.get('pending_cancel_reason') or status
                         self.trade_history.append({
                             'symbol': symbol,
                             'type': 'FAILED',
-                            'reason': status,
+                            'reason': failure_reason,
                             'entry_price': pos['entry_price'],
                             'time': datetime.now()
                         })
-                        print(f"[EXEC] Parent order {orderId} for {symbol} FAILED ({status}).")
+                        print(f"[EXEC] Parent order {orderId} for {symbol} FAILED ({failure_reason}).")
                         self._log_event(
                             "entry_failed",
                             symbol=symbol,
                             order_id=orderId,
-                            reason=status,
+                            reason=failure_reason,
                             entry_price=pos['entry_price'],
                         )
                         self._cleanup_position(symbol)
+                    elif pos['status'] == 'OPEN':
+                        pos['entry_cancel_requested'] = False
+                        pos['entry_remainder_cancelled'] = True
+                        self._log_event(
+                            "entry_remainder_cancelled",
+                            symbol=symbol,
+                            order_id=orderId,
+                            reason=pos.get('pending_cancel_reason') or status,
+                            filled_shares=pos.get('filled_shares', 0),
+                        )
                 elif role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit']:
                     if pos.get('active_exit_order_id') == orderId:
                         pos['exit_pending'] = False
                         pos['active_exit_order_id'] = None
 
-            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit']:
+            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit', 'extended_hours_stop_exit', 'session_close_exit']:
                 exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('last_price', pos.get('actual_entry_price', pos['entry_price']))
                 exit_shares = min(int(delta_filled), pos['remaining_shares'])
                 pos['remaining_shares'] = max(0, pos['remaining_shares'] - exit_shares)
@@ -293,6 +388,10 @@ class ExecutionEngine:
                         exit_type = "STRUCTURE"
                     elif role == 'reopen_weak_exit':
                         exit_type = "REOPEN_WEAK"
+                    elif role == 'extended_hours_stop_exit':
+                        exit_type = "EH_STOP"
+                    elif role == 'session_close_exit':
+                        exit_type = "SESSION_CLOSE"
                     else:
                         exit_type = "BOT"
                     self.trade_history.append({
@@ -368,9 +467,17 @@ class ExecutionEngine:
             return
         new_stop_price = self._round_price(new_stop_price)
         pos['current_stop_price'] = new_stop_price
+        if not pos.get('uses_broker_stop', True):
+            self._log_event(
+                "synthetic_stop_updated",
+                symbol=symbol,
+                stop_price=new_stop_price,
+                quantity=quantity,
+            )
+            return
         stop_order = self._build_stop_order(
             order_id=pos['stop_id'],
-            parent_id=pos['parent_id'],
+            parent_id=pos.get('stop_parent_id'),
             quantity=quantity,
             stop_price=new_stop_price,
         )
@@ -383,6 +490,29 @@ class ExecutionEngine:
             stop_price=new_stop_price,
             quantity=quantity,
         )
+
+    def _submit_limit_exit_locked(self, symbol: str, quantity: int, role: str, limit_price: Optional[float] = None):
+        pos = self.positions[symbol]
+        if quantity <= 0 or pos.get('exit_pending'):
+            return False
+        order_id = self.tws_app.next_order_id
+        self.tws_app.next_order_id += 1
+        if limit_price is None or limit_price <= 0:
+            limit_price = self._preferred_sell_limit_price(pos)
+        order = self._build_limit_sell_order(order_id, quantity, limit_price, outside_rth=True)
+        self._register_order(order_id, symbol, role)
+        pos['exit_pending'] = True
+        pos['active_exit_order_id'] = order_id
+        self.tws_app.placeOrder(order.orderId, self._create_contract(symbol), order)
+        self._log_event(
+            "exit_order_submitted",
+            symbol=symbol,
+            order_id=order_id,
+            role=role,
+            quantity=quantity,
+            limit_price=limit_price,
+        )
+        return True
 
     def _submit_market_exit_locked(self, symbol: str, quantity: int, role: str):
         pos = self.positions[symbol]
@@ -406,7 +536,15 @@ class ExecutionEngine:
         )
         return True
 
-    def execute_trade(self, symbol: str, entry_price: float, stop_price: float = None):
+    def execute_trade(
+        self,
+        symbol: str,
+        entry_price: float,
+        stop_price: float = None,
+        market_session: str = "REGULAR",
+        bid: float = 0.0,
+        ask: float = 0.0,
+    ):
         """Execute a new trade with a broker-side disaster stop and bot-managed exits."""
         with self.lock:
             if symbol in self.positions:
@@ -427,40 +565,92 @@ class ExecutionEngine:
                 stop_price = self._round_price(entry_price * (1 - self.sl_pct / 100))
             else:
                 stop_price = self._round_price(stop_price)
+
+            is_extended_hours = market_session in {"PREMARKET", "AFTERHOURS"}
+            spread_pct = self._compute_spread_pct(bid, ask, entry_price)
+            limit_price = None
+            parent_order_type = "MKT"
+            should_attach_initial_stop = True
+
+            if is_extended_hours:
+                if bid <= 0 or ask <= 0:
+                    print(f"[EXEC] Skipping {symbol} - missing bid/ask for extended-hours limit entry.")
+                    self._log_event(
+                        "entry_rejected_preflight",
+                        symbol=symbol,
+                        reason="missing_bid_ask_extended_hours",
+                        market_session=market_session,
+                    )
+                    return False
+                if spread_pct is not None and spread_pct > config.EXTENDED_HOURS_ENTRY_SPREAD_MAX_PCT:
+                    print(
+                        f"[EXEC] Skipping {symbol} - spread {spread_pct:.2f}% exceeds "
+                        f"extended-hours max {config.EXTENDED_HOURS_ENTRY_SPREAD_MAX_PCT:.2f}%."
+                    )
+                    self._log_event(
+                        "entry_rejected_preflight",
+                        symbol=symbol,
+                        reason="spread_too_wide_extended_hours",
+                        market_session=market_session,
+                        spread_pct=spread_pct,
+                        max_spread_pct=config.EXTENDED_HOURS_ENTRY_SPREAD_MAX_PCT,
+                    )
+                    return False
+                limit_reference = max(entry_price, ask)
+                limit_price = self._round_price(
+                    limit_reference * (1 + config.EXTENDED_HOURS_ENTRY_LIMIT_BUFFER_PCT / 100.0)
+                )
+                parent_order_type = "LMT"
+                should_attach_initial_stop = False
             
             parent_id = self.tws_app.next_order_id
             stop_id = parent_id + 1
             self.tws_app.next_order_id += 2
             
             contract = self._create_contract(symbol)
-            
-            parent = Order()
-            parent.orderId = parent_id
-            parent.action = "BUY"
-            parent.orderType = "MKT"
-            parent.totalQuantity = shares
-            parent.transmit = False
-            parent.tif = "DAY"
-            parent.account = self.account
-            parent.outsideRth = False
-            parent.eTradeOnly = False
-            parent.firmQuoteOnly = False
-            
-            stop_order = self._build_stop_order(
-                order_id=stop_id,
-                parent_id=parent_id,
-                quantity=shares,
-                stop_price=stop_price,
-            )
+            if parent_order_type == "LMT":
+                parent = self._build_limit_buy_order(parent_id, shares, limit_price, outside_rth=True)
+            else:
+                parent = Order()
+                parent.orderId = parent_id
+                parent.action = "BUY"
+                parent.orderType = "MKT"
+                parent.totalQuantity = shares
+                parent.transmit = False
+                parent.tif = "DAY"
+                parent.account = self.account
+                parent.outsideRth = False
+                parent.eTradeOnly = False
+                parent.firmQuoteOnly = False
+
+            stop_order = None
+            if should_attach_initial_stop:
+                stop_order = self._build_stop_order(
+                    order_id=stop_id,
+                    parent_id=parent_id,
+                    quantity=shares,
+                    stop_price=stop_price,
+                )
             
             self.positions[symbol] = {
                 'entry_price': entry_price,
                 'shares': shares,
+                'requested_shares': shares,
+                'filled_shares': 0,
                 'remaining_shares': shares,
                 'partial_target_price': partial_target_price,
                 'current_stop_price': stop_price,
                 'parent_id': parent_id,
                 'stop_id': stop_id,
+                'stop_parent_id': parent_id if should_attach_initial_stop else None,
+                'entry_order_type': parent_order_type,
+                'entry_limit_price': limit_price,
+                'market_session_at_entry': market_session,
+                'uses_broker_stop': not is_extended_hours,
+                'pending_cancel_reason': None,
+                'entry_cancel_requested': False,
+                'entry_remainder_cancelled': False,
+                'entry_fill_started_at': None,
                 'status': 'SUBMITTED',
                 'submitted_at': datetime.now(),
                 'filled_at': None,
@@ -490,10 +680,17 @@ class ExecutionEngine:
             
             self.tws_app.placeOrder(parent.orderId, contract, parent)
             print(f"[EXEC] Submitted Parent Order {parent.orderId} for {symbol}")
-            self.tws_app.placeOrder(stop_order.orderId, contract, stop_order)
-            print(f"[EXEC] Submitted disaster stop {stop_order.orderId} for {symbol}")
+            if stop_order is not None:
+                self.tws_app.placeOrder(stop_order.orderId, contract, stop_order)
+                print(f"[EXEC] Submitted disaster stop {stop_order.orderId} for {symbol}")
             
-            print(f"[EXEC] Entry submitted for {symbol}: {shares} shares | first target ${partial_target_price:.2f} | stop ${stop_price:.2f}")
+            if parent_order_type == "LMT":
+                print(
+                    f"[EXEC] Extended-hours entry submitted for {symbol}: {shares} shares "
+                    f"limit ${limit_price:.2f} | first target ${partial_target_price:.2f} | stop ${stop_price:.2f}"
+                )
+            else:
+                print(f"[EXEC] Entry submitted for {symbol}: {shares} shares | first target ${partial_target_price:.2f} | stop ${stop_price:.2f}")
             self._log_event(
                 "entry_submitted",
                 symbol=symbol,
@@ -503,6 +700,10 @@ class ExecutionEngine:
                 shares=shares,
                 first_target=partial_target_price,
                 stop_price=stop_price,
+                market_session=market_session,
+                entry_order_type=parent_order_type,
+                entry_limit_price=limit_price,
+                spread_pct=spread_pct,
             )
             return True
 
@@ -599,10 +800,46 @@ class ExecutionEngine:
     ):
         with self.lock:
             pos = self.positions.get(symbol)
-            if pos is None or pos['status'] != 'OPEN':
+            if pos is None:
                 return
 
             now = datetime.now()
+            if pos['status'] == 'SUBMITTED':
+                if (
+                    pos.get('entry_order_type') == 'LMT'
+                    and config.EXTENDED_HOURS_ENTRY_MAX_WAIT_SECONDS > 0
+                    and (now - pos.get('submitted_at', now)).total_seconds() >= config.EXTENDED_HOURS_ENTRY_MAX_WAIT_SECONDS
+                ):
+                    self._cancel_pending_entry_locked(symbol, pos, "extended_hours_limit_timeout")
+                elif (
+                    pos.get('entry_order_type') == 'LMT'
+                    and market_session in {"PREMARKET", "AFTERHOURS"}
+                ):
+                    spread_pct = self._compute_spread_pct(bid, ask, price)
+                    if (
+                        spread_pct is not None
+                        and spread_pct > config.EXTENDED_HOURS_ENTRY_SPREAD_MAX_PCT
+                    ):
+                        self._cancel_pending_entry_locked(symbol, pos, "extended_hours_spread_blew_out")
+                return
+
+            if pos['status'] != 'OPEN':
+                return
+
+            if (
+                pos.get('entry_order_type') == 'LMT'
+                and not pos.get('entry_remainder_cancelled')
+                and pos.get('filled_shares', 0) > 0
+                and pos.get('filled_shares', 0) < pos.get('requested_shares', 0)
+                and config.EXTENDED_HOURS_PARTIAL_FILL_CLEANUP_SECONDS > 0
+            ):
+                fill_started_at = pos.get('entry_fill_started_at') or pos.get('filled_at')
+                if (
+                    fill_started_at is not None
+                    and (now - fill_started_at).total_seconds() >= config.EXTENDED_HOURS_PARTIAL_FILL_CLEANUP_SECONDS
+                ):
+                    self._cancel_pending_entry_locked(symbol, pos, "extended_hours_partial_fill_cleanup")
+
             pause_detected = self._maybe_detect_market_pause_locked(symbol, pos, now, price, bid, ask, vwap)
             pos['last_price'] = price
             pos['last_vwap'] = vwap
@@ -612,6 +849,23 @@ class ExecutionEngine:
             pos['highest_price'] = max(pos['highest_price'], price)
             if volume > 0:
                 pos['volume_history'].append((now, volume))
+
+            if market_session in {"PREMARKET", "AFTERHOURS"}:
+                if pos.get('exit_pending'):
+                    return
+                if price <= pos.get('current_stop_price', 0):
+                    if self._submit_limit_exit_locked(symbol, pos['remaining_shares'], 'extended_hours_stop_exit'):
+                        self._log_event(
+                            "extended_hours_stop_exit_submitted",
+                            symbol=symbol,
+                            stop_price=pos.get('current_stop_price'),
+                            bid=bid,
+                            ask=ask,
+                            price=price,
+                            shares=pos['remaining_shares'],
+                        )
+                    return
+                return
 
             if market_session != "REGULAR" or pos.get('exit_pending'):
                 return
@@ -740,7 +994,7 @@ class ExecutionEngine:
         with self.lock:
             return symbol in self.positions
 
-    def close_all_positions(self):
+    def close_all_positions(self, market_session: str = "REGULAR"):
         """Close all open positions and cancel pending orders (EOD cleanup)"""
         with self.lock:
             if not self.positions:
@@ -756,38 +1010,53 @@ class ExecutionEngine:
                 contract = self._create_contract(symbol)
                 
                 # 1. Cancel all pending stop/exit orders
-                self.tws_app.cancelOrder(pos['stop_id'])
+                if pos.get('uses_broker_stop', True) and pos.get('stop_id') is not None:
+                    self.tws_app.cancelOrder(pos['stop_id'])
                 if pos.get('active_exit_order_id'):
                     self.tws_app.cancelOrder(pos['active_exit_order_id'])
+
+                if pos['status'] == 'SUBMITTED':
+                    self._cancel_pending_entry_locked(symbol, pos, 'session_close_pending_entry')
+                    continue
                 
                 # 2. If position is OPEN, submit a Market Order to close it
                 if pos['status'] == 'OPEN':
-                    close_order = Order()
-                    close_order.action = "SELL"
-                    close_order.orderType = "MKT"
-                    close_order.totalQuantity = pos['remaining_shares']
-                    close_order.account = self.account
-                    close_order.outsideRth = True # Ensure it can execute in after-hours if slightly late
-                    close_order.transmit = True
-                    
-                    # Fix for TWS Error Codes 10268 & 10269
-                    close_order.eTradeOnly = False
-                    close_order.firmQuoteOnly = False
-                    
-                    new_oid = self.tws_app.next_order_id
-                    self.tws_app.next_order_id += 1
-                    self._register_order(new_oid, symbol, 'eod_exit')
-                    pos['exit_pending'] = True
-                    pos['active_exit_order_id'] = new_oid
-                    
-                    self.tws_app.placeOrder(new_oid, contract, close_order)
-                    print(f"[EXEC] EOD: Submitted Market Sell for {symbol} ({pos['remaining_shares']} shares)")
-                    self._log_event(
-                        "eod_exit_submitted",
-                        symbol=symbol,
-                        order_id=new_oid,
-                        shares=pos['remaining_shares'],
-                    )
+                    if market_session in {"PREMARKET", "AFTERHOURS"}:
+                        limit_price = self._preferred_sell_limit_price(pos)
+                        if self._submit_limit_exit_locked(symbol, pos['remaining_shares'], 'session_close_exit', limit_price=limit_price):
+                            print(f"[EXEC] Session close: Submitted Limit Sell for {symbol} ({pos['remaining_shares']} shares) at ${limit_price:.2f}")
+                            self._log_event(
+                                "session_close_exit_submitted",
+                                symbol=symbol,
+                                shares=pos['remaining_shares'],
+                                limit_price=limit_price,
+                                market_session=market_session,
+                            )
+                    else:
+                        close_order = Order()
+                        close_order.action = "SELL"
+                        close_order.orderType = "MKT"
+                        close_order.totalQuantity = pos['remaining_shares']
+                        close_order.account = self.account
+                        close_order.outsideRth = True
+                        close_order.transmit = True
+                        close_order.eTradeOnly = False
+                        close_order.firmQuoteOnly = False
+
+                        new_oid = self.tws_app.next_order_id
+                        self.tws_app.next_order_id += 1
+                        self._register_order(new_oid, symbol, 'eod_exit')
+                        pos['exit_pending'] = True
+                        pos['active_exit_order_id'] = new_oid
+
+                        self.tws_app.placeOrder(new_oid, contract, close_order)
+                        print(f"[EXEC] EOD: Submitted Market Sell for {symbol} ({pos['remaining_shares']} shares)")
+                        self._log_event(
+                            "eod_exit_submitted",
+                            symbol=symbol,
+                            order_id=new_oid,
+                            shares=pos['remaining_shares'],
+                        )
                     continue
 
                 # Non-open positions can be cleaned up after pending orders are cancelled.
