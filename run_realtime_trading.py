@@ -870,7 +870,11 @@ def run_trading_bot():
     scanner.on_preliminary_alert(handle_scanner_alert)
 
     print("[INIT] Loading scanner fundamentals/news/history...")
-    scanner.load_fundamentals(tws_app)
+    excluded_symbols = scanner.load_fundamentals(tws_app)
+    if excluded_symbols:
+        excluded_set = set(excluded_symbols)
+        unique_symbols = [symbol for symbol in unique_symbols if symbol not in excluded_set]
+        symbol_states = {symbol: state for symbol, state in symbol_states.items() if symbol not in excluded_set}
     scanner.load_news(tws_app)
     scanner.load_previous_closes(tws_app)
     scanner.load_historical_prices(tws_app)

@@ -16,6 +16,9 @@ import pytz
 from scanner_config import (
     ALERT_MIN_SCORE_TO_NOTIFY,
     ALERT_DRAWDOWN_LOOKBACK_MINUTES,
+    EXCLUDED_SYMBOLS,
+    EXCLUDE_LEVERAGED_PRODUCTS,
+    LEVERAGED_PRODUCT_KEYWORDS,
     RUNTIME_FEEDBACK_TOP_SYMBOLS,
     SCANNER_MONITOR_CAP,
     SCANNER_MAX_SYMBOL_CHANGES_PER_REFRESH,
@@ -141,6 +144,59 @@ def classify_news_headline(headline: str) -> tuple[bool, str]:
             return True, f"Matched keyword: {keyword}"
 
     return False, "No configured catalyst keyword matched"
+
+
+def _extract_fundamental_text(root: ET.Element) -> str:
+    parts: List[str] = []
+    for element in root.iter():
+        text = (element.text or "").strip()
+        if text:
+            parts.append(text)
+        for value in element.attrib.values():
+            value_text = str(value).strip()
+            if value_text:
+                parts.append(value_text)
+    return " ".join(parts)
+
+
+def classify_excluded_product(symbol: str, xml_data: Optional[str]) -> tuple[bool, str]:
+    symbol_upper = (symbol or "").upper()
+    if symbol_upper in {entry.upper() for entry in EXCLUDED_SYMBOLS}:
+        return True, f"manual exclusion: {symbol_upper}"
+    if not EXCLUDE_LEVERAGED_PRODUCTS or not xml_data:
+        return False, ""
+
+    try:
+        root = ET.fromstring(xml_data)
+        searchable_text = _extract_fundamental_text(root).lower()
+    except Exception:
+        searchable_text = xml_data.lower()
+
+    for keyword in LEVERAGED_PRODUCT_KEYWORDS:
+        if keyword.lower() in searchable_text:
+            return True, f"matched product keyword: {keyword}"
+    return False, ""
+
+
+def _apply_symbol_fundamentals(monitor, symbol: str, xml_data: Optional[str], tws_app) -> tuple[bool, str]:
+    is_excluded, exclusion_reason = classify_excluded_product(symbol, xml_data)
+    if is_excluded:
+        return False, exclusion_reason
+
+    if not xml_data:
+        return True, ""
+
+    root = ET.fromstring(xml_data)
+    for ratio in root.findall(".//Ratio"):
+        field = ratio.get("FieldName")
+        if field == 'FLOAT':
+            monitor.float_shares = float(ratio.text)
+        elif field == 'VOL10DAVG':
+            monitor.avg_daily_volume = tws_app.normalize_stock_volume(ratio.text)
+            with tws_app.lock:
+                if symbol in tws_app.realtime_data:
+                    tws_app.realtime_data[symbol]['avg_daily_volume'] = monitor.avg_daily_volume
+    return True, ""
 
 
 def initialize_alert_score_audit_file():
@@ -792,28 +848,45 @@ class RealtimeBroadScanner:
 
     def load_fundamentals(self, tws_app):
         print("[SCANNER] Loading fundamental data for screening...")
-        for symbol, monitor in self.monitors.items():
+        excluded_symbols = []
+        for symbol, monitor in list(self.monitors.items()):
             # Try fundamental data first
             xml_data = tws_app.fetch_fundamental_data(symbol)
             if xml_data:
                 try:
-                    root = ET.fromstring(xml_data)
-                    for ratio in root.findall(".//Ratio"):
-                        field = ratio.get("FieldName")
-                        if field == 'FLOAT':
-                            monitor.float_shares = float(ratio.text)
-                        elif field == 'VOL10DAVG':
-                            monitor.avg_daily_volume = tws_app.normalize_stock_volume(ratio.text)
-                            # Update TWS app data for volume correction reference
-                            with tws_app.lock:
-                                if symbol in tws_app.realtime_data:
-                                    tws_app.realtime_data[symbol]['avg_daily_volume'] = monitor.avg_daily_volume
+                    keep_symbol, exclusion_reason = _apply_symbol_fundamentals(monitor, symbol, xml_data, tws_app)
+                    if not keep_symbol:
+                        print(f"[SCANNER] Excluding {symbol}: {exclusion_reason}")
+                        excluded_symbols.append(symbol)
+                        self.monitors.pop(symbol, None)
+                        if symbol in self.symbols:
+                            self.symbols.remove(symbol)
+                        continue
+                    float_display = (
+                        f"{monitor.float_shares/1e6:.1f}M"
+                        if monitor.float_shares is not None
+                        else "N/A"
+                    )
+                    avg_vol_display = (
+                        format_compact_volume(monitor.avg_daily_volume)
+                        if monitor.avg_daily_volume is not None
+                        else "N/A"
+                    )
                     print(
-                        f"[SCANNER] {symbol} Float: {monitor.float_shares/1e6:.1f}M, "
-                        f"Avg Vol: {format_compact_volume(monitor.avg_daily_volume)}"
+                        f"[SCANNER] {symbol} Float: {float_display}, "
+                        f"Avg Vol: {avg_vol_display}"
                     )
                 except Exception as e:
                     print(f"[SCANNER] Error parsing fundamentals for {symbol}: {e}")
+            else:
+                keep_symbol, exclusion_reason = _apply_symbol_fundamentals(monitor, symbol, None, tws_app)
+                if not keep_symbol:
+                    print(f"[SCANNER] Excluding {symbol}: {exclusion_reason}")
+                    excluded_symbols.append(symbol)
+                    self.monitors.pop(symbol, None)
+                    if symbol in self.symbols:
+                        self.symbols.remove(symbol)
+                    continue
             
             # Fallback: Calculate avg volume from historical data if not available from fundamentals
             if monitor.avg_daily_volume is None:
@@ -828,6 +901,7 @@ class RealtimeBroadScanner:
                     print(f"[SCANNER] {symbol} Avg Vol (10-day): {format_compact_volume(avg_vol)}")
                 else:
                     print(f"[SCANNER] {symbol} Could not calculate avg volume")
+        return excluded_symbols
 
     def _load_symbol_news(self, symbol: str, monitor, tws_app, force_refresh: bool = False):
         """Load and classify same-day IBKR headlines for one symbol."""
@@ -1052,6 +1126,7 @@ def update_scanner_symbols(
     ranked_new = list(dict.fromkeys(new_symbols))
     protected = set(protected_symbols or [])
     excluded = set(excluded_symbols or [])
+    excluded.update(EXCLUDED_SYMBOLS)
 
     protected_kept = [s for s in current_symbols if s in protected and s not in excluded]
     current_regular = [s for s in current_symbols if s not in protected and s not in excluded]
@@ -1107,16 +1182,17 @@ def update_scanner_symbols(
                 scanner.symbols.append(s)
             # Load fundamentals for new symbol
             xml_data = tws_app.fetch_fundamental_data(s)
-            if xml_data:
-                try:
-                    root = ET.fromstring(xml_data)
-                    for ratio in root.findall(".//Ratio"):
-                        field = ratio.get("FieldName")
-                        if field == 'FLOAT':
-                            scanner.monitors[s].float_shares = float(ratio.text)
-                        elif field == 'VOL10DAVG':
-                            scanner.monitors[s].avg_daily_volume = tws_app.normalize_stock_volume(ratio.text)
-                except: pass
+            try:
+                keep_symbol, exclusion_reason = _apply_symbol_fundamentals(scanner.monitors[s], s, xml_data, tws_app)
+            except Exception:
+                keep_symbol, exclusion_reason = True, ""
+            if not keep_symbol:
+                print(f"[SCANNER] Skipping {s}: {exclusion_reason}")
+                scanner.monitors.pop(s, None)
+                if s in scanner.symbols:
+                    scanner.symbols.remove(s)
+                excluded.add(s)
+                continue
             
             # Fallback for avg volume if fundamental data not available
             if scanner.monitors[s].avg_daily_volume is None:
@@ -1292,7 +1368,10 @@ def run_standalone_scanner():
     scanner.on_preliminary_alert(alert_handler)
     
     # Load Fundamentals
-    scanner.load_fundamentals(tws_app)
+    excluded_symbols = scanner.load_fundamentals(tws_app)
+    if excluded_symbols:
+        excluded_set = set(excluded_symbols)
+        unique_symbols = [symbol for symbol in unique_symbols if symbol not in excluded_set]
 
     # Load cautious news headlines for catalyst scoring
     scanner.load_news(tws_app)

@@ -1,5 +1,11 @@
 # Project Context
 
+## Maintenance Rule
+
+- `context.md` must be kept in sync with the live codebase.
+- Any meaningful implementation change, workflow adjustment, strategy rule change, config change, or new trading/scanner behavior should also update `context.md` in the same work session.
+- When helping on this repo, treat updating `context.md` as part of completing the task whenever the project behavior or mental model has changed.
+
 This repo has 3 related but distinct workflows. They share Stage 1 scanner ideas, but Stage 2 / Stage 3 behavior is different depending on the file.
 
 ## 1) `realtime_multi_session_scanner.py`
@@ -100,32 +106,50 @@ Workflow:
   - uses shared scanner alerts from `realtime_multi_session_scanner.py`
   - only qualifying scanner alerts get queued into sniper Stage 2
 - Stage 2:
-  - analyzes clean trend on 15s + 30s structure
-  - 5s is only for pullback timing, not trend definition
+  - analyzes clean trend on 15s + 30s structure, with an alternate 1m clean-squeeze path now enabled
+  - 5s is still only for pullback timing, not trend definition
   - evaluates:
     - impulse-anchored clean window
     - retracement vs impulse
-    - red candle count on 15s / 30s
+    - red candle count on the selected structure path
     - volume expansion
     - short-term volume acceleration
     - support / EMA context
     - pullback depth
     - stop validity
-  - enters only if context is extremely clean
+  - chooses the cleanest currently valid Stage 2 mode between:
+    - `15s/30s` clean-trend pullback
+    - `1m` clean-squeeze pullback
+  - enters only if context is extremely clean and price is still near the active micro-pullback low
 - Stage 3:
   - uses shared `ExecutionEngine`
   - but sniper provides custom structure-based stop at entry
   - sniper also has its own structure-break exit behavior
 
 Important sniper rules:
-- regular hours only for v1
-- clean trend is based on 15s + 30s, not 5s
+- regular hours only for v1 was the original intent, but the live config currently allows PREMARKET / REGULAR / AFTERHOURS
+- clean trend is based on higher-timeframe structure, not 5s
+- higher-timeframe structure can now come from either:
+  - 15s + 30s clean-trend logic
+  - 1m clean-squeeze logic
 - entry is near 5s pullback low without waiting for reclaim confirmation
-- structure break means 15s structure failure, not isolated 5s noise
+- current pullback band in config is:
+  - minimum fade from peak: 0.4%
+  - maximum fade from peak is tiered by extension:
+  - base cap: 3.0%
+  - at 5% extension: 4.0%
+  - at 10% extension: 5.5%
+- leveraged / fund-style products are now filtered from the scanner universe by:
+  - manual symbol blacklist
+  - keyword match on fundamental text such as ETF / ETN / 2X / 3X / Bull / Bear / Daily Target / Long / Short / Ultra
+- structure break means failure of the selected active structure mode, not isolated 5s noise
 - structure break must persist briefly before counting as invalid
 
 Recent changes:
 - sniper clean-context logic was changed from a blunt rolling window to an impulse-anchored window
+- sniper can now accept clean 1m squeeze structure as an alternate Stage 2 path
+- sniper pullback tolerance is now tiered by extension instead of using only a flat max-fade cap
+- leveraged products such as LUNL are now excluded earlier at the shared scanner-universe stage
 - Stage 2 now shows the first failed rule in the terminal when setup is on hold
 - recent sniper events now show timestamps
 - structure-based stops are preserved correctly through fill handling
@@ -173,7 +197,8 @@ Use these mental models:
 
 - `run_clean_momentum_sniper.py`
   - newer experimental trading path
-  - alert first, then clean-trend pullback entry inside an active impulse
+  - alert first, then higher-timeframe clean-structure pullback entry inside an active impulse
+  - can currently qualify from either 15s/30s structure or a 1m clean squeeze
 
 ## Current pain points / tuning themes
 
@@ -202,12 +227,13 @@ I have 3 workflows in this repo:
 
 3. `run_clean_momentum_sniper.py`
 - separate experimental sniper bot
-- uses the same scanner universe, but Stage 2 is clean-trend pullback logic
-- trend quality is based on 15s + 30s, 5s only for timing
+- uses the same scanner universe, but Stage 2 is higher-timeframe clean-structure pullback logic
+- trend quality is based on either 15s + 30s or 1m structure, with 5s only for timing
 - uses structure-based stops and structure-break exits
 
 Important shared context:
 - scanner logic should stay aligned between standalone scanner and trading runners
+- leveraged / fund-style products are now excluded at the shared Stage 1 universe level
 - execution is handled by shared `execution_engine.py`
 - halt / market-pause handling was recently added to execution engine
 

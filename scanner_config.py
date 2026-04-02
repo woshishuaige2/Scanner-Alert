@@ -126,6 +126,27 @@ NEWS_CATALYST_IGNORE_KEYWORDS = [
     "why is",
 ]
 
+# PRODUCT UNIVERSE FILTERS
+EXCLUDE_LEVERAGED_PRODUCTS = True
+EXCLUDED_SYMBOLS = [
+    "LUNL",
+]
+LEVERAGED_PRODUCT_KEYWORDS = [
+    "2x",
+    "3x",
+    "bear",
+    "bull",
+    "daily target",
+    "etf",
+    "etn",
+    "fund",
+    "inverse",
+    "leveraged",
+    "long",
+    "short",
+    "ultra",
+]
+
 # FAST IGNITION CONDITIONS (Used by realtime_multi_session_scanner.py)
 FAST_IGNITION_PCT_5S = 0.8                # Minimum move over last 5 seconds
 FAST_IGNITION_PCT_15S = 1.5             # Minimum move over last 15 seconds
@@ -175,11 +196,19 @@ SNIPER_MIN_IMPULSE_30S_CANDLES = 2               # Require at least some 30s con
 SNIPER_15S_EMA_PERIOD = 9                        # EMA context on 15s candles
 SNIPER_15S_MAX_RED_FRACTION = 0.25               # 15s red-candle allowance inside the clean phase
 SNIPER_30S_MAX_RED_CANDLES = 1                   # 30s red-candle allowance inside the clean phase
+SNIPER_1M_ENABLED = True                         # Allow an alternate Stage-2 path for clean 1-minute squeezes
+SNIPER_1M_WINDOW_CANDLES = 6                     # Clean-phase evaluation window on 1-minute candles
+SNIPER_MIN_IMPULSE_1M_CANDLES = 3                # Require a minimum 1-minute impulse length before judging cleanliness
+SNIPER_1M_EMA_PERIOD = 5                         # EMA context on 1-minute candles
+SNIPER_1M_MAX_RED_CANDLES = 1                    # 1-minute red-candle allowance inside the clean phase
+SNIPER_MIN_1M_VOLUME_EXPANSION = 1.2             # Current 1-minute volume vs rolling 1-minute average
 SNIPER_CLEAN_RETRACE_PREFERRED_PCT = 30.0        # Preferred max retracement vs prior impulse
 SNIPER_CLEAN_RETRACE_HARD_PCT = 40.0             # Hard cutoff for clean-trend invalidation
 SNIPER_MIN_15S_VOLUME_EXPANSION = 1.5            # Current 15s volume vs rolling 15s average
 SNIPER_PULLBACK_MIN_FROM_PEAK_PCT = 0.4          # Ignore ultra-shallow pullbacks that are still extended
-SNIPER_PULLBACK_MAX_FROM_PEAK_PCT = 3.0          # Pullback must stay controlled inside the trend
+SNIPER_PULLBACK_MAX_FROM_PEAK_PCT = 3.0          # Base max pullback allowed from peak for sniper entries
+SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_5_EXTENSION = 4.0   # Allow more fade once the move has extended meaningfully
+SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_10_EXTENSION = 5.5  # Allow deeper pullbacks after very strong extensions
 SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT = 0.20       # Entry must stay near the current 5s pullback low
 SNIPER_STOP_BUFFER_PCT = 0.20                    # Small noise buffer below the chosen structure stop
 SNIPER_MIN_STOP_DISTANCE_PCT = 0.35              # Avoid stops that sit unrealistically close to entry

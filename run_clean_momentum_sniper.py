@@ -9,6 +9,7 @@ import os
 import platform
 import signal
 import subprocess
+import threading
 import time
 from collections import deque
 from datetime import datetime, timedelta
@@ -43,6 +44,7 @@ RUNTIME_FEEDBACK_DIR = os.path.join(os.path.dirname(__file__), config.RUNTIME_FE
 should_exit = False
 tws_app = None
 filtered_alerts = deque(maxlen=25)
+shutdown_event = threading.Event()
 
 
 def append_sniper_event(events: deque, message: str) -> None:
@@ -53,6 +55,7 @@ def signal_handler(sig, frame):
     global should_exit
     print("\n[INFO] Graceful exit requested...")
     should_exit = True
+    shutdown_event.set()
 
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -79,6 +82,13 @@ def _format_display_price(value: Optional[float]) -> str:
     if value is None:
         return "N/A"
     return f"${value:.2f}"
+
+
+def _next_main_loop_start(now_et: datetime) -> datetime:
+    start_today = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+    if now_et < start_today:
+        return start_today
+    return start_today + timedelta(days=1)
 
 
 def _bucket_start(ts: datetime, timeframe_seconds: int) -> datetime:
@@ -250,43 +260,8 @@ def _find_impulse_start_index(candles_15s: List[Dict[str, Any]], ema15_series: L
     return min(start_idx, max(0, len(candles_15s) - 1))
 
 
-class SniperSymbolState:
-    def __init__(self, symbol: str):
-        self.symbol = symbol
-        self.price_history = deque(maxlen=900)
-        self.volume_history = deque(maxlen=900)
-        self.price: Optional[float] = None
-        self.previous_price: Optional[float] = None
-        self.vwap: float = 0.0
-        self.bid: float = 0.0
-        self.ask: float = 0.0
-        self.last_update: Optional[datetime] = None
-        self.previous_update: Optional[datetime] = None
-        self.last_gap_seconds: float = 0.0
-
-    def update_market_data(
-        self,
-        price: float,
-        volume: float,
-        vwap: float,
-        bid: float = 0.0,
-        ask: float = 0.0,
-    ) -> None:
-        now = datetime.now()
-        self.previous_price = self.price
-        self.previous_update = self.last_update
-        self.last_gap_seconds = (now - self.last_update).total_seconds() if self.last_update else 0.0
-        self.price = price
-        self.vwap = vwap
-        self.bid = bid
-        self.ask = ask
-        self.last_update = now
-        self.price_history.append((now, price))
-        self.volume_history.append((now, volume))
-
-
-def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
-    analysis: Dict[str, Any] = {
+def _empty_clean_analysis() -> Dict[str, Any]:
+    return {
         "enough_data": False,
         "clean_passed": False,
         "extreme_clean": False,
@@ -296,29 +271,44 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
         "first_failed_check": "",
         "entry_reason": "",
         "support_price": None,
+        "support_label": "",
         "stop_price": None,
         "pullback_low": None,
-        "ema15": None,
+        "ema_value": None,
+        "ema_label": "",
         "impulse_start": None,
+        "structure_mode": "",
         "metrics": {},
     }
-    if state.price is None or state.last_update is None or len(state.price_history) < 20 or len(state.volume_history) < 20:
-        analysis["reasons"].append("Waiting for more live history")
-        return analysis
 
-    contiguous_price_history = _slice_contiguous_history(
-        state.price_history,
-        config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS,
+
+def _score_clean_analysis(analysis: Dict[str, Any]) -> tuple:
+    metrics = analysis.get("metrics", {})
+    return (
+        1 if analysis.get("entry_ready") else 0,
+        1 if analysis.get("extreme_clean") else 0,
+        1 if analysis.get("clean_passed") else 0,
+        -len(analysis.get("failed_checks", [])),
+        float(metrics.get("volume_expansion", 0.0) or 0.0),
+        -float(metrics.get("retracement_pct_of_impulse", 1000.0) or 1000.0),
     )
-    contiguous_volume_history = _slice_contiguous_history(
-        state.volume_history,
-        config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS,
-    )
-    if len(contiguous_price_history) < 20 or len(contiguous_volume_history) < 20:
-        analysis["reasons"].append("Waiting for post-gap history rebuild")
-        if contiguous_price_history:
-            analysis["impulse_start"] = contiguous_price_history[0][0]
-        return analysis
+
+
+def _get_allowed_sniper_pullback_pct(extension_pct: float) -> float:
+    if extension_pct >= 10.0:
+        return config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_10_EXTENSION
+    if extension_pct >= 5.0:
+        return config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_5_EXTENSION
+    return config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT
+
+
+def _analyze_fast_clean_move(
+    state: SniperSymbolState,
+    contiguous_price_history: List[Any],
+    contiguous_volume_history: List[Any],
+) -> Dict[str, Any]:
+    analysis = _empty_clean_analysis()
+    analysis["structure_mode"] = "15s/30s"
 
     candles_15s = _build_candles(
         contiguous_price_history,
@@ -427,8 +417,10 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
     recent_prices_5s = [price for ts, price in contiguous_price_history if ts >= state.last_update - timedelta(seconds=5)]
     pullback_low = min(recent_prices_5s) if recent_prices_5s else current_price
     fade_from_peak_pct = ((recent_peak - current_price) / recent_peak) * 100 if recent_peak > 0 else 0.0
+    extension_pct = ((recent_peak - impulse_low) / impulse_low) * 100 if impulse_low > 0 else 0.0
+    allowed_pullback_pct = _get_allowed_sniper_pullback_pct(extension_pct)
     near_pullback_low = current_price <= pullback_low * (1 + config.SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT / 100.0)
-    pullback_in_range = config.SNIPER_PULLBACK_MIN_FROM_PEAK_PCT <= fade_from_peak_pct <= config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT
+    pullback_in_range = config.SNIPER_PULLBACK_MIN_FROM_PEAK_PCT <= fade_from_peak_pct <= allowed_pullback_pct
 
     stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
     chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
@@ -445,7 +437,6 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
         and stop_distance_pct is not None
         and config.SNIPER_MIN_STOP_DISTANCE_PCT <= stop_distance_pct <= config.SNIPER_MAX_STOP_DISTANCE_PCT
     )
-
     entry_ready = extreme_clean and pullback_in_range and near_pullback_low and valid_stop
 
     analysis["clean_passed"] = clean_passed
@@ -454,11 +445,14 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
     analysis["failed_checks"] = failed_checks
     analysis["first_failed_check"] = failed_checks[0] if failed_checks else ""
     analysis["support_price"] = support_price
+    analysis["support_label"] = "15s support"
     analysis["pullback_low"] = pullback_low
-    analysis["ema15"] = ema15
+    analysis["ema_value"] = ema15
+    analysis["ema_label"] = "EMA15"
     analysis["stop_price"] = stop_price
     analysis["impulse_start"] = impulse_start_time
     analysis["metrics"] = {
+        "structure_mode": "15s/30s",
         "impulse_15s_candles": len(impulse_15s),
         "impulse_30s_candles": len(impulse_30s),
         "retracement_pct_of_impulse": retracement_pct_of_impulse,
@@ -468,30 +462,272 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
         "vol_rate_5s": vol_rate_5s,
         "vol_rate_15s": vol_rate_15s,
         "vol_rate_30s": vol_rate_30s,
+        "extension_pct": extension_pct,
         "fade_from_peak_pct": fade_from_peak_pct,
+        "allowed_pullback_pct": allowed_pullback_pct,
         "stop_distance_pct": stop_distance_pct,
     }
     analysis["reasons"] = [
+        "Mode 15s/30s",
         f"Impulse start {impulse_start_time.strftime('%H:%M:%S')}",
         f"15s retrace {retracement_pct_of_impulse:.1f}% of impulse",
         f"15s red {red_15_count}/{len(impulse_15s)}",
         f"30s red {red_30_count}/{len(impulse_30s)}",
+        f"Extension {extension_pct:.1f}% | pullback cap {allowed_pullback_pct:.1f}%",
         f"15s vol {volume_expansion:.2f}x avg",
         "Vol accel 5s>15s>30s" if volume_accel_pass else "Vol accel failed",
         (
-            f"Support ${support_price:.2f}, EMA15 ${ema15:.2f}"
+            f"15s support ${support_price:.2f}, EMA15 ${ema15:.2f}"
             if support_price is not None and ema15 is not None
-            else "Support/EMA not ready"
+            else "15s support/EMA not ready"
         ),
     ]
     if failed_checks:
         analysis["reasons"].append(f"First fail: {failed_checks[0]}")
     if entry_ready:
         analysis["entry_reason"] = (
-            f"Extremely clean trend, pullback {fade_from_peak_pct:.2f}% from peak, "
+            f"15s/30s clean trend, pullback {fade_from_peak_pct:.2f}% from peak, "
             f"price near 5s low ${pullback_low:.2f}, stop ${stop_price:.2f}"
         )
     return analysis
+
+
+def _analyze_one_minute_clean_move(
+    state: SniperSymbolState,
+    contiguous_price_history: List[Any],
+    contiguous_volume_history: List[Any],
+) -> Dict[str, Any]:
+    analysis = _empty_clean_analysis()
+    analysis["structure_mode"] = "1m"
+    if not config.SNIPER_1M_ENABLED:
+        analysis["reasons"].append("1m clean-squeeze mode disabled")
+        return analysis
+
+    candles_1m = _build_candles(
+        contiguous_price_history,
+        contiguous_volume_history,
+        timeframe_seconds=60,
+        candle_count=config.SNIPER_1M_WINDOW_CANDLES,
+    )
+    if len(candles_1m) < 4:
+        analysis["reasons"].append("Waiting for 1m structure")
+        return analysis
+
+    analysis["enough_data"] = True
+    current_price = state.price
+    closes_1m = [candle["close"] for candle in candles_1m]
+    ema_1m_series = _compute_ema_series(closes_1m, config.SNIPER_1M_EMA_PERIOD)
+    ema_1m = ema_1m_series[-1] if ema_1m_series else None
+    impulse_start_idx = _find_impulse_start_index(candles_1m, ema_1m_series)
+    impulse_1m = candles_1m[impulse_start_idx:]
+    impulse_start_time = impulse_1m[0]["start"] if impulse_1m else candles_1m[0]["start"]
+    if len(impulse_1m) < config.SNIPER_MIN_IMPULSE_1M_CANDLES:
+        analysis["reasons"].append(f"Waiting for 1m impulse window ({len(impulse_1m)}x1m)")
+        analysis["impulse_start"] = impulse_start_time
+        return analysis
+
+    support_price = _find_recent_pivot_low(impulse_1m)
+    recent_peak = max(candle["high"] for candle in impulse_1m)
+    impulse_low = min(candle["low"] for candle in impulse_1m)
+    impulse_size = max(0.0, recent_peak - impulse_low)
+    retracement_pct_of_impulse = 100.0
+    if impulse_size > 0:
+        retracement_pct_of_impulse = max(0.0, ((recent_peak - current_price) / impulse_size) * 100.0)
+
+    red_1m_count = sum(1 for candle in impulse_1m if candle["close"] < candle["open"])
+    has_back_to_back_red_1m = any(
+        impulse_1m[idx]["close"] < impulse_1m[idx]["open"]
+        and impulse_1m[idx - 1]["close"] < impulse_1m[idx - 1]["open"]
+        for idx in range(1, len(impulse_1m))
+    )
+
+    current_1m_volume = impulse_1m[-1]["volume"]
+    prior_1m_volumes = [candle["volume"] for candle in impulse_1m[:-1] if candle["volume"] > 0]
+    avg_1m_volume = (sum(prior_1m_volumes) / len(prior_1m_volumes)) if prior_1m_volumes else 0.0
+    volume_expansion = (current_1m_volume / avg_1m_volume) if avg_1m_volume > 0 else 0.0
+
+    contiguous_volume_deque = deque(contiguous_volume_history, maxlen=len(contiguous_volume_history))
+    vol_rate_15s = _compute_volume_rate(contiguous_volume_deque, 15)
+    vol_rate_30s = _compute_volume_rate(contiguous_volume_deque, 30)
+    vol_rate_60s = _compute_volume_rate(contiguous_volume_deque, 60)
+    volume_accel_pass = (
+        vol_rate_15s is not None
+        and vol_rate_30s is not None
+        and vol_rate_60s is not None
+        and vol_rate_15s > vol_rate_30s > vol_rate_60s > 0
+    )
+
+    above_ema = ema_1m is not None and current_price >= ema_1m
+    above_support = support_price is not None and current_price >= support_price
+    trend_advancing = impulse_1m[-1]["close"] > impulse_1m[0]["open"]
+
+    failed_checks: List[str] = []
+    if retracement_pct_of_impulse > config.SNIPER_CLEAN_RETRACE_HARD_PCT:
+        failed_checks.append(
+            f"Retrace {retracement_pct_of_impulse:.1f}% > {config.SNIPER_CLEAN_RETRACE_HARD_PCT:.1f}% hard cutoff"
+        )
+    if red_1m_count > config.SNIPER_1M_MAX_RED_CANDLES:
+        failed_checks.append(
+            f"1m red candles {red_1m_count}/{len(impulse_1m)} exceeds max {config.SNIPER_1M_MAX_RED_CANDLES}"
+        )
+    if has_back_to_back_red_1m:
+        failed_checks.append("Back-to-back red 1m candles")
+    if volume_expansion < config.SNIPER_MIN_1M_VOLUME_EXPANSION:
+        failed_checks.append(
+            f"1m volume expansion {volume_expansion:.2f}x < {config.SNIPER_MIN_1M_VOLUME_EXPANSION:.2f}x"
+        )
+    if not volume_accel_pass:
+        failed_checks.append("Vol accel failed (need 15s > 30s > 60s)")
+    if not above_ema:
+        failed_checks.append("Price below EMA1m")
+    if not above_support:
+        failed_checks.append("Price below 1m support")
+    if not trend_advancing:
+        failed_checks.append("Impulse not advancing on 1m")
+
+    clean_passed = not failed_checks
+    extreme_clean = (
+        clean_passed
+        and retracement_pct_of_impulse <= config.SNIPER_CLEAN_RETRACE_PREFERRED_PCT
+        and red_1m_count == 0
+    )
+
+    recent_prices_5s = [price for ts, price in contiguous_price_history if ts >= state.last_update - timedelta(seconds=5)]
+    pullback_low = min(recent_prices_5s) if recent_prices_5s else current_price
+    fade_from_peak_pct = ((recent_peak - current_price) / recent_peak) * 100 if recent_peak > 0 else 0.0
+    extension_pct = ((recent_peak - impulse_low) / impulse_low) * 100 if impulse_low > 0 else 0.0
+    allowed_pullback_pct = _get_allowed_sniper_pullback_pct(extension_pct)
+    near_pullback_low = current_price <= pullback_low * (1 + config.SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT / 100.0)
+    pullback_in_range = config.SNIPER_PULLBACK_MIN_FROM_PEAK_PCT <= fade_from_peak_pct <= allowed_pullback_pct
+
+    stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
+    chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
+    stop_price = None
+    stop_distance_pct = None
+    if chosen_stop_ref is not None:
+        buffered_stop = chosen_stop_ref * (1 - config.SNIPER_STOP_BUFFER_PCT / 100.0)
+        stop_price = round(buffered_stop, 2)
+        if current_price > 0:
+            stop_distance_pct = ((current_price - stop_price) / current_price) * 100.0
+
+    valid_stop = (
+        stop_price is not None
+        and stop_distance_pct is not None
+        and config.SNIPER_MIN_STOP_DISTANCE_PCT <= stop_distance_pct <= config.SNIPER_MAX_STOP_DISTANCE_PCT
+    )
+    entry_ready = extreme_clean and pullback_in_range and near_pullback_low and valid_stop
+
+    analysis["clean_passed"] = clean_passed
+    analysis["extreme_clean"] = extreme_clean
+    analysis["entry_ready"] = entry_ready
+    analysis["failed_checks"] = failed_checks
+    analysis["first_failed_check"] = failed_checks[0] if failed_checks else ""
+    analysis["support_price"] = support_price
+    analysis["support_label"] = "1m support"
+    analysis["pullback_low"] = pullback_low
+    analysis["ema_value"] = ema_1m
+    analysis["ema_label"] = "EMA1m"
+    analysis["stop_price"] = stop_price
+    analysis["impulse_start"] = impulse_start_time
+    analysis["metrics"] = {
+        "structure_mode": "1m",
+        "impulse_1m_candles": len(impulse_1m),
+        "retracement_pct_of_impulse": retracement_pct_of_impulse,
+        "red_1m_count": red_1m_count,
+        "volume_expansion": volume_expansion,
+        "vol_rate_15s": vol_rate_15s,
+        "vol_rate_30s": vol_rate_30s,
+        "vol_rate_60s": vol_rate_60s,
+        "extension_pct": extension_pct,
+        "fade_from_peak_pct": fade_from_peak_pct,
+        "allowed_pullback_pct": allowed_pullback_pct,
+        "stop_distance_pct": stop_distance_pct,
+    }
+    analysis["reasons"] = [
+        "Mode 1m squeeze",
+        f"Impulse start {impulse_start_time.strftime('%H:%M:%S')}",
+        f"1m retrace {retracement_pct_of_impulse:.1f}% of impulse",
+        f"1m red {red_1m_count}/{len(impulse_1m)}",
+        f"Extension {extension_pct:.1f}% | pullback cap {allowed_pullback_pct:.1f}%",
+        f"1m vol {volume_expansion:.2f}x avg",
+        "Vol accel 15s>30s>60s" if volume_accel_pass else "Vol accel failed",
+        (
+            f"1m support ${support_price:.2f}, EMA1m ${ema_1m:.2f}"
+            if support_price is not None and ema_1m is not None
+            else "1m support/EMA not ready"
+        ),
+    ]
+    if failed_checks:
+        analysis["reasons"].append(f"First fail: {failed_checks[0]}")
+    if entry_ready:
+        analysis["entry_reason"] = (
+            f"1m clean squeeze, pullback {fade_from_peak_pct:.2f}% from peak, "
+            f"price near 5s low ${pullback_low:.2f}, stop ${stop_price:.2f}"
+        )
+    return analysis
+
+
+class SniperSymbolState:
+    def __init__(self, symbol: str):
+        self.symbol = symbol
+        self.price_history = deque(maxlen=900)
+        self.volume_history = deque(maxlen=900)
+        self.price: Optional[float] = None
+        self.previous_price: Optional[float] = None
+        self.vwap: float = 0.0
+        self.bid: float = 0.0
+        self.ask: float = 0.0
+        self.last_update: Optional[datetime] = None
+        self.previous_update: Optional[datetime] = None
+        self.last_gap_seconds: float = 0.0
+
+    def update_market_data(
+        self,
+        price: float,
+        volume: float,
+        vwap: float,
+        bid: float = 0.0,
+        ask: float = 0.0,
+    ) -> None:
+        now = datetime.now()
+        self.previous_price = self.price
+        self.previous_update = self.last_update
+        self.last_gap_seconds = (now - self.last_update).total_seconds() if self.last_update else 0.0
+        self.price = price
+        self.vwap = vwap
+        self.bid = bid
+        self.ask = ask
+        self.last_update = now
+        self.price_history.append((now, price))
+        self.volume_history.append((now, volume))
+
+
+def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
+    analysis = _empty_clean_analysis()
+    if state.price is None or state.last_update is None or len(state.price_history) < 20 or len(state.volume_history) < 20:
+        analysis["reasons"].append("Waiting for more live history")
+        return analysis
+
+    contiguous_price_history = _slice_contiguous_history(
+        state.price_history,
+        config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS,
+    )
+    contiguous_volume_history = _slice_contiguous_history(
+        state.volume_history,
+        config.DYNAMIC_EXIT_MARKET_PAUSE_SUSPECT_SECONDS,
+    )
+    if len(contiguous_price_history) < 20 or len(contiguous_volume_history) < 20:
+        analysis["reasons"].append("Waiting for post-gap history rebuild")
+        if contiguous_price_history:
+            analysis["impulse_start"] = contiguous_price_history[0][0]
+        return analysis
+    fast_analysis = _analyze_fast_clean_move(state, contiguous_price_history, contiguous_volume_history)
+    candidate_analyses = [fast_analysis]
+    if config.SNIPER_1M_ENABLED:
+        candidate_analyses.append(
+            _analyze_one_minute_clean_move(state, contiguous_price_history, contiguous_volume_history)
+        )
+    return max(candidate_analyses, key=_score_clean_analysis)
 
 
 class CleanMomentumSniperManager:
@@ -631,6 +867,7 @@ class CleanMomentumSniperManager:
                 "entry_ready": analysis.get("entry_ready", False),
                 "entry_reason": analysis.get("entry_reason", ""),
                 "first_failed_check": analysis.get("first_failed_check", ""),
+                "structure_mode": analysis.get("structure_mode", ""),
                 "market_pause_state": candidate.get("market_pause_state", "ACTIVE"),
                 "reopen_grace_until": candidate.get("reopen_grace_until"),
                 "post_halt_classification": candidate.get("post_halt_classification"),
@@ -828,13 +1065,15 @@ class CleanMomentumSniperManager:
 
         analysis = analyze_clean_move(symbol_state)
         support_price = analysis.get("support_price")
-        ema15 = analysis.get("ema15")
-        if support_price is None or ema15 is None:
+        ema_value = analysis.get("ema_value")
+        support_label = analysis.get("support_label") or "support"
+        ema_label = analysis.get("ema_label") or "EMA"
+        if support_price is None or ema_value is None:
             self.structure_breaks.pop(symbol, None)
             return
 
         current_price = symbol_state.price
-        structure_broken = current_price < support_price and current_price < ema15
+        structure_broken = current_price < support_price and current_price < ema_value
         now = datetime.now()
         if not structure_broken:
             self.structure_breaks.pop(symbol, None)
@@ -848,7 +1087,10 @@ class CleanMomentumSniperManager:
                 symbol=symbol,
                 price=current_price,
                 support_price=support_price,
-                ema15=ema15,
+                support_label=support_label,
+                ema_label=ema_label,
+                ema_value=ema_value,
+                structure_mode=analysis.get("structure_mode"),
             )
             return
 
@@ -860,14 +1102,17 @@ class CleanMomentumSniperManager:
             append_sniper_event(
                 filtered_events,
                 f"{symbol} structure exit submitted at ${current_price:.2f} "
-                f"(support ${support_price:.2f}, EMA15 ${ema15:.2f})",
+                f"({support_label} ${support_price:.2f}, {ema_label} ${ema_value:.2f})",
             )
             self._log_event(
                 "sniper_structure_exit_submitted",
                 symbol=symbol,
                 price=current_price,
                 support_price=support_price,
-                ema15=ema15,
+                support_label=support_label,
+                ema_label=ema_label,
+                ema_value=ema_value,
+                structure_mode=analysis.get("structure_mode"),
             )
 
 
@@ -921,7 +1166,9 @@ def sniper_visualization(scanner_state, filtered_events, executor, sniper_manage
                 )
                 reason = f"halt pause ({classification} reopen){grace_label}"
             else:
+                mode = pending.get("structure_mode") or "pending"
                 reason = pending["entry_reason"] or pending["first_failed_check"] or "--"
+                reason = f"{mode}: {reason}"
             print(
                 f"  [{clean_tag}/{ready_tag}] {pending['symbol']} [{pending['grade']} {pending['score']}] "
                 f"alert ${pending['alert_price']:.2f} ({queued_time}) | {reason}"
@@ -995,137 +1242,164 @@ def run_clean_momentum_sniper():
     global tws_app
     telemetry = RuntimeTelemetry(component="clean_momentum_sniper", base_dir=RUNTIME_FEEDBACK_DIR)
     permanently_excluded_symbols = set()
-
-    tws_client_id = int(os.getenv("SNIPER_TWS_CLIENT_ID", "12"))
-    tws_port = int(os.getenv("SNIPER_TWS_PORT", str(config.TWS_PORT)))
-    print(f"[INIT] Connecting to TWS on port {tws_port} with client ID {tws_client_id}...")
-    tws_app = create_tws_data_app(host="127.0.0.1", port=tws_port, client_id=tws_client_id)
-    if not tws_app:
-        print("[ERROR] Could not connect to TWS.")
-        return
-
-    time.sleep(2)
-
-    print("[INIT] Fetching top gainers for clean momentum sniper...")
-    symbols = get_top_gainers(
-        top_n=config.SCANNER_MONITOR_CAP,
-        use_ibkr=True,
-        ibkr_port=tws_port,
-        force_refresh=True,
-    )
-    unique_symbols = list(dict.fromkeys(symbols))
-    print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
-
-    scanner = RealtimeBroadScanner(unique_symbols)
-    initialize_alert_score_audit_file()
-
-    executor = ExecutionEngine(
-        tws_app=tws_app,
-        account=ACCOUNT_NUMBER,
-        tp_pct=TP_PCT,
-        sl_pct=SL_PCT,
-        investment_per_trade=INVESTMENT_PER_TRADE,
-        telemetry=telemetry,
-    )
-    sniper_manager = CleanMomentumSniperManager(telemetry=telemetry)
-    symbol_states: Dict[str, SniperSymbolState] = {symbol: SniperSymbolState(symbol) for symbol in unique_symbols}
-
-    telemetry.log_event("clean_sniper_started", tws_client_id=tws_client_id, tws_port=tws_port, runtime_dir=telemetry.run_dir)
-    telemetry.log_event("scanner_started", symbols=unique_symbols, client_id=tws_client_id, runtime_dir=telemetry.run_dir)
-
-    def handle_scanner_alert(symbol, timestamp, reasons, monitor):
-        session = get_market_session()
-        alert_event = {
-            "symbol": symbol,
-            "session": session,
-            "reasons": list(reasons),
-            "alert_grade": monitor.alert_grade,
-            "alert_score": monitor.alert_score,
-            "suppressed": monitor.alert_is_suppressed,
-            "price": monitor.price_history[-1][1] if monitor.price_history else None,
-            "vwap": monitor.vwap,
-            "relative_volume": monitor.relative_volume,
-        }
-        telemetry.log_event("scanner_alert", **alert_event)
-        append_alert_score_audit(symbol, timestamp, session, reasons, monitor)
-        sniper_manager.queue_candidate_from_scanner_alert(alert_event, symbol_states.get(symbol), executor, filtered_alerts)
-
-        if monitor.alert_is_suppressed:
-            return
-
-        send_discord_alert(symbol, session, reasons, monitor)
-        try:
-            voice_text = build_voice_announcement(symbol, session)
-            if platform.system() == "Windows":
-                escaped_text = voice_text.replace('"', '`"')
-                ps_script = (
-                    "Add-Type -AssemblyName System.Speech; "
-                    "$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-                    f'$synth.Speak("{escaped_text}")'
-                )
-                subprocess.run(["powershell", "-Command", ps_script], capture_output=True, timeout=5)
-            else:
-                os.system(f'espeak "{voice_text}" 2>/dev/null')
-        except Exception as e:
-            print(f"[WARNING] Voice announcement failed: {e}")
-
-    scanner.on_preliminary_alert(handle_scanner_alert)
-
-    print("[INIT] Loading scanner fundamentals/news/history...")
-    scanner.load_fundamentals(tws_app)
-    scanner.load_news(tws_app)
-    scanner.load_previous_closes(tws_app)
-    scanner.load_historical_prices(tws_app)
-
-    def handle_market_update(symbol, price, volume, vwap, bid, ask):
-        state = symbol_states.setdefault(symbol, SniperSymbolState(symbol))
-        state.update_market_data(price=price, volume=volume, vwap=vwap, bid=bid, ask=ask)
-        scanner.update(symbol, price=price, volume=volume, vwap=vwap, bid=bid, ask=ask)
-        sniper_manager.evaluate_symbol(symbol, state, executor, filtered_alerts)
-        executor.on_market_update(
-            symbol,
-            price=price,
-            volume=volume,
-            vwap=vwap,
-            market_session=get_market_session(),
-            bid=bid,
-            ask=ask,
-        )
-        sniper_manager.monitor_open_position(symbol, state, executor, filtered_alerts)
-
-    def create_market_data_callback(sym):
-        return lambda s, p, v, vw, ts, b, a: handle_market_update(s, p, v, vw, b, a)
-
-    def remove_symbols_from_scanner(symbols_to_remove, reason: str):
-        nonlocal unique_symbols
-        removed_any = False
-        for symbol in sorted(set(symbols_to_remove)):
-            if symbol not in scanner.monitors:
-                continue
-            tws_app.unsubscribe_realtime_data(symbol)
-            scanner.monitors.pop(symbol, None)
-            if symbol in scanner.symbols:
-                scanner.symbols.remove(symbol)
-            sniper_manager.discard_symbol(symbol)
-            symbol_states.pop(symbol, None)
-            unique_symbols = [tracked for tracked in unique_symbols if tracked != symbol]
-            telemetry.log_event("scanner_symbol_removed", symbol=symbol, reason=reason)
-            removed_any = True
-        return removed_any
-
-    print("[INIT] Subscribing to sniper market data...")
-    for symbol in unique_symbols:
-        tws_app.subscribe_market_data(symbol, create_market_data_callback(symbol))
-        telemetry.log_event("market_data_subscribed", symbol=symbol)
-
-    last_session_check = datetime.now()
     et_tz = pytz.timezone('US/Eastern')
-    next_symbol_update = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_REFRESH_INTERVAL_SECONDS)
-    next_news_refresh = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_NEWS_REFRESH_INTERVAL_SECONDS)
-    eod_triggered = False
+    main_loop_start = _next_main_loop_start(datetime.now(et_tz))
 
     try:
+        now_et = datetime.now(et_tz)
+        if now_et < main_loop_start:
+            wait_seconds = int((main_loop_start - now_et).total_seconds())
+            if wait_seconds > 0:
+                print(
+                    f"[SCHEDULE] Startup paused until "
+                    f"{main_loop_start.strftime('%Y-%m-%d %H:%M:%S %Z')} "
+                    f"({wait_seconds // 60} min remaining)."
+                )
+                while not should_exit:
+                    now_et = datetime.now(et_tz)
+                    if now_et >= main_loop_start:
+                        break
+                    wait_timeout = min(30, max(1, int((main_loop_start - now_et).total_seconds())))
+                    if shutdown_event.wait(wait_timeout):
+                        break
+
+        if should_exit:
+            return
+
+        tws_client_id = int(os.getenv("SNIPER_TWS_CLIENT_ID", "12"))
+        tws_port = int(os.getenv("SNIPER_TWS_PORT", str(config.TWS_PORT)))
+        print(f"[INIT] Connecting to TWS on port {tws_port} with client ID {tws_client_id}...")
+        tws_app = create_tws_data_app(host="127.0.0.1", port=tws_port, client_id=tws_client_id)
+        if not tws_app:
+            print("[ERROR] Could not connect to TWS.")
+            return
+
+        if shutdown_event.wait(2):
+            return
+
+        print("[INIT] Fetching top gainers for clean momentum sniper...")
+        symbols = get_top_gainers(
+            top_n=config.SCANNER_MONITOR_CAP,
+            use_ibkr=True,
+            ibkr_port=tws_port,
+            force_refresh=True,
+        )
+        unique_symbols = list(dict.fromkeys(symbols))
+        print(f"[INIT] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols[:10])}{'...' if len(unique_symbols) > 10 else ''}")
+
+        scanner = RealtimeBroadScanner(unique_symbols)
+        initialize_alert_score_audit_file()
+
+        executor = ExecutionEngine(
+            tws_app=tws_app,
+            account=ACCOUNT_NUMBER,
+            tp_pct=TP_PCT,
+            sl_pct=SL_PCT,
+            investment_per_trade=INVESTMENT_PER_TRADE,
+            telemetry=telemetry,
+        )
+        sniper_manager = CleanMomentumSniperManager(telemetry=telemetry)
+        symbol_states: Dict[str, SniperSymbolState] = {symbol: SniperSymbolState(symbol) for symbol in unique_symbols}
+
+        telemetry.log_event("clean_sniper_started", tws_client_id=tws_client_id, tws_port=tws_port, runtime_dir=telemetry.run_dir)
+        telemetry.log_event("scanner_started", symbols=unique_symbols, client_id=tws_client_id, runtime_dir=telemetry.run_dir)
+
+        def handle_scanner_alert(symbol, timestamp, reasons, monitor):
+            session = get_market_session()
+            alert_event = {
+                "symbol": symbol,
+                "session": session,
+                "reasons": list(reasons),
+                "alert_grade": monitor.alert_grade,
+                "alert_score": monitor.alert_score,
+                "suppressed": monitor.alert_is_suppressed,
+                "price": monitor.price_history[-1][1] if monitor.price_history else None,
+                "vwap": monitor.vwap,
+                "relative_volume": monitor.relative_volume,
+            }
+            telemetry.log_event("scanner_alert", **alert_event)
+            append_alert_score_audit(symbol, timestamp, session, reasons, monitor)
+            sniper_manager.queue_candidate_from_scanner_alert(alert_event, symbol_states.get(symbol), executor, filtered_alerts)
+
+            if monitor.alert_is_suppressed:
+                return
+
+            send_discord_alert(symbol, session, reasons, monitor)
+            try:
+                voice_text = build_voice_announcement(symbol, session)
+                if platform.system() == "Windows":
+                    escaped_text = voice_text.replace('"', '`"')
+                    ps_script = (
+                        "Add-Type -AssemblyName System.Speech; "
+                        "$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                        f'$synth.Speak("{escaped_text}")'
+                    )
+                    subprocess.run(["powershell", "-Command", ps_script], capture_output=True, timeout=5)
+                else:
+                    os.system(f'espeak "{voice_text}" 2>/dev/null')
+            except Exception as e:
+                print(f"[WARNING] Voice announcement failed: {e}")
+
+        scanner.on_preliminary_alert(handle_scanner_alert)
+
+        print("[INIT] Loading scanner fundamentals/news/history...")
+        excluded_symbols = scanner.load_fundamentals(tws_app)
+        if excluded_symbols:
+            excluded_set = set(excluded_symbols)
+            unique_symbols = [symbol for symbol in unique_symbols if symbol not in excluded_set]
+            symbol_states = {symbol: state for symbol, state in symbol_states.items() if symbol not in excluded_set}
+        scanner.load_news(tws_app)
+        scanner.load_previous_closes(tws_app)
+        scanner.load_historical_prices(tws_app)
+
+        def handle_market_update(symbol, price, volume, vwap, bid, ask):
+            state = symbol_states.setdefault(symbol, SniperSymbolState(symbol))
+            state.update_market_data(price=price, volume=volume, vwap=vwap, bid=bid, ask=ask)
+            scanner.update(symbol, price=price, volume=volume, vwap=vwap, bid=bid, ask=ask)
+            sniper_manager.evaluate_symbol(symbol, state, executor, filtered_alerts)
+            executor.on_market_update(
+                symbol,
+                price=price,
+                volume=volume,
+                vwap=vwap,
+                market_session=get_market_session(),
+                bid=bid,
+                ask=ask,
+            )
+            sniper_manager.monitor_open_position(symbol, state, executor, filtered_alerts)
+
+        def create_market_data_callback(sym):
+            return lambda s, p, v, vw, ts, b, a: handle_market_update(s, p, v, vw, b, a)
+
+        def remove_symbols_from_scanner(symbols_to_remove, reason: str):
+            nonlocal unique_symbols
+            removed_any = False
+            for symbol in sorted(set(symbols_to_remove)):
+                if symbol not in scanner.monitors:
+                    continue
+                tws_app.unsubscribe_realtime_data(symbol)
+                scanner.monitors.pop(symbol, None)
+                if symbol in scanner.symbols:
+                    scanner.symbols.remove(symbol)
+                sniper_manager.discard_symbol(symbol)
+                symbol_states.pop(symbol, None)
+                unique_symbols = [tracked for tracked in unique_symbols if tracked != symbol]
+                telemetry.log_event("scanner_symbol_removed", symbol=symbol, reason=reason)
+                removed_any = True
+            return removed_any
+
+        print("[INIT] Subscribing to sniper market data...")
+        for symbol in unique_symbols:
+            tws_app.subscribe_market_data(symbol, create_market_data_callback(symbol))
+            telemetry.log_event("market_data_subscribed", symbol=symbol)
+
+        last_session_check = datetime.now()
+        next_symbol_update = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_REFRESH_INTERVAL_SECONDS)
+        next_news_refresh = datetime.now(et_tz) + timedelta(seconds=config.SCANNER_NEWS_REFRESH_INTERVAL_SECONDS)
+        eod_triggered = False
+
         while not should_exit:
+
             if (datetime.now() - last_session_check).total_seconds() > 60:
                 if scanner.check_session_transition():
                     scanner.resync_vwap_all_symbols(tws_app)
@@ -1198,11 +1472,13 @@ def run_clean_momentum_sniper():
             )
             telemetry.write_state(state_payload)
             sniper_visualization(state_payload["scanner"], filtered_alerts, executor, sniper_manager)
-            time.sleep(1)
+            if shutdown_event.wait(1):
+                break
     finally:
         telemetry.log_event("scanner_stopped")
         telemetry.log_event("clean_sniper_stopped")
-        tws_app.disconnect()
+        if tws_app is not None:
+            tws_app.disconnect()
         print("[INFO] Clean momentum sniper stopped.")
 
 
