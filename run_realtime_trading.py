@@ -44,6 +44,21 @@ tws_app = None
 filtered_alerts = deque(maxlen=20)
 
 
+def _format_trade_span(entry_time: Optional[datetime], exit_time: datetime) -> str:
+    if not isinstance(exit_time, datetime):
+        return "--"
+    if not isinstance(entry_time, datetime):
+        return exit_time.strftime('%H:%M:%S')
+
+    duration_seconds = max(0, int((exit_time - entry_time).total_seconds()))
+    hours, remainder = divmod(duration_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return (
+        f"{entry_time.strftime('%H:%M:%S')}->{exit_time.strftime('%H:%M:%S')} "
+        f"({hours:02d}:{minutes:02d}:{seconds:02d})"
+    )
+
+
 def signal_handler(sig, frame):
     global should_exit
     print("\n[INFO] Graceful exit requested...")
@@ -648,7 +663,10 @@ class TradeTraceRecorder:
 def _format_display_price(value: Optional[float]) -> str:
     if value is None:
         return "N/A"
-    return f"${value:.2f}"
+    rounded_2 = round(value, 2)
+    if abs(value - rounded_2) < 0.00005:
+        return f"${rounded_2:.2f}"
+    return f"${value:.4f}".rstrip("0").rstrip(".")
 
 
 def unified_visualization(scanner_state, filtered_alerts, executor, entry_manager: BreakoutEntryManager):
@@ -723,7 +741,7 @@ def unified_visualization(scanner_state, filtered_alerts, executor, entry_manage
     if not history:
         print("  No completed trades in this session.")
     for trade in reversed(history[-10:]):
-        time_disp = trade['time'].strftime('%H:%M:%S')
+        time_disp = _format_trade_span(trade.get('entry_time'), trade['time'])
         if trade['type'] == 'CLOSED':
             pnl = (trade['exit_price'] - trade['entry_price']) * trade['shares']
             pnl_pct = (trade['exit_price'] - trade['entry_price']) / trade['entry_price'] * 100 if trade['entry_price'] else 0.0

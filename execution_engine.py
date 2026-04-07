@@ -215,6 +215,7 @@ class ExecutionEngine:
                             'type': 'FAILED',
                             'reason': f"REJECTED: {errorString[:30]}...",
                             'entry_price': pos['entry_price'],
+                            'entry_time': pos.get('submitted_at'),
                             'time': datetime.now()
                         })
                         self._cleanup_position(symbol)
@@ -305,6 +306,7 @@ class ExecutionEngine:
                             'type': 'FAILED',
                             'reason': failure_reason,
                             'entry_price': pos['entry_price'],
+                            'entry_time': pos.get('submitted_at'),
                             'time': datetime.now()
                         })
                         print(f"[EXEC] Parent order {orderId} for {symbol} FAILED ({failure_reason}).")
@@ -326,12 +328,12 @@ class ExecutionEngine:
                             reason=pos.get('pending_cancel_reason') or status,
                             filled_shares=pos.get('filled_shares', 0),
                         )
-                elif role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit']:
+                elif role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit', 'flush_fail_exit']:
                     if pos.get('active_exit_order_id') == orderId:
                         pos['exit_pending'] = False
                         pos['active_exit_order_id'] = None
 
-            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit', 'extended_hours_stop_exit', 'session_close_exit']:
+            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit', 'flush_fail_exit', 'extended_hours_stop_exit', 'session_close_exit']:
                 exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('last_price', pos.get('actual_entry_price', pos['entry_price']))
                 exit_shares = min(int(delta_filled), pos['remaining_shares'])
                 pos['remaining_shares'] = max(0, pos['remaining_shares'] - exit_shares)
@@ -348,6 +350,7 @@ class ExecutionEngine:
                         'entry_price': pos.get('actual_entry_price', pos['entry_price']),
                         'exit_price': exit_price,
                         'shares': exit_shares,
+                        'entry_time': pos.get('filled_at') or pos.get('submitted_at'),
                         'time': datetime.now()
                     })
                     print(f"[EXEC] >>> PARTIAL EXIT: {symbol} sold {exit_shares} at ${exit_price:.2f} <<<")
@@ -388,27 +391,101 @@ class ExecutionEngine:
                         exit_type = "STRUCTURE"
                     elif role == 'reopen_weak_exit':
                         exit_type = "REOPEN_WEAK"
+                    elif role == 'flush_fail_exit':
+                        exit_type = "FLUSH_FAIL"
                     elif role == 'extended_hours_stop_exit':
                         exit_type = "EH_STOP"
                     elif role == 'session_close_exit':
                         exit_type = "SESSION_CLOSE"
                     else:
                         exit_type = "BOT"
+                    if pos['remaining_shares'] > 0:
+                        self._log_event(
+                            "exit_partial_fill_updated",
+                            symbol=symbol,
+                            order_id=orderId,
+                            exit_type=exit_type,
+                            exit_price=exit_price,
+                            shares=exit_shares,
+                            remaining_shares=pos['remaining_shares'],
+                        )
+                        self._emit_position_event(
+                            "exit_partial_fill_updated",
+                            symbol=symbol,
+                            order_id=orderId,
+                            exit_type=exit_type,
+                            exit_price=exit_price,
+                            shares=exit_shares,
+                            remaining_shares=pos['remaining_shares'],
+                        )
+                    else:
+                        self.trade_history.append({
+                            'symbol': symbol,
+                            'type': 'CLOSED',
+                            'exit_type': exit_type,
+                            'entry_price': pos.get('actual_entry_price', pos['entry_price']),
+                            'exit_price': exit_price,
+                            'shares': exit_shares,
+                            'entry_time': pos.get('filled_at') or pos.get('submitted_at'),
+                            'time': datetime.now()
+                        })
+                        print(f"[EXEC] >>> POSITION CLOSED: {symbol} via {exit_type} at ${exit_price:.2f} <<<")
+                        self._log_event(
+                            "position_closed",
+                            symbol=symbol,
+                            order_id=orderId,
+                            exit_type=exit_type,
+                            exit_price=exit_price,
+                            shares=exit_shares,
+                        )
+                        self._emit_position_event(
+                            "position_closed",
+                            symbol=symbol,
+                            order_id=orderId,
+                            exit_type=exit_type,
+                            exit_price=exit_price,
+                            shares=exit_shares,
+                        )
+                        self._cleanup_position(symbol)
+
+            if delta_filled > 0 and role == 'stop':
+                exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('current_stop_price', pos['entry_price'])
+                exit_shares = min(int(delta_filled), pos['remaining_shares'] if pos['remaining_shares'] > 0 else pos['shares'])
+                pos['remaining_shares'] = max(0, pos['remaining_shares'] - exit_shares)
+                if pos['remaining_shares'] > 0:
+                    self._log_event(
+                        "stop_partial_fill_updated",
+                        symbol=symbol,
+                        order_id=orderId,
+                        exit_price=exit_price,
+                        shares=exit_shares,
+                        remaining_shares=pos['remaining_shares'],
+                    )
+                    self._emit_position_event(
+                        "stop_partial_fill_updated",
+                        symbol=symbol,
+                        order_id=orderId,
+                        exit_price=exit_price,
+                        shares=exit_shares,
+                        remaining_shares=pos['remaining_shares'],
+                    )
+                else:
                     self.trade_history.append({
                         'symbol': symbol,
                         'type': 'CLOSED',
-                        'exit_type': exit_type,
+                        'exit_type': 'SL',
                         'entry_price': pos.get('actual_entry_price', pos['entry_price']),
                         'exit_price': exit_price,
                         'shares': exit_shares,
+                        'entry_time': pos.get('filled_at') or pos.get('submitted_at'),
                         'time': datetime.now()
                     })
-                    print(f"[EXEC] >>> POSITION CLOSED: {symbol} via {exit_type} at ${exit_price:.2f} <<<")
+                    print(f"[EXEC] >>> POSITION CLOSED: {symbol} via SL at ${exit_price:.2f} <<<")
                     self._log_event(
                         "position_closed",
                         symbol=symbol,
                         order_id=orderId,
-                        exit_type=exit_type,
+                        exit_type="SL",
                         exit_price=exit_price,
                         shares=exit_shares,
                     )
@@ -416,42 +493,11 @@ class ExecutionEngine:
                         "position_closed",
                         symbol=symbol,
                         order_id=orderId,
-                        exit_type=exit_type,
+                        exit_type="SL",
                         exit_price=exit_price,
                         shares=exit_shares,
                     )
                     self._cleanup_position(symbol)
-
-            if role == 'stop' and status == 'Filled':
-                exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('current_stop_price', pos['entry_price'])
-                exit_shares = pos['remaining_shares'] if pos['remaining_shares'] > 0 else pos['shares']
-                self.trade_history.append({
-                    'symbol': symbol,
-                    'type': 'CLOSED',
-                    'exit_type': 'SL',
-                    'entry_price': pos.get('actual_entry_price', pos['entry_price']),
-                    'exit_price': exit_price,
-                    'shares': exit_shares,
-                    'time': datetime.now()
-                })
-                print(f"[EXEC] >>> POSITION CLOSED: {symbol} via SL at ${exit_price:.2f} <<<")
-                self._log_event(
-                    "position_closed",
-                    symbol=symbol,
-                    order_id=orderId,
-                    exit_type="SL",
-                    exit_price=exit_price,
-                    shares=exit_shares,
-                )
-                self._emit_position_event(
-                    "position_closed",
-                    symbol=symbol,
-                    order_id=orderId,
-                    exit_type="SL",
-                    exit_price=exit_price,
-                    shares=exit_shares,
-                )
-                self._cleanup_position(symbol)
 
     def _cleanup_position(self, symbol: str):
         """Internal helper to clean up position tracking"""
@@ -519,6 +565,12 @@ class ExecutionEngine:
         if quantity <= 0 or pos.get('exit_pending'):
             return False
 
+        # Extended-hours positions should exit with a sell limit using the
+        # current bid/last price path; regular-hours market sells can hang or
+        # be cancelled premarket/afterhours.
+        if not pos.get('uses_broker_stop', True):
+            return self._submit_limit_exit_locked(symbol, quantity, role)
+
         order_id = self.tws_app.next_order_id
         self.tws_app.next_order_id += 1
         order = self._build_market_sell_order(order_id, quantity)
@@ -544,6 +596,7 @@ class ExecutionEngine:
         market_session: str = "REGULAR",
         bid: float = 0.0,
         ask: float = 0.0,
+        entry_context: Optional[Dict] = None,
     ):
         """Execute a new trade with a broker-side disaster stop and bot-managed exits."""
         with self.lock:
@@ -634,6 +687,8 @@ class ExecutionEngine:
             
             self.positions[symbol] = {
                 'entry_price': entry_price,
+                'entry_context': dict(entry_context or {}),
+                'entry_extension_pct': float((entry_context or {}).get('extension_pct', 0.0) or 0.0),
                 'shares': shares,
                 'requested_shares': shares,
                 'filled_shares': 0,
@@ -850,24 +905,20 @@ class ExecutionEngine:
             if volume > 0:
                 pos['volume_history'].append((now, volume))
 
-            if market_session in {"PREMARKET", "AFTERHOURS"}:
-                if pos.get('exit_pending'):
-                    return
-                if price <= pos.get('current_stop_price', 0):
-                    if self._submit_limit_exit_locked(symbol, pos['remaining_shares'], 'extended_hours_stop_exit'):
-                        self._log_event(
-                            "extended_hours_stop_exit_submitted",
-                            symbol=symbol,
-                            stop_price=pos.get('current_stop_price'),
-                            bid=bid,
-                            ask=ask,
-                            price=price,
-                            shares=pos['remaining_shares'],
-                        )
-                    return
+            if pos.get('exit_pending'):
                 return
 
-            if market_session != "REGULAR" or pos.get('exit_pending'):
+            if market_session in {"PREMARKET", "AFTERHOURS"} and price <= pos.get('current_stop_price', 0):
+                if self._submit_limit_exit_locked(symbol, pos['remaining_shares'], 'extended_hours_stop_exit'):
+                    self._log_event(
+                        "extended_hours_stop_exit_submitted",
+                        symbol=symbol,
+                        stop_price=pos.get('current_stop_price'),
+                        bid=bid,
+                        ask=ask,
+                        price=price,
+                        shares=pos['remaining_shares'],
+                    )
                 return
 
             filled_at = pos.get('filled_at')

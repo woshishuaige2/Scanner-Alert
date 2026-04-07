@@ -151,7 +151,7 @@ LEVERAGED_PRODUCT_KEYWORDS = [
 FAST_IGNITION_PCT_5S = 0.8                # Minimum move over last 5 seconds
 FAST_IGNITION_PCT_15S = 1.5             # Minimum move over last 15 seconds
 FAST_IGNITION_VOLUME_MULTIPLIER = 2.0   # 5s burst volume vs trailing average
-FAST_IGNITION_MAX_RETRACEMENT_PCT = 0.7 # Allowed pullback from local high
+FAST_IGNITION_MAX_RETRACEMENT_PCT = 1.0 # Allowed pullback from local high
 
 # DISCORD ALERT CONFIGURATION
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1474054384131248310/43pw1SxLPf2j9Rj1gRrh6SL3SZ9zuHhqn2QmRFZ-sZ7a_DnordIXbbHFKxyaGjYzoSAg"
@@ -205,14 +205,19 @@ SNIPER_MIN_1M_VOLUME_EXPANSION = 1.2             # Current 1-minute volume vs ro
 SNIPER_CLEAN_RETRACE_PREFERRED_PCT = 30.0        # Preferred max retracement vs prior impulse
 SNIPER_CLEAN_RETRACE_HARD_PCT = 40.0             # Hard cutoff for clean-trend invalidation
 SNIPER_MIN_15S_VOLUME_EXPANSION = 1.5            # Current 15s volume vs rolling 15s average
-SNIPER_PULLBACK_MIN_FROM_PEAK_PCT = 0.4          # Ignore ultra-shallow pullbacks that are still extended
+SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS = 1.2        # Detect sudden selloffs over roughly the last second
+SNIPER_FLUSH_ENTRY_MIN_DROP_PCT = 1.0            # Enter only when the clean squeeze suddenly flushes by at least this much
 SNIPER_PULLBACK_MAX_FROM_PEAK_PCT = 3.0          # Base max pullback allowed from peak for sniper entries
 SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_5_EXTENSION = 4.0   # Allow more fade once the move has extended meaningfully
 SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_10_EXTENSION = 5.5  # Allow deeper pullbacks after very strong extensions
-SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT = 0.20       # Entry must stay near the current 5s pullback low
 SNIPER_STOP_BUFFER_PCT = 0.20                    # Small noise buffer below the chosen structure stop
 SNIPER_MIN_STOP_DISTANCE_PCT = 0.35              # Avoid stops that sit unrealistically close to entry
 SNIPER_MAX_STOP_DISTANCE_PCT = 3.0               # Skip setups whose valid structure stop is too far away
+SNIPER_POST_ENTRY_BOUNCE_CHECK_SECONDS = 5.0     # If a flush entry does not bounce within this many seconds, cut it
+SNIPER_POST_ENTRY_MIN_BOUNCE_PCT = 0.15          # Minimum reflex bounce expected soon after a flush entry
+SNIPER_POST_ENTRY_MAX_ADVERSE_PCT = 0.75         # If the flush keeps extending this much below entry before bouncing, exit fast
+SNIPER_POST_ENTRY_ADVERSE_EXTENSION_FACTOR = 0.25 # Allow adverse move up to this fraction of extension_pct for strong trends
+SNIPER_POST_ENTRY_MAX_ADVERSE_CAP_PCT = 5.0      # Hard cap on the adaptive adverse-move allowance before bounce confirmation
 SNIPER_STRUCTURE_BREAK_PERSIST_SECONDS = 1.0     # 15s structure break must persist to count as invalid
 
 # DYNAMIC EXIT MANAGEMENT (Used by execution_engine.py)

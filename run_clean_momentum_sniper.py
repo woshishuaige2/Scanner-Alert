@@ -5,6 +5,8 @@ Independent trading runner that reuses the standalone scanner as stage 1, then
 applies a clean-trend / pullback-sniper stage 2 before delegating execution to
 the shared ExecutionEngine.
 """
+from __future__ import annotations
+
 import os
 import platform
 import signal
@@ -51,6 +53,21 @@ def append_sniper_event(events: deque, message: str) -> None:
     events.appendleft((datetime.now(), message))
 
 
+def _format_trade_span(entry_time: Optional[datetime], exit_time: datetime) -> str:
+    if not isinstance(exit_time, datetime):
+        return "--"
+    if not isinstance(entry_time, datetime):
+        return exit_time.strftime('%H:%M:%S')
+
+    duration_seconds = max(0, int((exit_time - entry_time).total_seconds()))
+    hours, remainder = divmod(duration_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return (
+        f"{entry_time.strftime('%H:%M:%S')}->{exit_time.strftime('%H:%M:%S')} "
+        f"({hours:02d}:{minutes:02d}:{seconds:02d})"
+    )
+
+
 def signal_handler(sig, frame):
     global should_exit
     print("\n[INFO] Graceful exit requested...")
@@ -81,14 +98,17 @@ def _session_close_cleanup_marker(now_et: datetime) -> Optional[str]:
 def _format_display_price(value: Optional[float]) -> str:
     if value is None:
         return "N/A"
-    return f"${value:.2f}"
+    rounded_2 = round(value, 2)
+    if abs(value - rounded_2) < 0.00005:
+        return f"${rounded_2:.2f}"
+    return f"${value:.4f}".rstrip("0").rstrip(".")
 
 
 def _next_main_loop_start(now_et: datetime) -> datetime:
     start_today = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
     if now_et < start_today:
         return start_today
-    return start_today + timedelta(days=1)
+    return now_et
 
 
 def _bucket_start(ts: datetime, timeframe_seconds: int) -> datetime:
@@ -302,6 +322,33 @@ def _get_allowed_sniper_pullback_pct(extension_pct: float) -> float:
     return config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT
 
 
+def _get_allowed_post_entry_adverse_pct(extension_pct: float) -> float:
+    return min(
+        config.SNIPER_POST_ENTRY_MAX_ADVERSE_CAP_PCT,
+        max(
+            config.SNIPER_POST_ENTRY_MAX_ADVERSE_PCT,
+            extension_pct * config.SNIPER_POST_ENTRY_ADVERSE_EXTENSION_FACTOR,
+        ),
+    )
+
+
+def _compute_flush_drop_pct(
+    price_history: List[Any],
+    now: datetime,
+    current_price: float,
+) -> tuple[float, Optional[float]]:
+    lookback_start = now - timedelta(seconds=config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS)
+    recent_prices = [price for ts, price in price_history if ts >= lookback_start]
+    if len(recent_prices) < 2:
+        return 0.0, None
+
+    recent_high = max(recent_prices)
+    if recent_high <= 0:
+        return 0.0, None
+    flush_drop_pct = max(0.0, ((recent_high - current_price) / recent_high) * 100.0)
+    return flush_drop_pct, recent_high
+
+
 def _analyze_fast_clean_move(
     state: SniperSymbolState,
     contiguous_price_history: List[Any],
@@ -419,8 +466,13 @@ def _analyze_fast_clean_move(
     fade_from_peak_pct = ((recent_peak - current_price) / recent_peak) * 100 if recent_peak > 0 else 0.0
     extension_pct = ((recent_peak - impulse_low) / impulse_low) * 100 if impulse_low > 0 else 0.0
     allowed_pullback_pct = _get_allowed_sniper_pullback_pct(extension_pct)
-    near_pullback_low = current_price <= pullback_low * (1 + config.SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT / 100.0)
-    pullback_in_range = config.SNIPER_PULLBACK_MIN_FROM_PEAK_PCT <= fade_from_peak_pct <= allowed_pullback_pct
+    flush_drop_pct, flush_reference_price = _compute_flush_drop_pct(
+        contiguous_price_history,
+        state.last_update,
+        current_price,
+    )
+    flush_triggered = flush_drop_pct >= config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT
+    pullback_in_range = fade_from_peak_pct <= allowed_pullback_pct
 
     stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
     chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
@@ -437,13 +489,26 @@ def _analyze_fast_clean_move(
         and stop_distance_pct is not None
         and config.SNIPER_MIN_STOP_DISTANCE_PCT <= stop_distance_pct <= config.SNIPER_MAX_STOP_DISTANCE_PCT
     )
-    entry_ready = extreme_clean and pullback_in_range and near_pullback_low and valid_stop
+    entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    if not failed_checks:
+        if not flush_triggered:
+            analysis["first_failed_check"] = (
+                f"Waiting for sudden flush >= {config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT:.2f}% "
+                f"over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s"
+            )
+        elif not pullback_in_range:
+            analysis["first_failed_check"] = (
+                f"Total fade {fade_from_peak_pct:.2f}% exceeds cap {allowed_pullback_pct:.2f}%"
+            )
+        elif not valid_stop:
+            analysis["first_failed_check"] = "Stop distance invalid for flush entry"
 
     analysis["clean_passed"] = clean_passed
     analysis["extreme_clean"] = extreme_clean
     analysis["entry_ready"] = entry_ready
     analysis["failed_checks"] = failed_checks
-    analysis["first_failed_check"] = failed_checks[0] if failed_checks else ""
+    if not analysis["first_failed_check"]:
+        analysis["first_failed_check"] = failed_checks[0] if failed_checks else ""
     analysis["support_price"] = support_price
     analysis["support_label"] = "15s support"
     analysis["pullback_low"] = pullback_low
@@ -465,6 +530,8 @@ def _analyze_fast_clean_move(
         "extension_pct": extension_pct,
         "fade_from_peak_pct": fade_from_peak_pct,
         "allowed_pullback_pct": allowed_pullback_pct,
+        "flush_drop_pct": flush_drop_pct,
+        "flush_reference_price": flush_reference_price,
         "stop_distance_pct": stop_distance_pct,
     }
     analysis["reasons"] = [
@@ -474,6 +541,11 @@ def _analyze_fast_clean_move(
         f"15s red {red_15_count}/{len(impulse_15s)}",
         f"30s red {red_30_count}/{len(impulse_30s)}",
         f"Extension {extension_pct:.1f}% | pullback cap {allowed_pullback_pct:.1f}%",
+        (
+            f"Flush {flush_drop_pct:.2f}% over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s"
+            if flush_reference_price is not None
+            else "Waiting for sudden flush trigger"
+        ),
         f"15s vol {volume_expansion:.2f}x avg",
         "Vol accel 5s>15s>30s" if volume_accel_pass else "Vol accel failed",
         (
@@ -486,8 +558,8 @@ def _analyze_fast_clean_move(
         analysis["reasons"].append(f"First fail: {failed_checks[0]}")
     if entry_ready:
         analysis["entry_reason"] = (
-            f"15s/30s clean trend, pullback {fade_from_peak_pct:.2f}% from peak, "
-            f"price near 5s low ${pullback_low:.2f}, stop ${stop_price:.2f}"
+            f"15s/30s clean trend, sudden flush {flush_drop_pct:.2f}% from short-term high, "
+            f"total fade {fade_from_peak_pct:.2f}% from peak, stop ${stop_price:.2f}"
         )
     return analysis
 
@@ -597,8 +669,13 @@ def _analyze_one_minute_clean_move(
     fade_from_peak_pct = ((recent_peak - current_price) / recent_peak) * 100 if recent_peak > 0 else 0.0
     extension_pct = ((recent_peak - impulse_low) / impulse_low) * 100 if impulse_low > 0 else 0.0
     allowed_pullback_pct = _get_allowed_sniper_pullback_pct(extension_pct)
-    near_pullback_low = current_price <= pullback_low * (1 + config.SNIPER_PULLBACK_NEAR_LOW_BUFFER_PCT / 100.0)
-    pullback_in_range = config.SNIPER_PULLBACK_MIN_FROM_PEAK_PCT <= fade_from_peak_pct <= allowed_pullback_pct
+    flush_drop_pct, flush_reference_price = _compute_flush_drop_pct(
+        contiguous_price_history,
+        state.last_update,
+        current_price,
+    )
+    flush_triggered = flush_drop_pct >= config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT
+    pullback_in_range = fade_from_peak_pct <= allowed_pullback_pct
 
     stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
     chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
@@ -615,13 +692,26 @@ def _analyze_one_minute_clean_move(
         and stop_distance_pct is not None
         and config.SNIPER_MIN_STOP_DISTANCE_PCT <= stop_distance_pct <= config.SNIPER_MAX_STOP_DISTANCE_PCT
     )
-    entry_ready = extreme_clean and pullback_in_range and near_pullback_low and valid_stop
+    entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    if not failed_checks:
+        if not flush_triggered:
+            analysis["first_failed_check"] = (
+                f"Waiting for sudden flush >= {config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT:.2f}% "
+                f"over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s"
+            )
+        elif not pullback_in_range:
+            analysis["first_failed_check"] = (
+                f"Total fade {fade_from_peak_pct:.2f}% exceeds cap {allowed_pullback_pct:.2f}%"
+            )
+        elif not valid_stop:
+            analysis["first_failed_check"] = "Stop distance invalid for flush entry"
 
     analysis["clean_passed"] = clean_passed
     analysis["extreme_clean"] = extreme_clean
     analysis["entry_ready"] = entry_ready
     analysis["failed_checks"] = failed_checks
-    analysis["first_failed_check"] = failed_checks[0] if failed_checks else ""
+    if not analysis["first_failed_check"]:
+        analysis["first_failed_check"] = failed_checks[0] if failed_checks else ""
     analysis["support_price"] = support_price
     analysis["support_label"] = "1m support"
     analysis["pullback_low"] = pullback_low
@@ -641,6 +731,8 @@ def _analyze_one_minute_clean_move(
         "extension_pct": extension_pct,
         "fade_from_peak_pct": fade_from_peak_pct,
         "allowed_pullback_pct": allowed_pullback_pct,
+        "flush_drop_pct": flush_drop_pct,
+        "flush_reference_price": flush_reference_price,
         "stop_distance_pct": stop_distance_pct,
     }
     analysis["reasons"] = [
@@ -649,6 +741,11 @@ def _analyze_one_minute_clean_move(
         f"1m retrace {retracement_pct_of_impulse:.1f}% of impulse",
         f"1m red {red_1m_count}/{len(impulse_1m)}",
         f"Extension {extension_pct:.1f}% | pullback cap {allowed_pullback_pct:.1f}%",
+        (
+            f"Flush {flush_drop_pct:.2f}% over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s"
+            if flush_reference_price is not None
+            else "Waiting for sudden flush trigger"
+        ),
         f"1m vol {volume_expansion:.2f}x avg",
         "Vol accel 15s>30s>60s" if volume_accel_pass else "Vol accel failed",
         (
@@ -661,8 +758,8 @@ def _analyze_one_minute_clean_move(
         analysis["reasons"].append(f"First fail: {failed_checks[0]}")
     if entry_ready:
         analysis["entry_reason"] = (
-            f"1m clean squeeze, pullback {fade_from_peak_pct:.2f}% from peak, "
-            f"price near 5s low ${pullback_low:.2f}, stop ${stop_price:.2f}"
+            f"1m clean squeeze, sudden flush {flush_drop_pct:.2f}% from short-term high, "
+            f"total fade {fade_from_peak_pct:.2f}% from peak, stop ${stop_price:.2f}"
         )
     return analysis
 
@@ -1028,6 +1125,7 @@ class CleanMomentumSniperManager:
             market_session=get_market_session(),
             bid=symbol_state.bid,
             ask=symbol_state.ask,
+            entry_context=dict(analysis.get("metrics", {})),
         )
         if success:
             self.pending_entries.pop(symbol, None)
@@ -1063,6 +1161,60 @@ class CleanMomentumSniperManager:
             self.structure_breaks.pop(symbol, None)
             return
 
+        filled_at = snapshot.get("filled_at")
+        actual_entry_price = snapshot.get("actual_entry_price") or snapshot.get("entry_price")
+        highest_price = snapshot.get("highest_price") or actual_entry_price or 0.0
+        now = datetime.now()
+        if filled_at is not None and actual_entry_price and actual_entry_price > 0:
+            held_seconds = (now - filled_at).total_seconds()
+            bounce_target_price = actual_entry_price * (1 + config.SNIPER_POST_ENTRY_MIN_BOUNCE_PCT / 100.0)
+            bounce_confirmed = highest_price >= bounce_target_price
+            entry_extension_pct = float(snapshot.get("entry_extension_pct", 0.0) or 0.0)
+            allowed_adverse_pct = _get_allowed_post_entry_adverse_pct(entry_extension_pct)
+            adverse_price = actual_entry_price * (1 - allowed_adverse_pct / 100.0)
+            if not bounce_confirmed:
+                if current_price := symbol_state.price:
+                    if current_price <= adverse_price:
+                        if executor.submit_market_exit(symbol, role="flush_fail_exit"):
+                            self.structure_breaks.pop(symbol, None)
+                            append_sniper_event(
+                                filtered_events,
+                                f"{symbol} flush-fail exit at ${current_price:.2f} "
+                                f"(no bounce, price kept falling below ${adverse_price:.2f}; "
+                                f"allowed adverse {allowed_adverse_pct:.2f}% from entry)",
+                            )
+                            self._log_event(
+                                "sniper_flush_fail_exit_submitted",
+                                symbol=symbol,
+                                reason="continued_flush_after_entry",
+                                price=current_price,
+                                actual_entry_price=actual_entry_price,
+                                adverse_price=adverse_price,
+                                allowed_adverse_pct=allowed_adverse_pct,
+                                entry_extension_pct=entry_extension_pct,
+                                held_seconds=round(held_seconds, 2),
+                            )
+                        return
+                if held_seconds >= config.SNIPER_POST_ENTRY_BOUNCE_CHECK_SECONDS:
+                    if executor.submit_market_exit(symbol, role="flush_fail_exit"):
+                        self.structure_breaks.pop(symbol, None)
+                        append_sniper_event(
+                            filtered_events,
+                            f"{symbol} flush-fail exit at ${symbol_state.price:.2f} "
+                            f"(no {config.SNIPER_POST_ENTRY_MIN_BOUNCE_PCT:.2f}% bounce within "
+                            f"{config.SNIPER_POST_ENTRY_BOUNCE_CHECK_SECONDS:.1f}s)",
+                        )
+                        self._log_event(
+                            "sniper_flush_fail_exit_submitted",
+                            symbol=symbol,
+                            reason="no_immediate_bounce_after_entry",
+                            price=symbol_state.price,
+                            actual_entry_price=actual_entry_price,
+                            bounce_target_price=bounce_target_price,
+                            held_seconds=round(held_seconds, 2),
+                        )
+                    return
+
         analysis = analyze_clean_move(symbol_state)
         support_price = analysis.get("support_price")
         ema_value = analysis.get("ema_value")
@@ -1074,7 +1226,6 @@ class CleanMomentumSniperManager:
 
         current_price = symbol_state.price
         structure_broken = current_price < support_price and current_price < ema_value
-        now = datetime.now()
         if not structure_broken:
             self.structure_breaks.pop(symbol, None)
             return
@@ -1190,9 +1341,10 @@ def sniper_visualization(scanner_state, filtered_events, executor, sniper_manage
     print("\n" + "-" * 132)
     print(f"{'RECENT SNIPER EVENTS':<132}")
     print("-" * 132)
-    if not filtered_events:
+    recent_events = list(filtered_events)
+    if not recent_events:
         print("  No recent sniper events yet...")
-    for event_time, event_message in filtered_events:
+    for event_time, event_message in recent_events:
         print(f"  {event_message} | {event_time.strftime('%H:%M:%S')}")
 
     print("\n" + "-" * 132)
@@ -1202,7 +1354,7 @@ def sniper_visualization(scanner_state, filtered_events, executor, sniper_manage
     if not history:
         print("  No completed trades in this session.")
     for trade in reversed(history[-10:]):
-        time_disp = trade['time'].strftime('%H:%M:%S')
+        time_disp = _format_trade_span(trade.get('entry_time'), trade['time'])
         if trade['type'] == 'CLOSED':
             pnl = (trade['exit_price'] - trade['entry_price']) * trade['shares']
             pnl_pct = (trade['exit_price'] - trade['entry_price']) / trade['entry_price'] * 100 if trade['entry_price'] else 0.0
