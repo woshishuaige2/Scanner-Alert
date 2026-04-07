@@ -315,11 +315,10 @@ def _score_clean_analysis(analysis: Dict[str, Any]) -> tuple:
 
 
 def _get_allowed_sniper_pullback_pct(extension_pct: float) -> float:
-    if extension_pct >= 10.0:
-        return config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_10_EXTENSION
-    if extension_pct >= 5.0:
-        return config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT_AT_5_EXTENSION
-    return config.SNIPER_PULLBACK_MAX_FROM_PEAK_PCT
+    return min(
+        config.SNIPER_PULLBACK_MAX_CAP_PCT,
+        max(0.0, extension_pct * config.SNIPER_PULLBACK_EXTENSION_FACTOR),
+    )
 
 
 def _get_allowed_post_entry_adverse_pct(extension_pct: float) -> float:
