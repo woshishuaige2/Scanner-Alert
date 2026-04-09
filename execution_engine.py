@@ -729,6 +729,8 @@ class ExecutionEngine:
                 'active_exit_order_id': None,
                 'volume_history': deque(maxlen=128),
                 'peak_volume_rate_15s': 0.0,
+                'volume_fade_warning_at': None,
+                'volume_fade_warning_high_price': None,
             }
             self._register_order(parent_id, symbol, 'parent')
             self._register_order(stop_id, symbol, 'stop')
@@ -902,6 +904,16 @@ class ExecutionEngine:
             pos['last_ask'] = ask
             pos['last_market_update_at'] = now
             pos['highest_price'] = max(pos['highest_price'], price)
+            warning_high_price = pos.get('volume_fade_warning_high_price')
+            if warning_high_price is not None and price >= warning_high_price:
+                pos['volume_fade_warning_at'] = None
+                pos['volume_fade_warning_high_price'] = None
+                self._log_event(
+                    "volume_fade_warning_cleared",
+                    symbol=symbol,
+                    price=price,
+                    reclaimed_high_price=warning_high_price,
+                )
             if volume > 0:
                 pos['volume_history'].append((now, volume))
 
@@ -1006,6 +1018,26 @@ class ExecutionEngine:
                     and recent_volume_rate <= peak_volume_rate * config.DYNAMIC_EXIT_VOLUME_FADE_FRACTION_OF_PEAK
                     and fade_from_peak_pct >= config.DYNAMIC_EXIT_VOLUME_FADE_MIN_RETRACE_PCT
                 ):
+                    warning_at = pos.get('volume_fade_warning_at')
+                    if warning_at is None:
+                        pos['volume_fade_warning_at'] = now
+                        pos['volume_fade_warning_high_price'] = high_price
+                        self._log_event(
+                            "volume_fade_warning_armed",
+                            symbol=symbol,
+                            held_seconds=round((now - filled_at).total_seconds(), 1),
+                            recent_volume_rate=recent_volume_rate,
+                            peak_volume_rate=peak_volume_rate,
+                            fade_from_peak_pct=fade_from_peak_pct,
+                            warning_high_price=high_price,
+                            confirm_seconds=config.DYNAMIC_EXIT_VOLUME_FADE_CONFIRM_SECONDS,
+                        )
+                        return
+
+                    warning_age_seconds = (now - warning_at).total_seconds()
+                    if warning_age_seconds < config.DYNAMIC_EXIT_VOLUME_FADE_CONFIRM_SECONDS:
+                        return
+
                     if self._submit_market_exit_locked(symbol, pos['remaining_shares'], 'volume_fade_exit'):
                         self._log_event(
                             "volume_fade_exit_submitted",
@@ -1014,6 +1046,7 @@ class ExecutionEngine:
                             recent_volume_rate=recent_volume_rate,
                             peak_volume_rate=peak_volume_rate,
                             fade_from_peak_pct=fade_from_peak_pct,
+                            warning_age_seconds=round(warning_age_seconds, 1),
                             shares=pos['remaining_shares'],
                         )
                     return

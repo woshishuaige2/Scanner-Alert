@@ -7,6 +7,7 @@ the shared ExecutionEngine.
 """
 from __future__ import annotations
 
+import math
 import os
 import platform
 import signal
@@ -93,6 +94,29 @@ def _session_close_cleanup_marker(now_et: datetime) -> Optional[str]:
     if now_et.hour == 19 and now_et.minute == 59:
         return "AFTERHOURS_CLOSE"
     return None
+
+
+def _floor_price_to_cent(price: float) -> float:
+    return math.floor(price * 100.0) / 100.0
+
+
+def _compute_buffered_structure_stop(current_price: float, chosen_stop_ref: Optional[float]) -> Optional[float]:
+    if chosen_stop_ref is None or current_price <= 0:
+        return None
+
+    percent_buffer = chosen_stop_ref * (config.SNIPER_STOP_BUFFER_PCT / 100.0)
+    absolute_buffer = max(0.0, config.SNIPER_STOP_BUFFER_MIN_DOLLARS)
+    buffer_dollars = max(percent_buffer, absolute_buffer)
+    raw_stop = chosen_stop_ref - buffer_dollars
+    stop_price = _floor_price_to_cent(raw_stop)
+
+    if stop_price >= chosen_stop_ref:
+        stop_price = _floor_price_to_cent(chosen_stop_ref - 0.01)
+
+    if stop_price <= 0:
+        return None
+
+    return stop_price
 
 
 def _format_display_price(value: Optional[float]) -> str:
@@ -314,6 +338,80 @@ def _score_clean_analysis(analysis: Dict[str, Any]) -> tuple:
     )
 
 
+def _clone_clean_analysis(analysis: Dict[str, Any]) -> Dict[str, Any]:
+    cloned = dict(analysis)
+    cloned["reasons"] = list(analysis.get("reasons", []))
+    cloned["failed_checks"] = list(analysis.get("failed_checks", []))
+    cloned["metrics"] = dict(analysis.get("metrics", {}))
+    return cloned
+
+
+def _classify_timeframe_alignment(analysis: Dict[str, Any]) -> Dict[str, Any]:
+    structure_mode = analysis.get("structure_mode") or "unknown"
+    failed_checks = list(analysis.get("failed_checks", []))
+    metrics = analysis.get("metrics", {})
+    contradictory_reasons: List[str] = []
+
+    if structure_mode == "15s/30s":
+        contradiction_prefixes = (
+            "Retrace ",
+            "15s red fraction ",
+            "30s red candles ",
+        )
+        contradiction_exact = {
+            "Back-to-back red 30s candles",
+            "Price below EMA15",
+            "Price below 15s support",
+            "Impulse not advancing on 15s/30s",
+        }
+    elif structure_mode == "1m":
+        contradiction_prefixes = (
+            "Retrace ",
+            "1m red candles ",
+        )
+        contradiction_exact = {
+            "Back-to-back red 1m candles",
+            "Price below EMA1m",
+            "Price below 1m support",
+            "Impulse not advancing on 1m",
+        }
+    else:
+        contradiction_prefixes = tuple()
+        contradiction_exact = set()
+
+    for failed_check in failed_checks:
+        if failed_check.startswith(contradiction_prefixes) or failed_check in contradiction_exact:
+            contradictory_reasons.append(failed_check)
+
+    fade_from_peak_pct = float(metrics.get("fade_from_peak_pct", 0.0) or 0.0)
+    allowed_pullback_pct = float(metrics.get("allowed_pullback_pct", 0.0) or 0.0)
+    if allowed_pullback_pct > 0 and fade_from_peak_pct > allowed_pullback_pct:
+        contradictory_reasons.append(
+            f"Total fade {fade_from_peak_pct:.2f}% exceeds cap {allowed_pullback_pct:.2f}%"
+        )
+
+    contradictory_reasons = list(dict.fromkeys(contradictory_reasons))
+    if contradictory_reasons:
+        return {
+            "structure_mode": structure_mode,
+            "status": "contradictory",
+            "reasons": contradictory_reasons,
+        }
+
+    if analysis.get("clean_passed"):
+        return {
+            "structure_mode": structure_mode,
+            "status": "supportive",
+            "reasons": [],
+        }
+
+    return {
+        "structure_mode": structure_mode,
+        "status": "neutral",
+        "reasons": [],
+    }
+
+
 def _get_allowed_sniper_pullback_pct(extension_pct: float) -> float:
     return min(
         config.SNIPER_PULLBACK_MAX_CAP_PCT,
@@ -475,11 +573,9 @@ def _analyze_fast_clean_move(
 
     stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
     chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
-    stop_price = None
+    stop_price = _compute_buffered_structure_stop(current_price, chosen_stop_ref)
     stop_distance_pct = None
-    if chosen_stop_ref is not None:
-        buffered_stop = chosen_stop_ref * (1 - config.SNIPER_STOP_BUFFER_PCT / 100.0)
-        stop_price = round(buffered_stop, 2)
+    if stop_price is not None:
         if current_price > 0:
             stop_distance_pct = ((current_price - stop_price) / current_price) * 100.0
 
@@ -488,12 +584,26 @@ def _analyze_fast_clean_move(
         and stop_distance_pct is not None
         and config.SNIPER_MIN_STOP_DISTANCE_PCT <= stop_distance_pct <= config.SNIPER_MAX_STOP_DISTANCE_PCT
     )
-    entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    continuation_stop_valid = (
+        stop_price is not None
+        and stop_distance_pct is not None
+        and config.SNIPER_MIN_STOP_DISTANCE_PCT
+        <= stop_distance_pct
+        <= config.SNIPER_CONTINUATION_MAX_STOP_DISTANCE_PCT
+    )
+    flush_entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    continuation_entry_ready = extreme_clean and pullback_in_range and (not flush_triggered) and continuation_stop_valid
+    entry_ready = flush_entry_ready or continuation_entry_ready
     if not failed_checks:
-        if not flush_triggered:
+        if flush_entry_ready or continuation_entry_ready:
+            analysis["first_failed_check"] = ""
+        elif not flush_triggered and continuation_stop_valid:
+            analysis["first_failed_check"] = ""
+        elif not flush_triggered:
             analysis["first_failed_check"] = (
                 f"Waiting for sudden flush >= {config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT:.2f}% "
-                f"over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s"
+                f"over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s or continuation stop <= "
+                f"{config.SNIPER_CONTINUATION_MAX_STOP_DISTANCE_PCT:.2f}%"
             )
         elif not pullback_in_range:
             analysis["first_failed_check"] = (
@@ -532,6 +642,9 @@ def _analyze_fast_clean_move(
         "flush_drop_pct": flush_drop_pct,
         "flush_reference_price": flush_reference_price,
         "stop_distance_pct": stop_distance_pct,
+        "flush_entry_ready": flush_entry_ready,
+        "continuation_entry_ready": continuation_entry_ready,
+        "entry_style": "flush" if flush_entry_ready else ("continuation" if continuation_entry_ready else ""),
     }
     analysis["reasons"] = [
         "Mode 15s/30s",
@@ -555,10 +668,15 @@ def _analyze_fast_clean_move(
     ]
     if failed_checks:
         analysis["reasons"].append(f"First fail: {failed_checks[0]}")
-    if entry_ready:
+    if flush_entry_ready:
         analysis["entry_reason"] = (
             f"15s/30s clean trend, sudden flush {flush_drop_pct:.2f}% from short-term high, "
             f"total fade {fade_from_peak_pct:.2f}% from peak, stop ${stop_price:.2f}"
+        )
+    elif continuation_entry_ready:
+        analysis["entry_reason"] = (
+            f"15s/30s extreme clean continuation, pullback {fade_from_peak_pct:.2f}% from peak, "
+            f"stop ${stop_price:.2f} ({stop_distance_pct:.2f}% risk)"
         )
     return analysis
 
@@ -678,11 +796,9 @@ def _analyze_one_minute_clean_move(
 
     stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
     chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
-    stop_price = None
+    stop_price = _compute_buffered_structure_stop(current_price, chosen_stop_ref)
     stop_distance_pct = None
-    if chosen_stop_ref is not None:
-        buffered_stop = chosen_stop_ref * (1 - config.SNIPER_STOP_BUFFER_PCT / 100.0)
-        stop_price = round(buffered_stop, 2)
+    if stop_price is not None:
         if current_price > 0:
             stop_distance_pct = ((current_price - stop_price) / current_price) * 100.0
 
@@ -691,12 +807,26 @@ def _analyze_one_minute_clean_move(
         and stop_distance_pct is not None
         and config.SNIPER_MIN_STOP_DISTANCE_PCT <= stop_distance_pct <= config.SNIPER_MAX_STOP_DISTANCE_PCT
     )
-    entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    continuation_stop_valid = (
+        stop_price is not None
+        and stop_distance_pct is not None
+        and config.SNIPER_MIN_STOP_DISTANCE_PCT
+        <= stop_distance_pct
+        <= config.SNIPER_CONTINUATION_MAX_STOP_DISTANCE_PCT
+    )
+    flush_entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    continuation_entry_ready = extreme_clean and pullback_in_range and (not flush_triggered) and continuation_stop_valid
+    entry_ready = flush_entry_ready or continuation_entry_ready
     if not failed_checks:
-        if not flush_triggered:
+        if flush_entry_ready or continuation_entry_ready:
+            analysis["first_failed_check"] = ""
+        elif not flush_triggered and continuation_stop_valid:
+            analysis["first_failed_check"] = ""
+        elif not flush_triggered:
             analysis["first_failed_check"] = (
                 f"Waiting for sudden flush >= {config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT:.2f}% "
-                f"over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s"
+                f"over {config.SNIPER_FLUSH_ENTRY_LOOKBACK_SECONDS:.1f}s or continuation stop <= "
+                f"{config.SNIPER_CONTINUATION_MAX_STOP_DISTANCE_PCT:.2f}%"
             )
         elif not pullback_in_range:
             analysis["first_failed_check"] = (
@@ -733,6 +863,9 @@ def _analyze_one_minute_clean_move(
         "flush_drop_pct": flush_drop_pct,
         "flush_reference_price": flush_reference_price,
         "stop_distance_pct": stop_distance_pct,
+        "flush_entry_ready": flush_entry_ready,
+        "continuation_entry_ready": continuation_entry_ready,
+        "entry_style": "flush" if flush_entry_ready else ("continuation" if continuation_entry_ready else ""),
     }
     analysis["reasons"] = [
         "Mode 1m squeeze",
@@ -755,10 +888,15 @@ def _analyze_one_minute_clean_move(
     ]
     if failed_checks:
         analysis["reasons"].append(f"First fail: {failed_checks[0]}")
-    if entry_ready:
+    if flush_entry_ready:
         analysis["entry_reason"] = (
             f"1m clean squeeze, sudden flush {flush_drop_pct:.2f}% from short-term high, "
             f"total fade {fade_from_peak_pct:.2f}% from peak, stop ${stop_price:.2f}"
+        )
+    elif continuation_entry_ready:
+        analysis["entry_reason"] = (
+            f"1m extreme clean continuation, pullback {fade_from_peak_pct:.2f}% from peak, "
+            f"stop ${stop_price:.2f} ({stop_distance_pct:.2f}% risk)"
         )
     return analysis
 
@@ -823,7 +961,40 @@ def analyze_clean_move(state: SniperSymbolState) -> Dict[str, Any]:
         candidate_analyses.append(
             _analyze_one_minute_clean_move(state, contiguous_price_history, contiguous_volume_history)
         )
-    return max(candidate_analyses, key=_score_clean_analysis)
+    primary_analysis = _clone_clean_analysis(max(candidate_analyses, key=_score_clean_analysis))
+    secondary_reviews = []
+    contradictory_reviews = []
+
+    for candidate_analysis in candidate_analyses:
+        if candidate_analysis.get("structure_mode") == primary_analysis.get("structure_mode"):
+            continue
+        review = _classify_timeframe_alignment(candidate_analysis)
+        secondary_reviews.append(review)
+        if review["status"] == "contradictory":
+            contradictory_reviews.append(review)
+
+    primary_analysis["metrics"]["secondary_timeframe_reviews"] = secondary_reviews
+    primary_analysis["metrics"]["secondary_timeframe_statuses"] = {
+        review["structure_mode"]: review["status"] for review in secondary_reviews
+    }
+    if contradictory_reviews:
+        primary_analysis["metrics"]["secondary_contradictions"] = contradictory_reviews
+
+    if primary_analysis.get("entry_ready") and contradictory_reviews:
+        veto_review = contradictory_reviews[0]
+        veto_reason = (
+            f"Secondary timeframe veto ({veto_review['structure_mode']}): "
+            f"{'; '.join(veto_review['reasons'])}"
+        )
+        primary_analysis["entry_ready"] = False
+        primary_analysis["entry_reason"] = ""
+        primary_analysis["first_failed_check"] = veto_reason
+        primary_analysis["reasons"].append(veto_reason)
+        primary_analysis["metrics"]["secondary_timeframe_veto"] = True
+    else:
+        primary_analysis["metrics"]["secondary_timeframe_veto"] = False
+
+    return primary_analysis
 
 
 class CleanMomentumSniperManager:
