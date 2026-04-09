@@ -1696,7 +1696,15 @@ def run_clean_momentum_sniper():
         def remove_symbols_from_scanner(symbols_to_remove, reason: str):
             nonlocal unique_symbols
             removed_any = False
+            active_symbols = executor.get_active_position_symbols()
             for symbol in sorted(set(symbols_to_remove)):
+                if symbol in active_symbols:
+                    telemetry.log_event(
+                        "scanner_symbol_retained",
+                        symbol=symbol,
+                        reason=f"{reason}_active_position",
+                    )
+                    continue
                 if symbol not in scanner.monitors:
                     continue
                 tws_app.unsubscribe_realtime_data(symbol)

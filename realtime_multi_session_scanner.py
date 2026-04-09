@@ -1128,7 +1128,10 @@ def update_scanner_symbols(
     excluded = set(excluded_symbols or [])
     excluded.update(EXCLUDED_SYMBOLS)
 
-    protected_kept = [s for s in current_symbols if s in protected and s not in excluded]
+    # Protected symbols are live positions or pending entries. Keep them
+    # subscribed even if they also appear in the exclusion set so the trading
+    # layer can continue managing the position safely.
+    protected_kept = [s for s in current_symbols if s in protected]
     current_regular = [s for s in current_symbols if s not in protected and s not in excluded]
     ranked_candidates = [s for s in ranked_new if s not in excluded and s not in protected]
     regular_capacity = max(0, max_symbols - len(protected_kept))
@@ -1163,7 +1166,7 @@ def update_scanner_symbols(
         ]
         removals.extend(removable_pool[:overflow])
 
-    removed = [s for s in current_symbols if s in set(removals) or s in excluded]
+    removed = [s for s in current_symbols if s in set(removals) or (s in excluded and s not in protected)]
     if removed:
         print(f"[SCANNER] Removing {len(removed)} symbols from monitor: {', '.join(sorted(removed))}")
         for s in removed:

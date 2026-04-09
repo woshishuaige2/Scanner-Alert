@@ -42,6 +42,19 @@ class ExecutionEngine:
     def _round_price(price: float) -> float:
         return round(price, 2)
 
+    @staticmethod
+    def _floor_price(price: float) -> float:
+        return math.floor(price * 100.0) / 100.0
+
+    def _normalize_initial_long_stop(self, desired_stop_price: float, actual_entry_price: float) -> float:
+        normalized_stop = self._round_price(desired_stop_price)
+        if actual_entry_price <= 0:
+            return normalized_stop
+        if normalized_stop < actual_entry_price:
+            return normalized_stop
+        safe_stop = self._floor_price(actual_entry_price - 0.01)
+        return max(0.01, self._round_price(safe_stop))
+
     def _create_contract(self, symbol: str) -> Contract:
         contract = Contract()
         contract.symbol = symbol
@@ -197,33 +210,55 @@ class ExecutionEngine:
                 meta = self.order_to_symbol.get(reqId)
                 if meta:
                     symbol = meta['symbol']
-                    print(f"[EXEC] CRITICAL: {symbol} rejected by TWS ({errorString}). Blacklisting for this session.")
-                    self.blacklist.add(symbol)
+                    role = meta.get('role')
                     self._log_event(
                         "order_rejected",
                         symbol=symbol,
                         order_id=reqId,
+                        role=role,
                         error_code=errorCode,
                         error_string=errorString,
                     )
-                    
-                    # If we had a pending position, move it to history as FAILED
-                    if symbol in self.positions and self.positions[symbol]['status'] == 'SUBMITTED':
-                        pos = self.positions[symbol]
-                        self.trade_history.append({
-                            'symbol': symbol,
-                            'type': 'FAILED',
-                            'reason': f"REJECTED: {errorString[:30]}...",
-                            'entry_price': pos['entry_price'],
-                            'entry_time': pos.get('submitted_at'),
-                            'time': datetime.now()
-                        })
-                        self._cleanup_position(symbol)
-                    elif symbol in self.positions:
+
+                    # Entry-side rejections should blacklist the symbol so we do not
+                    # keep attempting new opens that TWS has already denied.
+                    if role == 'parent':
+                        print(f"[EXEC] CRITICAL: {symbol} entry rejected by TWS ({errorString}). Blacklisting for this session.")
+                        self.blacklist.add(symbol)
+
+                        # If we had a pending position, move it to history as FAILED.
+                        if symbol in self.positions and self.positions[symbol]['status'] == 'SUBMITTED':
+                            pos = self.positions[symbol]
+                            self.trade_history.append({
+                                'symbol': symbol,
+                                'type': 'FAILED',
+                                'reason': f"REJECTED: {errorString[:30]}...",
+                                'entry_price': pos['entry_price'],
+                                'entry_time': pos.get('submitted_at'),
+                                'time': datetime.now()
+                            })
+                            self._cleanup_position(symbol)
+                        return
+
+                    # Exit-side rejections are critical, but blacklisting here would
+                    # orphan a live position by removing it from the monitored set.
+                    print(f"[EXEC] WARNING: Exit order {reqId} for {symbol} rejected by TWS ({errorString}).")
+                    if symbol in self.positions:
                         pos = self.positions[symbol]
                         if pos.get('active_exit_order_id') == reqId:
                             pos['exit_pending'] = False
                             pos['active_exit_order_id'] = None
+                            pos['last_exit_rejection_at'] = datetime.now()
+                            pos['last_exit_rejection_reason'] = errorString
+                            pos['last_exit_rejection_role'] = role
+                            self._log_event(
+                                "exit_order_rejected",
+                                symbol=symbol,
+                                order_id=reqId,
+                                role=role,
+                                error_string=errorString,
+                                remaining_shares=pos.get('remaining_shares'),
+                            )
 
     def _on_order_status(self, orderId, status, filled, remaining, avgFillPrice, parentId):
         """Callback for order status updates from TWS"""
@@ -255,12 +290,25 @@ class ExecutionEngine:
                     pos['shares'] = total_filled_shares if total_filled_shares > 0 else pos.get('requested_shares', pos['shares'])
                     pos['remaining_shares'] = pos['shares']
                     pos['partial_target_price'] = self._round_price(pos['actual_entry_price'] * (1 + self.tp_pct / 100))
-                    pos['current_stop_price'] = self._round_price(
+                    desired_stop_price = self._round_price(
                         pos.get('current_stop_price')
                         or (pos['actual_entry_price'] * (1 - self.sl_pct / 100))
                     )
+                    pos['current_stop_price'] = self._normalize_initial_long_stop(
+                        desired_stop_price,
+                        pos['actual_entry_price'],
+                    )
                     pos['highest_price'] = pos['actual_entry_price']
                     print(f"[EXEC] >>> POSITION OPEN: {symbol} at ${pos['actual_entry_price']:.2f} <<<")
+                    if pos['current_stop_price'] != desired_stop_price:
+                        self._log_event(
+                            "initial_stop_adjusted_for_fill",
+                            symbol=symbol,
+                            desired_stop_price=desired_stop_price,
+                            adjusted_stop_price=pos['current_stop_price'],
+                            actual_entry_price=pos['actual_entry_price'],
+                            order_id=orderId,
+                        )
                     self._log_event(
                         "position_opened",
                         symbol=symbol,
@@ -317,6 +365,7 @@ class ExecutionEngine:
                             reason=failure_reason,
                             entry_price=pos['entry_price'],
                         )
+                        self._cancel_protective_orders_locked(pos, filled_order_id=orderId)
                         self._cleanup_position(symbol)
                     elif pos['status'] == 'OPEN':
                         pos['entry_cancel_requested'] = False
@@ -446,6 +495,7 @@ class ExecutionEngine:
                             exit_price=exit_price,
                             shares=exit_shares,
                         )
+                        self._cancel_protective_orders_locked(pos, filled_order_id=orderId)
                         self._cleanup_position(symbol)
 
             if delta_filled > 0 and role == 'stop':
@@ -470,6 +520,7 @@ class ExecutionEngine:
                         remaining_shares=pos['remaining_shares'],
                     )
                 else:
+                    self._cancel_protective_orders_locked(pos, filled_order_id=orderId)
                     self.trade_history.append({
                         'symbol': symbol,
                         'type': 'CLOSED',
@@ -503,9 +554,18 @@ class ExecutionEngine:
         """Internal helper to clean up position tracking"""
         if symbol in self.positions:
             del self.positions[symbol]
-            to_del = [oid for oid, sym in self.order_to_symbol.items() if sym == symbol]
+            to_del = [oid for oid, meta in self.order_to_symbol.items() if meta.get('symbol') == symbol]
             for oid in to_del:
                 del self.order_to_symbol[oid]
+
+    def _cancel_protective_orders_locked(self, pos: Dict, *, filled_order_id: Optional[int] = None):
+        stop_id = pos.get('stop_id')
+        if pos.get('uses_broker_stop', True) and stop_id is not None and stop_id != filled_order_id:
+            self.tws_app.cancelOrder(stop_id)
+
+        active_exit_order_id = pos.get('active_exit_order_id')
+        if active_exit_order_id is not None and active_exit_order_id != filled_order_id:
+            self.tws_app.cancelOrder(active_exit_order_id)
 
     def _submit_stop_update_locked(self, symbol: str, new_stop_price: float, quantity: int):
         pos = self.positions[symbol]
@@ -727,6 +787,9 @@ class ExecutionEngine:
                 'partial_taken': False,
                 'exit_pending': False,
                 'active_exit_order_id': None,
+                'last_exit_rejection_at': None,
+                'last_exit_rejection_reason': None,
+                'last_exit_rejection_role': None,
                 'volume_history': deque(maxlen=128),
                 'peak_volume_rate_15s': 0.0,
                 'volume_fade_warning_at': None,
