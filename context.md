@@ -40,6 +40,11 @@ Important notes:
 - premarket relative volume was fixed so premarket numerator uses full cumulative session volume from first observed premarket tick, not just post-start deltas
 - alert score audit logs are written here and reused by the trading runners
 - the Fast Ignition preliminary trigger now allows up to 1.0% retracement from the local high, loosened from 0.7% to better admit strong high-volume squeezes that pause slightly
+- scanner scoring now includes a conservative multi-timeframe structure-damage penalty:
+  - recent 15s / 30s / 1m drawdowns are cross-analyzed into one result
+  - penalty output is `0`, `-1`, or `-2`
+  - this subtracts from score only and does not hard-cap grades by itself
+  - designed to make repeated squeeze alerts on damaged names more cautious without fully blocking repaired setups
 
 Current concept:
 - this file defines the shared scanner worldview
@@ -177,6 +182,7 @@ Recent changes:
 - Stage 2 now shows the first failed rule in the terminal when setup is on hold
 - recent sniper events now show timestamps
 - structure-based stops are preserved correctly through fill handling
+- symbols with active sniper positions are now retained in scanner management even if they later become excluded, to avoid live trades falling out of monitoring during blacklist/exclusion churn
 
 ## Shared `ExecutionEngine` context
 
@@ -210,6 +216,48 @@ Recent important engine changes:
   - adds reopen buffer after trading resumes
   - classifies reopen as strong or weak
   - keeps a separate wall-clock max hold cap
+- exit-side `Code 201` rejects are now treated differently from entry rejects:
+  - entry rejects can still blacklist the symbol
+  - exit rejects do not blacklist the symbol
+  - exit rejects now clear pending-exit state and are logged as `exit_order_rejected`
+- position cleanup now correctly removes all order mappings for a symbol from `order_to_symbol`
+- full exits now cancel their own remaining protective orders before cleanup so old stops cannot leak into future re-entries
+- stale protective-order contamination was fixed:
+  - same-symbol re-entries should no longer be closed by an old broker stop from a prior trade
+- initial long stop handling now validates the stop against the actual fill price:
+  - if the actual fill comes in below the precomputed stop, the initial stop is adjusted below the real fill
+  - this prevents instant self-stopouts caused by stop inversion after slippage
+
+## Recent live-session findings
+
+Important issues observed during the `2026-04-09` clean sniper session:
+
+- `SKYQ` at `09:41` was a real clean continuation setup, but it stopped out instantly because the pre-fill stop (`8.10`) sat above the actual fill (`8.09`)
+- multiple zero-second / near-zero-second losses were caused by stale old stops hitting new re-entries:
+  - `ONCO` at `10:42`
+  - `ONCO` at `11:04`
+  - `BBGI` at `14:38`
+- `ELAB` and later `ONCO` exposed a separate operational problem where IBKR rejected sell exits with `Code 201` (`The contract is not available for short sale`), leaving positions open when they should have been closed
+
+Current interpretation:
+
+- some disappointing trades were genuine strategy losses
+- but several of the most suspicious instant losses were mechanical workflow bugs, not bad setup quality
+- the biggest remaining unresolved risk is broker-side sell rejection on live long positions
+
+## Daily performance notes
+
+- daily markdown summaries are now kept locally under:
+  - `runtime_feedback/clean_momentum_sniper/performance_summaries/`
+- a reusable template now exists there:
+  - `_daily_summary_template.md`
+- note:
+  - `runtime_feedback/` is git-ignored, so these summaries are currently local workspace notes and are not pushed to GitHub unless that ignore rule is intentionally overridden
+
+## Latest pushed code state
+
+- latest pushed commit during this workstream:
+  - `2ebe4dc` - `Fix trade lifecycle and stop handling`
 
 ## Design intent
 
@@ -237,6 +285,42 @@ Use these mental models:
   - volume interpretation
   - impulse window detection
   - post-halt behavior
+- standalone scanner still needs tuning on:
+  - repeated same-symbol squeeze / recycle alerts after structural damage
+  - alert selectivity when one name dominates the tape for long stretches
+
+## 2026-04-09 scanner review + decisions
+
+Today we reviewed recent alert-history runs and observed:
+
+- the scanner can over-fire on the same symbol for long periods when a squeeze keeps retriggering
+- many emitted audit entries are still `C` or `Below Threshold`, which makes review noisy
+- some names can still earn strong scores after showing ugly intraday damage because momentum factors can outweigh structural weakness
+
+Implemented today:
+
+- Stage 1 scanner now applies a conservative combined structure-damage score penalty:
+  - cross-analyzes recent `15s`, `30s`, and `1m` drawdowns
+  - outputs `0`, `-1`, or `-2`
+  - subtracts from score only
+  - does not hard-cap letter grade or hard-block alerts by itself
+- audit output now includes structure-damage debug so recent drawdown damage is explainable during alert review
+
+Deferred optimization ideas discussed today:
+
+- intraday memory layer:
+  - idea is to maintain small per-symbol memory such as intraday high tests, clean breaks, failed breakouts, rejections, and time near high
+  - intended use is a lightweight score adjustment to reward clean persistence and penalize repeated failed breakouts
+  - decision: defer implementation until after validating the new structure-damage penalty in live sessions, so effects do not get mixed together
+- low-risk refactor / modularization:
+  - goal is cleaner internal layering without changing the daily user-facing entrypoints
+  - keep these top-level workflows stable:
+    - `realtime_multi_session_scanner.py`
+    - `run_clean_momentum_sniper.py`
+    - `summarize_alert_run.py`
+    - `alert_history/`
+  - safe direction later is to reorganize internals underneath those files rather than renaming the main files the user runs every day
+  - decision: defer until after current scanner behavior is revalidated, to avoid stacking structural change on top of scoring change
 
 ## If starting a new Codex chat
 
@@ -263,6 +347,7 @@ I have 3 workflows in this repo:
 Important shared context:
 - scanner logic should stay aligned between standalone scanner and trading runners
 - leveraged / fund-style products are now excluded at the shared Stage 1 universe level
+- Stage 1 scanner now also applies a conservative score penalty for recent multi-timeframe structure damage instead of hard-blocking damaged symbols outright
 - execution is handled by shared `execution_engine.py`
 - execution engine now uses a warning/confirmation flow for volume-fade exits rather than an immediate one-shot exit
 - halt / market-pause handling was recently added to execution engine

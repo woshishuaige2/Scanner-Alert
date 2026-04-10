@@ -41,7 +41,14 @@ from scanner_config import (
 )
 import requests
 from top_gainers_fetcher import get_top_gainers
-from alert_rating import calculate_alert_rating, get_breakout_debug_info, get_drawdown_debug_info, get_momentum_debug_info, get_alert_grade_rank
+from alert_rating import (
+    calculate_alert_rating,
+    get_alert_grade_rank,
+    get_breakout_debug_info,
+    get_drawdown_debug_info,
+    get_momentum_debug_info,
+    get_structure_damage_debug_info,
+)
 from runtime_feedback import RuntimeTelemetry
 
 # Market session times (Eastern Time)
@@ -230,6 +237,7 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
     factors = monitor.alert_score_reasons if monitor.alert_score_reasons else []
     breakout_debug = monitor.alert_breakout_debug_info if monitor.alert_breakout_debug_info else None
     drawdown_debug = monitor.alert_drawdown_debug_info if monitor.alert_drawdown_debug_info else None
+    structure_damage_debug = monitor.alert_structure_damage_debug_info if monitor.alert_structure_damage_debug_info else None
     momentum_debug = monitor.alert_momentum_debug_info if monitor.alert_momentum_debug_info else None
     news_debug = monitor.alert_news_debug_info if monitor.alert_news_debug_info else None
     header_line = f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {symbol} | Session={session} | Grade={monitor.alert_grade} | Score={monitor.alert_score}"
@@ -279,6 +287,28 @@ def append_alert_score_audit(symbol: str, timestamp: datetime, session: str, tri
                 f"- Lower threshold: max({drawdown_debug['lower_base_threshold_pct']:.2f}%, dynamic) = {drawdown_debug['lower_dynamic_threshold_pct']:.2f}% | pass={drawdown_debug['passed_lower_threshold']}",
             ]
         )
+
+    if structure_damage_debug:
+        lines.extend(
+            [
+                "Structure damage debug:",
+                f"- Summary: {structure_damage_debug['summary']}",
+                f"- Penalty: {structure_damage_debug['penalty']}",
+                f"- Lookback: {structure_damage_debug['lookback_minutes']}m",
+                f"- Moderate threshold: {structure_damage_debug['lower_dynamic_threshold_pct']:.2f}%",
+                f"- Severe threshold: {structure_damage_debug['upper_dynamic_threshold_pct']:.2f}%",
+            ]
+        )
+        for timeframe in structure_damage_debug["timeframes"]:
+            observed_str = (
+                f"{timeframe['observed_drawdown_pct']:.2f}%"
+                if timeframe["observed_drawdown_pct"] is not None
+                else "insufficient history"
+            )
+            lines.append(
+                f"- {timeframe['label']} max drawdown: {observed_str} | "
+                f"moderate={timeframe['breached_moderate']} | severe={timeframe['breached_severe']}"
+            )
 
     if momentum_debug:
         lines.extend(
@@ -462,6 +492,7 @@ class RealtimeSymbolMonitor:
         self.alert_is_suppressed = False
         self.alert_breakout_debug_info = None
         self.alert_drawdown_debug_info = None
+        self.alert_structure_damage_debug_info = None
         self.alert_momentum_debug_info = None
         self.alert_news_debug_info = None
         self.preliminary_block_reason = ""
@@ -722,6 +753,7 @@ class RealtimeSymbolMonitor:
                 self.alert_is_suppressed = True
                 self.alert_breakout_debug_info = None
                 self.alert_drawdown_debug_info = None
+                self.alert_structure_damage_debug_info = None
                 self.alert_momentum_debug_info = None
                 self.alert_news_debug_info = None
                 self.preliminary_block_reason = ""
@@ -748,6 +780,11 @@ class RealtimeSymbolMonitor:
                 max_intraday_1m_drawdown_pct=effective_max_drawdown,
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
             )
+            self.alert_structure_damage_debug_info = get_structure_damage_debug_info(
+                price_history=list(self.price_history),
+                last_update=self.last_update,
+                recent_green_1m_body_pcts=recent_green_1m_body_pcts,
+            )
             self.alert_momentum_debug_info = get_momentum_debug_info(
                 price_history=list(self.price_history),
                 volume_history=list(self.signal_volume_history),
@@ -767,6 +804,7 @@ class RealtimeSymbolMonitor:
                 recent_green_1m_body_pcts=recent_green_1m_body_pcts,
                 has_meaningful_news_today=self.has_meaningful_news_today,
                 momentum_debug_info=self.alert_momentum_debug_info,
+                structure_damage_debug_info=self.alert_structure_damage_debug_info,
             )
             self.alert_news_debug_info = {
                 "enabled": NEWS_CATALYST_ENABLED,
@@ -808,6 +846,7 @@ class RealtimeSymbolMonitor:
                 self.alert_is_suppressed = False
                 self.alert_breakout_debug_info = None
                 self.alert_drawdown_debug_info = None
+                self.alert_structure_damage_debug_info = None
                 self.alert_momentum_debug_info = None
                 self.alert_news_debug_info = None
                 self.last_emitted_grade = None

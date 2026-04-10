@@ -27,6 +27,12 @@ Current grade mapping (Max 14):
 - B: score >= 6
 - C: score 3-5
 - Below alert threshold: score < 3
+
+Structure-damage penalty:
+- Recent 15s / 30s / 1m drawdowns are cross-analyzed into one penalty.
+- 0 if no significant multi-timeframe damage is present.
+- -1 for moderate damage.
+- -2 for multi-timeframe red flags.
 """
 
 from datetime import datetime, timedelta
@@ -42,6 +48,9 @@ from scanner_config import (
     ALERT_DRAWDOWN_UPPER_VOL_MULTIPLIER,
     ALERT_GRADE_A_MIN_SCORE,
     ALERT_GRADE_B_MIN_SCORE,
+    ALERT_STRUCTURE_DAMAGE_LOOKBACK_MINUTES,
+    ALERT_STRUCTURE_DAMAGE_MODERATE_PENALTY,
+    ALERT_STRUCTURE_DAMAGE_RED_FLAG_PENALTY,
     ALERT_MOMENTUM_MIN_SAMPLES_60S,
     ALERT_MOMENTUM_MIN_VOL_15S,
     ALERT_MOMENTUM_PRICE_MIN_PCT_5S,
@@ -133,6 +142,122 @@ def get_drawdown_debug_info(
         "lower_dynamic_threshold_pct": lower_threshold_pct,
         "passed_upper_threshold": max_intraday_1m_drawdown_pct < upper_threshold_pct,
         "passed_lower_threshold": max_intraday_1m_drawdown_pct < lower_threshold_pct,
+    }
+
+
+def _bucket_start(ts: datetime, timeframe_seconds: int) -> datetime:
+    epoch = int(ts.timestamp())
+    bucket = epoch - (epoch % timeframe_seconds)
+    return datetime.fromtimestamp(bucket)
+
+
+def _compute_max_bucket_drawdown_pct(
+    price_history: List[Tuple[datetime, float]],
+    last_update: datetime,
+    timeframe_seconds: int,
+    lookback_minutes: int,
+) -> Optional[float]:
+    if not price_history:
+        return None
+
+    lookback_start = last_update - timedelta(minutes=lookback_minutes)
+    recent_prices = [(ts, price) for ts, price in price_history if ts >= lookback_start and price is not None and price > 0]
+    if len(recent_prices) < 2:
+        return None
+
+    buckets: Dict[datetime, Dict[str, float]] = {}
+    for ts, price in recent_prices:
+        bucket = _bucket_start(ts, timeframe_seconds)
+        candle = buckets.get(bucket)
+        if candle is None:
+            buckets[bucket] = {"high": price, "low": price}
+            continue
+        candle["high"] = max(candle["high"], price)
+        candle["low"] = min(candle["low"], price)
+
+    max_drawdown_pct = None
+    for candle in buckets.values():
+        high = candle["high"]
+        low = candle["low"]
+        if high <= 0:
+            continue
+        drawdown_pct = ((high - low) / high) * 100
+        if max_drawdown_pct is None:
+            max_drawdown_pct = drawdown_pct
+        else:
+            max_drawdown_pct = max(max_drawdown_pct, drawdown_pct)
+
+    return max_drawdown_pct
+
+
+def get_structure_damage_debug_info(
+    price_history: List[Tuple[datetime, float]],
+    last_update: Optional[datetime],
+    recent_green_1m_body_pcts: Optional[List[float]],
+) -> Optional[Dict[str, Any]]:
+    """Cross-analyze 15s/30s/1m drawdown damage into a single conservative penalty."""
+    if not price_history or last_update is None:
+        return None
+
+    upper_threshold_pct, lower_threshold_pct = _compute_dynamic_drawdown_thresholds(recent_green_1m_body_pcts)
+    timeframe_windows = (
+        ("15s", 15),
+        ("30s", 30),
+        ("1m", 60),
+    )
+
+    timeframe_stats: List[Dict[str, Any]] = []
+    moderate_count = 0
+    severe_count = 0
+
+    for label, seconds in timeframe_windows:
+        observed_drawdown_pct = _compute_max_bucket_drawdown_pct(
+            price_history=price_history,
+            last_update=last_update,
+            timeframe_seconds=seconds,
+            lookback_minutes=ALERT_STRUCTURE_DAMAGE_LOOKBACK_MINUTES,
+        )
+        breached_moderate = (
+            observed_drawdown_pct is not None and observed_drawdown_pct >= lower_threshold_pct
+        )
+        breached_severe = (
+            observed_drawdown_pct is not None and observed_drawdown_pct >= upper_threshold_pct
+        )
+        if breached_moderate:
+            moderate_count += 1
+        if breached_severe:
+            severe_count += 1
+        timeframe_stats.append(
+            {
+                "label": label,
+                "observed_drawdown_pct": observed_drawdown_pct,
+                "breached_moderate": breached_moderate,
+                "breached_severe": breached_severe,
+            }
+        )
+
+    penalty = 0
+    status = "none"
+    summary = "No significant recent structure damage"
+    if severe_count >= 2 or (severe_count >= 1 and moderate_count == 3):
+        penalty = -ALERT_STRUCTURE_DAMAGE_RED_FLAG_PENALTY
+        status = "red_flags"
+        summary = "Multi-timeframe drawdown red flags"
+    elif severe_count >= 1 or moderate_count >= 2:
+        penalty = -ALERT_STRUCTURE_DAMAGE_MODERATE_PENALTY
+        status = "moderate_damage"
+        summary = "Recent multi-timeframe drawdown damage"
+
+    return {
+        "lookback_minutes": ALERT_STRUCTURE_DAMAGE_LOOKBACK_MINUTES,
+        "upper_dynamic_threshold_pct": upper_threshold_pct,
+        "lower_dynamic_threshold_pct": lower_threshold_pct,
+        "timeframes": timeframe_stats,
+        "moderate_breach_count": moderate_count,
+        "severe_breach_count": severe_count,
+        "penalty": penalty,
+        "status": status,
+        "summary": summary,
     }
 
 
@@ -285,6 +410,7 @@ def calculate_alert_rating(
     recent_green_1m_body_pcts: Optional[List[float]] = None,
     has_meaningful_news_today: bool = False,
     momentum_debug_info: Optional[Dict[str, Any]] = None,
+    structure_damage_debug_info: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, str, List[str]]:
     if not price_history or last_update is None:
         return 0, "Below Threshold", []
@@ -355,6 +481,19 @@ def calculate_alert_rating(
             if max_intraday_1m_drawdown_pct < lower_drawdown_threshold_pct:
                 score += 1
                 reasons.append(f"No 1m H-L drawdown >={lower_drawdown_threshold_pct:.1f}% (+1)")
+
+    if structure_damage_debug_info is None:
+        structure_damage_debug_info = get_structure_damage_debug_info(
+            price_history=price_history,
+            last_update=last_update,
+            recent_green_1m_body_pcts=recent_green_1m_body_pcts,
+        )
+    if structure_damage_debug_info and structure_damage_debug_info["penalty"] < 0:
+        score += structure_damage_debug_info["penalty"]
+        reasons.append(
+            f"Structure damage penalty {structure_damage_debug_info['penalty']} "
+            f"({structure_damage_debug_info['summary']})"
+        )
 
     if has_meaningful_news_today:
         score += 1
