@@ -205,6 +205,11 @@ Recent changes:
   - if startup happens while the market is closed, it waits for the next tradable session and then resumes the flatten process before proceeding
   - on `Ctrl+C`, the bot now immediately submits close-all exits for tracked positions and also attempts to flatten any remaining broker positions before shutdown
   - design intent is that no position should be intentionally left open when the sniper process is no longer running
+- Stage 1 alert grading was adjusted again after reviewing `RAYA`-style higher-timeframe squeezes:
+  - the `B` cutoff was moved back to `6`
+  - missing float data no longer suppresses score quality:
+    - scanner now treats `float is None` the same as `<20M` for the +1 float point
+    - this is meant to avoid IBKR fundamental-data gaps unfairly lowering alert quality
 
 ## Shared `ExecutionEngine` context
 

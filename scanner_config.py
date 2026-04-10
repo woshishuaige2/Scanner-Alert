@@ -38,7 +38,7 @@ SPREAD_FILTER_OVER_3_MAX_PCT = 0.5       # Keep the tighter spread allowance at 
 # ALERT RATING / QUALITY SCORING (Used by alert_rating.py and realtime_multi_session_scanner.py)
 ALERT_MIN_SCORE_TO_NOTIFY = 3               # Suppress low-quality setups below C
 ALERT_GRADE_A_MIN_SCORE = 9                 # Tightened A cutoff after validating cautious news scoring
-ALERT_GRADE_B_MIN_SCORE = 6                 # Tightened B cutoff after validating cautious news scoring
+ALERT_GRADE_B_MIN_SCORE = 6                 # Keep B selective; Stage 2 handles the stricter trade-entry filtering
 ALERT_BREAKOUT_LOOKBACK_MINUTES = 10        # Rolling 1-minute candle lookback for local breakout scoring
 ALERT_DRAWDOWN_LOOKBACK_MINUTES = 60        # Rolling 1-minute candle lookback
 ALERT_DRAWDOWN_TOP_GREEN_CANDLE_COUNT = 3   # Average the strongest green bodies in the lookback

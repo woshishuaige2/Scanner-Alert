@@ -7,7 +7,7 @@ Scoring rules (additive points):
   1-minute candle high from the prior configured rolling lookback window.
 - Session HOD breakout: +1 if current 1-minute candle high is above the highest
   completed 1-minute candle high seen earlier in the current session.
-- Float size: +1 if float < 20M shares.
+- Float size: +1 if float < 20M shares or float is unavailable.
 - Multi-timeframe momentum expansion: +2 if rolling 5s/15s/30s/60s price acceleration
   and volume acceleration both confirm a steepening move.
 - Squeeze strength (lookback window): +2 if >= 20%, +1 if >= configured threshold.
@@ -24,7 +24,7 @@ Scoring rules (additive points):
 Current grade mapping (Max 14):
 - A+: score >= 12
 - A: score >= 9
-- B: score >= 6
+- B: score >= 5
 - C: score 3-5
 - Below alert threshold: score < 3
 
@@ -431,9 +431,12 @@ def calculate_alert_rating(
         score += 1
         reasons.append("Session HOD breakout (+1)")
 
-    if float_shares is not None and float_shares < 20_000_000:
+    if float_shares is None or float_shares < 20_000_000:
         score += 1
-        reasons.append(f"Float {float_shares/1e6:.1f}M (+1)")
+        if float_shares is None:
+            reasons.append("Float unavailable, treated as pass (+1)")
+        else:
+            reasons.append(f"Float {float_shares/1e6:.1f}M (+1)")
 
     if momentum_debug_info is None:
         momentum_debug_info = get_momentum_debug_info(
