@@ -183,6 +183,19 @@ Recent changes:
 - recent sniper events now show timestamps
 - structure-based stops are preserved correctly through fill handling
 - symbols with active sniper positions are now retained in scanner management even if they later become excluded, to avoid live trades falling out of monitoring during blacklist/exclusion churn
+- `extreme_clean` is now stricter and more parabolic-focused:
+  - `clean_passed` still means the structure has no major red flags
+  - `extreme_clean` now additionally requires strict parabolic progression confirmation
+  - for the `15s/30s` path:
+    - `30s` acts as the main parabolic frame
+    - `15s` must confirm with clean advancing candles
+    - `1m` must avoid a nearby red-flag confirmation failure
+  - for the `1m` path:
+    - `1m` acts as the main parabolic frame
+    - `30s` must confirm with clean advancing candles
+    - `15s` must avoid a nearby red-flag confirmation failure
+  - the latest main-frame candle now has to show strong body expansion and strong volume expansion versus the prior candle, plus a minimum dollar-volume floor
+- sniper size now doubles when an entry passes the stricter `extreme_clean` filter
 
 ## Shared `ExecutionEngine` context
 

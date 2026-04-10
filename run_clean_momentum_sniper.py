@@ -69,6 +69,13 @@ def _format_trade_span(entry_time: Optional[datetime], exit_time: datetime) -> s
     )
 
 
+def _format_trade_reference_timeframe(trade: Dict[str, Any]) -> str:
+    structure_mode = (trade.get("structure_mode") or "").strip()
+    if structure_mode:
+        return structure_mode
+    return "--"
+
+
 def signal_handler(sig, frame):
     global should_exit
     print("\n[INFO] Graceful exit requested...")
@@ -165,6 +172,107 @@ def _compute_ema_series(values: List[float], period: int) -> List[float]:
         ema = (value * alpha) + (ema * (1 - alpha))
         series.append(ema)
     return series
+
+
+def _candle_is_green(candle: Dict[str, Any]) -> bool:
+    return candle["close"] >= candle["open"]
+
+
+def _candle_body_pct(candle: Dict[str, Any]) -> float:
+    open_price = candle.get("open", 0.0) or 0.0
+    if open_price <= 0:
+        return 0.0
+    return abs((candle["close"] - candle["open"]) / open_price) * 100.0
+
+
+def _evaluate_parabolic_progression(
+    main_candles: List[Dict[str, Any]],
+    confirm_candles: List[Dict[str, Any]],
+    *,
+    current_price: float,
+    main_label: str,
+    confirm_label: str,
+) -> Dict[str, Any]:
+    result = {
+        "passed": False,
+        "failed_checks": [],
+        "metrics": {},
+    }
+
+    if len(main_candles) < 3:
+        result["failed_checks"].append(f"Need 3 {main_label} candles for parabolic confirmation")
+        return result
+    if len(confirm_candles) < 3:
+        result["failed_checks"].append(f"Need 3 {confirm_label} candles for parabolic confirmation")
+        return result
+
+    recent_main = main_candles[-3:]
+    recent_confirm = confirm_candles[-3:]
+    latest_main = recent_main[-1]
+    prior_main = recent_main[-2]
+
+    latest_main_body_pct = _candle_body_pct(latest_main)
+    prior_main_body_pct = _candle_body_pct(prior_main)
+    latest_main_volume = float(latest_main.get("volume", 0.0) or 0.0)
+    prior_main_volume = float(prior_main.get("volume", 0.0) or 0.0)
+    latest_main_dollar_volume = latest_main_volume * max(0.0, current_price)
+
+    main_all_green = all(_candle_is_green(candle) for candle in recent_main)
+    main_advancing = all(
+        recent_main[idx]["close"] > recent_main[idx - 1]["close"]
+        and recent_main[idx]["high"] > recent_main[idx - 1]["high"]
+        for idx in range(1, len(recent_main))
+    )
+    confirm_all_green = all(_candle_is_green(candle) for candle in recent_confirm)
+    confirm_advancing = all(
+        recent_confirm[idx]["close"] >= recent_confirm[idx - 1]["close"]
+        and recent_confirm[idx]["high"] >= recent_confirm[idx - 1]["high"]
+        for idx in range(1, len(recent_confirm))
+    )
+    latest_main_body_pass = latest_main_body_pct >= max(
+        config.SNIPER_PARABOLIC_MAIN_MIN_BODY_PCT,
+        prior_main_body_pct * config.SNIPER_PARABOLIC_MAIN_BODY_MULTIPLIER,
+    )
+    latest_main_volume_pass = (
+        prior_main_volume > 0
+        and latest_main_volume >= prior_main_volume * config.SNIPER_PARABOLIC_MAIN_VOLUME_MULTIPLIER
+        and latest_main_dollar_volume >= config.SNIPER_PARABOLIC_MAIN_MIN_DOLLAR_VOLUME
+    )
+
+    if not main_all_green:
+        result["failed_checks"].append(f"{main_label} parabolic sequence needs 3 green candles")
+    if not main_advancing:
+        result["failed_checks"].append(f"{main_label} parabolic sequence needs rising highs/closes")
+    if not latest_main_body_pass:
+        result["failed_checks"].append(
+            f"{main_label} latest body {latest_main_body_pct:.2f}% lacks parabolic expansion vs prior {prior_main_body_pct:.2f}%"
+        )
+    if not latest_main_volume_pass:
+        result["failed_checks"].append(
+            f"{main_label} latest volume {latest_main_volume:,.0f} lacks parabolic expansion vs prior {prior_main_volume:,.0f}"
+        )
+    if not confirm_all_green:
+        result["failed_checks"].append(f"{confirm_label} confirmation needs 3 green candles")
+    if not confirm_advancing:
+        result["failed_checks"].append(f"{confirm_label} confirmation needs rising highs/closes")
+
+    result["passed"] = not result["failed_checks"]
+    result["metrics"] = {
+        "main_label": main_label,
+        "confirm_label": confirm_label,
+        "latest_main_body_pct": latest_main_body_pct,
+        "prior_main_body_pct": prior_main_body_pct,
+        "latest_main_volume": latest_main_volume,
+        "prior_main_volume": prior_main_volume,
+        "latest_main_dollar_volume": latest_main_dollar_volume,
+        "main_all_green": main_all_green,
+        "main_advancing": main_advancing,
+        "confirm_all_green": confirm_all_green,
+        "confirm_advancing": confirm_advancing,
+        "latest_main_body_pass": latest_main_body_pass,
+        "latest_main_volume_pass": latest_main_volume_pass,
+    }
+    return result
 
 
 def _compute_volume_rate(volume_history: deque, window_seconds: int) -> Optional[float]:
@@ -466,6 +574,12 @@ def _analyze_fast_clean_move(
         timeframe_seconds=30,
         candle_count=config.SNIPER_30S_WINDOW_CANDLES,
     )
+    candles_1m = _build_candles(
+        contiguous_price_history,
+        contiguous_volume_history,
+        timeframe_seconds=60,
+        candle_count=max(4, config.SNIPER_MIN_IMPULSE_1M_CANDLES + 1),
+    )
     if len(candles_15s) < 4 or len(candles_30s) < 3:
         analysis["reasons"].append("Waiting for 15s/30s structure")
         return analysis
@@ -552,11 +666,27 @@ def _analyze_fast_clean_move(
         failed_checks.append("Impulse not advancing on 15s/30s")
 
     clean_passed = not failed_checks
-    extreme_clean = (
+    base_extreme_clean = (
         clean_passed
         and retracement_pct_of_impulse <= config.SNIPER_CLEAN_RETRACE_PREFERRED_PCT
         and red_30_count == 0
     )
+    parabolic_check = _evaluate_parabolic_progression(
+        main_candles=impulse_30s,
+        confirm_candles=impulse_15s,
+        current_price=current_price,
+        main_label="30s",
+        confirm_label="15s",
+    )
+    one_minute_no_red_flag = (
+        len(candles_1m) >= 2
+        and all(candle["close"] >= candle["open"] for candle in candles_1m[-2:])
+        and candles_1m[-1]["close"] >= candles_1m[-2]["close"]
+    )
+    parabolic_failed_checks = list(parabolic_check["failed_checks"])
+    if not one_minute_no_red_flag:
+        parabolic_failed_checks.append("1m confirmation shows a red flag")
+    extreme_clean = base_extreme_clean and not parabolic_failed_checks
 
     recent_prices_5s = [price for ts, price in contiguous_price_history if ts >= state.last_update - timedelta(seconds=5)]
     pullback_low = min(recent_prices_5s) if recent_prices_5s else current_price
@@ -597,6 +727,8 @@ def _analyze_fast_clean_move(
     if not failed_checks:
         if flush_entry_ready or continuation_entry_ready:
             analysis["first_failed_check"] = ""
+        elif base_extreme_clean and parabolic_failed_checks:
+            analysis["first_failed_check"] = parabolic_failed_checks[0]
         elif not flush_triggered and continuation_stop_valid:
             analysis["first_failed_check"] = ""
         elif not flush_triggered:
@@ -645,6 +777,12 @@ def _analyze_fast_clean_move(
         "flush_entry_ready": flush_entry_ready,
         "continuation_entry_ready": continuation_entry_ready,
         "entry_style": "flush" if flush_entry_ready else ("continuation" if continuation_entry_ready else ""),
+        "base_extreme_clean": base_extreme_clean,
+        "parabolic_check_passed": parabolic_check["passed"] and one_minute_no_red_flag,
+        "parabolic_main_label": "30s",
+        "parabolic_confirm_label": "15s",
+        "parabolic_one_minute_no_red_flag": one_minute_no_red_flag,
+        **{f"parabolic_{key}": value for key, value in parabolic_check["metrics"].items()},
     }
     analysis["reasons"] = [
         "Mode 15s/30s",
@@ -668,6 +806,8 @@ def _analyze_fast_clean_move(
     ]
     if failed_checks:
         analysis["reasons"].append(f"First fail: {failed_checks[0]}")
+    elif base_extreme_clean and parabolic_failed_checks:
+        analysis["reasons"].append(f"Parabolic fail: {parabolic_failed_checks[0]}")
     if flush_entry_ready:
         analysis["entry_reason"] = (
             f"15s/30s clean trend, sudden flush {flush_drop_pct:.2f}% from short-term high, "
@@ -697,6 +837,18 @@ def _analyze_one_minute_clean_move(
         contiguous_volume_history,
         timeframe_seconds=60,
         candle_count=config.SNIPER_1M_WINDOW_CANDLES,
+    )
+    candles_30s = _build_candles(
+        contiguous_price_history,
+        contiguous_volume_history,
+        timeframe_seconds=30,
+        candle_count=max(4, config.SNIPER_30S_WINDOW_CANDLES),
+    )
+    candles_15s = _build_candles(
+        contiguous_price_history,
+        contiguous_volume_history,
+        timeframe_seconds=15,
+        candle_count=max(4, config.SNIPER_15S_WINDOW_CANDLES),
     )
     if len(candles_1m) < 4:
         analysis["reasons"].append("Waiting for 1m structure")
@@ -775,11 +927,27 @@ def _analyze_one_minute_clean_move(
         failed_checks.append("Impulse not advancing on 1m")
 
     clean_passed = not failed_checks
-    extreme_clean = (
+    base_extreme_clean = (
         clean_passed
         and retracement_pct_of_impulse <= config.SNIPER_CLEAN_RETRACE_PREFERRED_PCT
         and red_1m_count == 0
     )
+    parabolic_check = _evaluate_parabolic_progression(
+        main_candles=impulse_1m,
+        confirm_candles=candles_30s,
+        current_price=current_price,
+        main_label="1m",
+        confirm_label="30s",
+    )
+    fifteen_second_no_red_flag = (
+        len(candles_15s) >= 3
+        and all(candle["close"] >= candle["open"] for candle in candles_15s[-3:])
+        and candles_15s[-1]["close"] >= candles_15s[-2]["close"] >= candles_15s[-3]["close"]
+    )
+    parabolic_failed_checks = list(parabolic_check["failed_checks"])
+    if not fifteen_second_no_red_flag:
+        parabolic_failed_checks.append("15s confirmation shows a red flag")
+    extreme_clean = base_extreme_clean and not parabolic_failed_checks
 
     recent_prices_5s = [price for ts, price in contiguous_price_history if ts >= state.last_update - timedelta(seconds=5)]
     pullback_low = min(recent_prices_5s) if recent_prices_5s else current_price
@@ -820,6 +988,8 @@ def _analyze_one_minute_clean_move(
     if not failed_checks:
         if flush_entry_ready or continuation_entry_ready:
             analysis["first_failed_check"] = ""
+        elif base_extreme_clean and parabolic_failed_checks:
+            analysis["first_failed_check"] = parabolic_failed_checks[0]
         elif not flush_triggered and continuation_stop_valid:
             analysis["first_failed_check"] = ""
         elif not flush_triggered:
@@ -866,6 +1036,12 @@ def _analyze_one_minute_clean_move(
         "flush_entry_ready": flush_entry_ready,
         "continuation_entry_ready": continuation_entry_ready,
         "entry_style": "flush" if flush_entry_ready else ("continuation" if continuation_entry_ready else ""),
+        "base_extreme_clean": base_extreme_clean,
+        "parabolic_check_passed": parabolic_check["passed"] and fifteen_second_no_red_flag,
+        "parabolic_main_label": "1m",
+        "parabolic_confirm_label": "30s",
+        "parabolic_fifteen_second_no_red_flag": fifteen_second_no_red_flag,
+        **{f"parabolic_{key}": value for key, value in parabolic_check["metrics"].items()},
     }
     analysis["reasons"] = [
         "Mode 1m squeeze",
@@ -888,6 +1064,8 @@ def _analyze_one_minute_clean_move(
     ]
     if failed_checks:
         analysis["reasons"].append(f"First fail: {failed_checks[0]}")
+    elif base_extreme_clean and parabolic_failed_checks:
+        analysis["reasons"].append(f"Parabolic fail: {parabolic_failed_checks[0]}")
     if flush_entry_ready:
         analysis["entry_reason"] = (
             f"1m clean squeeze, sudden flush {flush_drop_pct:.2f}% from short-term high, "
@@ -1295,7 +1473,15 @@ class CleanMomentumSniperManager:
             market_session=get_market_session(),
             bid=symbol_state.bid,
             ask=symbol_state.ask,
-            entry_context=dict(analysis.get("metrics", {})),
+            entry_context={
+                **dict(analysis.get("metrics", {})),
+                "structure_mode": analysis.get("structure_mode", ""),
+                "size_multiplier": (
+                    config.SNIPER_EXTREME_CLEAN_SIZE_MULTIPLIER
+                    if analysis.get("extreme_clean")
+                    else 1.0
+                ),
+            },
         )
         if success:
             self.pending_entries.pop(symbol, None)
@@ -1529,15 +1715,21 @@ def sniper_visualization(scanner_state, filtered_events, executor, sniper_manage
             pnl = (trade['exit_price'] - trade['entry_price']) * trade['shares']
             pnl_pct = (trade['exit_price'] - trade['entry_price']) / trade['entry_price'] * 100 if trade['entry_price'] else 0.0
             details = f"{trade['exit_type']} Exit at ${trade['exit_price']:.2f} (P&L: ${pnl:.2f}, {pnl_pct:+.2f}%)"
-            print(f"{trade['symbol']:<8} | {'CLOSED':<12} | {details:<80} | {time_disp}")
+            status_label = "CLOSED"
         elif trade['type'] == 'PARTIAL':
             pnl = (trade['exit_price'] - trade['entry_price']) * trade['shares']
             pnl_pct = (trade['exit_price'] - trade['entry_price']) / trade['entry_price'] * 100 if trade['entry_price'] else 0.0
             details = f"Partial at ${trade['exit_price']:.2f} ({trade['shares']} sh, P&L: ${pnl:.2f}, {pnl_pct:+.2f}%)"
-            print(f"{trade['symbol']:<8} | {'PARTIAL':<12} | {details:<80} | {time_disp}")
+            status_label = "PARTIAL"
         else:
             details = f"{trade['reason']} at ~${trade['entry_price']:.2f}"
-            print(f"{trade['symbol']:<8} | {'FAILED':<12} | {details:<80} | {time_disp}")
+            status_label = "FAILED"
+
+        print(
+            f"{trade['symbol']:<8} | "
+            f"{status_label:<12} | "
+            f"{details:<80} | {time_disp} | {_format_trade_reference_timeframe(trade)}"
+        )
     print("=" * 132)
 
 

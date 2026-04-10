@@ -108,6 +108,11 @@ class ExecutionEngine:
             except Exception:
                 pass
 
+    @staticmethod
+    def _get_trade_structure_mode(pos: Dict) -> str:
+        entry_context = pos.get('entry_context') or {}
+        return entry_context.get('structure_mode', '') or ''
+
     def register_position_event_callback(self, callback):
         self.position_event_callbacks.append(callback)
 
@@ -235,7 +240,8 @@ class ExecutionEngine:
                                 'reason': f"REJECTED: {errorString[:30]}...",
                                 'entry_price': pos['entry_price'],
                                 'entry_time': pos.get('submitted_at'),
-                                'time': datetime.now()
+                                'time': datetime.now(),
+                                'structure_mode': self._get_trade_structure_mode(pos),
                             })
                             self._cleanup_position(symbol)
                         return
@@ -355,7 +361,8 @@ class ExecutionEngine:
                             'reason': failure_reason,
                             'entry_price': pos['entry_price'],
                             'entry_time': pos.get('submitted_at'),
-                            'time': datetime.now()
+                            'time': datetime.now(),
+                            'structure_mode': self._get_trade_structure_mode(pos),
                         })
                         print(f"[EXEC] Parent order {orderId} for {symbol} FAILED ({failure_reason}).")
                         self._log_event(
@@ -400,7 +407,8 @@ class ExecutionEngine:
                         'exit_price': exit_price,
                         'shares': exit_shares,
                         'entry_time': pos.get('filled_at') or pos.get('submitted_at'),
-                        'time': datetime.now()
+                        'time': datetime.now(),
+                        'structure_mode': self._get_trade_structure_mode(pos),
                     })
                     print(f"[EXEC] >>> PARTIAL EXIT: {symbol} sold {exit_shares} at ${exit_price:.2f} <<<")
                     self._log_event(
@@ -476,7 +484,8 @@ class ExecutionEngine:
                             'exit_price': exit_price,
                             'shares': exit_shares,
                             'entry_time': pos.get('filled_at') or pos.get('submitted_at'),
-                            'time': datetime.now()
+                            'time': datetime.now(),
+                            'structure_mode': self._get_trade_structure_mode(pos),
                         })
                         print(f"[EXEC] >>> POSITION CLOSED: {symbol} via {exit_type} at ${exit_price:.2f} <<<")
                         self._log_event(
@@ -529,7 +538,8 @@ class ExecutionEngine:
                         'exit_price': exit_price,
                         'shares': exit_shares,
                         'entry_time': pos.get('filled_at') or pos.get('submitted_at'),
-                        'time': datetime.now()
+                        'time': datetime.now(),
+                        'structure_mode': self._get_trade_structure_mode(pos),
                     })
                     print(f"[EXEC] >>> POSITION CLOSED: {symbol} via SL at ${exit_price:.2f} <<<")
                     self._log_event(
@@ -668,7 +678,8 @@ class ExecutionEngine:
                 return False
 
             # Calculate shares and bracket prices
-            shares = int(self.investment_per_trade / entry_price)
+            position_size_multiplier = float((entry_context or {}).get('size_multiplier', 1.0) or 1.0)
+            shares = int((self.investment_per_trade * position_size_multiplier) / entry_price)
             if shares <= 0:
                 print(f"[EXEC] Investment too low for {symbol}. Skipping.")
                 return False
@@ -748,6 +759,7 @@ class ExecutionEngine:
             self.positions[symbol] = {
                 'entry_price': entry_price,
                 'entry_context': dict(entry_context or {}),
+                'position_size_multiplier': position_size_multiplier,
                 'entry_extension_pct': float((entry_context or {}).get('extension_pct', 0.0) or 0.0),
                 'shares': shares,
                 'requested_shares': shares,
@@ -824,6 +836,7 @@ class ExecutionEngine:
                 entry_order_type=parent_order_type,
                 entry_limit_price=limit_price,
                 spread_pct=spread_pct,
+                size_multiplier=position_size_multiplier,
             )
             return True
 
