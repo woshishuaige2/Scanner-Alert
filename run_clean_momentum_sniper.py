@@ -46,6 +46,7 @@ RUNTIME_FEEDBACK_DIR = os.path.join(os.path.dirname(__file__), config.RUNTIME_FE
 
 should_exit = False
 tws_app = None
+active_executor = None
 filtered_alerts = deque(maxlen=25)
 shutdown_event = threading.Event()
 
@@ -79,6 +80,21 @@ def _format_trade_reference_timeframe(trade: Dict[str, Any]) -> str:
 def signal_handler(sig, frame):
     global should_exit
     print("\n[INFO] Graceful exit requested...")
+    executor = active_executor
+    if executor is not None:
+        try:
+            print("[INFO] Emergency exit: submitting close-all orders for open positions...")
+            executor.close_all_positions(market_session=get_market_session())
+            broker_positions = executor.tws_app.request_open_positions(account=ACCOUNT_NUMBER, timeout=5.0)
+            if broker_positions:
+                print("[INFO] Emergency exit: flattening any remaining broker positions...")
+                executor.flatten_external_positions(
+                    broker_positions,
+                    market_session=get_market_session(),
+                    reason="sigint_flatten",
+                )
+        except Exception as exc:
+            print(f"[WARNING] Close-all on exit failed: {exc}")
     should_exit = True
     shutdown_event.set()
 
@@ -140,6 +156,15 @@ def _next_main_loop_start(now_et: datetime) -> datetime:
     if now_et < start_today:
         return start_today
     return now_et
+
+
+def _next_tradable_session_start(now_et: datetime) -> datetime:
+    candidate = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+    if now_et >= candidate:
+        candidate += timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate += timedelta(days=1)
+    return candidate
 
 
 def _bucket_start(ts: datetime, timeframe_seconds: int) -> datetime:
@@ -721,14 +746,18 @@ def _analyze_fast_clean_move(
         <= stop_distance_pct
         <= config.SNIPER_CONTINUATION_MAX_STOP_DISTANCE_PCT
     )
-    flush_entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    flush_entry_ready = clean_passed and pullback_in_range and flush_triggered and valid_stop
     continuation_entry_ready = extreme_clean and pullback_in_range and (not flush_triggered) and continuation_stop_valid
     entry_ready = flush_entry_ready or continuation_entry_ready
     if not failed_checks:
         if flush_entry_ready or continuation_entry_ready:
             analysis["first_failed_check"] = ""
-        elif base_extreme_clean and parabolic_failed_checks:
+        elif flush_triggered and not valid_stop:
+            analysis["first_failed_check"] = "Stop distance invalid for flush entry"
+        elif (not flush_triggered) and base_extreme_clean and parabolic_failed_checks:
             analysis["first_failed_check"] = parabolic_failed_checks[0]
+        elif base_extreme_clean and parabolic_failed_checks:
+            analysis["first_failed_check"] = ""
         elif not flush_triggered and continuation_stop_valid:
             analysis["first_failed_check"] = ""
         elif not flush_triggered:
@@ -741,7 +770,7 @@ def _analyze_fast_clean_move(
             analysis["first_failed_check"] = (
                 f"Total fade {fade_from_peak_pct:.2f}% exceeds cap {allowed_pullback_pct:.2f}%"
             )
-        elif not valid_stop:
+        elif flush_triggered and not valid_stop:
             analysis["first_failed_check"] = "Stop distance invalid for flush entry"
 
     analysis["clean_passed"] = clean_passed
@@ -982,14 +1011,18 @@ def _analyze_one_minute_clean_move(
         <= stop_distance_pct
         <= config.SNIPER_CONTINUATION_MAX_STOP_DISTANCE_PCT
     )
-    flush_entry_ready = extreme_clean and pullback_in_range and flush_triggered and valid_stop
+    flush_entry_ready = clean_passed and pullback_in_range and flush_triggered and valid_stop
     continuation_entry_ready = extreme_clean and pullback_in_range and (not flush_triggered) and continuation_stop_valid
     entry_ready = flush_entry_ready or continuation_entry_ready
     if not failed_checks:
         if flush_entry_ready or continuation_entry_ready:
             analysis["first_failed_check"] = ""
-        elif base_extreme_clean and parabolic_failed_checks:
+        elif flush_triggered and not valid_stop:
+            analysis["first_failed_check"] = "Stop distance invalid for flush entry"
+        elif (not flush_triggered) and base_extreme_clean and parabolic_failed_checks:
             analysis["first_failed_check"] = parabolic_failed_checks[0]
+        elif base_extreme_clean and parabolic_failed_checks:
+            analysis["first_failed_check"] = ""
         elif not flush_triggered and continuation_stop_valid:
             analysis["first_failed_check"] = ""
         elif not flush_triggered:
@@ -1002,7 +1035,7 @@ def _analyze_one_minute_clean_move(
             analysis["first_failed_check"] = (
                 f"Total fade {fade_from_peak_pct:.2f}% exceeds cap {allowed_pullback_pct:.2f}%"
             )
-        elif not valid_stop:
+        elif flush_triggered and not valid_stop:
             analysis["first_failed_check"] = "Stop distance invalid for flush entry"
 
     analysis["clean_passed"] = clean_passed
@@ -1753,7 +1786,7 @@ def build_sniper_runtime_state(
 
 
 def run_clean_momentum_sniper():
-    global tws_app
+    global tws_app, active_executor
     telemetry = RuntimeTelemetry(component="clean_momentum_sniper", base_dir=RUNTIME_FEEDBACK_DIR)
     permanently_excluded_symbols = set()
     et_tz = pytz.timezone('US/Eastern')
@@ -1788,6 +1821,60 @@ def run_clean_momentum_sniper():
             print("[ERROR] Could not connect to TWS.")
             return
 
+        executor = ExecutionEngine(
+            tws_app=tws_app,
+            account=ACCOUNT_NUMBER,
+            tp_pct=TP_PCT,
+            sl_pct=SL_PCT,
+            investment_per_trade=INVESTMENT_PER_TRADE,
+            telemetry=telemetry,
+        )
+        active_executor = executor
+
+        open_positions = tws_app.request_open_positions(account=ACCOUNT_NUMBER, timeout=5.0)
+        while open_positions and not should_exit:
+            current_session = get_market_session()
+            print("[SAFETY] Existing broker positions detected. Auto-flattening before sniper startup...")
+            for item in open_positions:
+                print(
+                    f"  - {item['symbol']} | {item['secType']} | "
+                    f"shares={item['position']:.0f} | avgCost=${item['avgCost']:.2f}"
+                )
+
+            if current_session == "CLOSED":
+                next_resolution_start = _next_tradable_session_start(datetime.now(et_tz))
+                print(
+                    f"[SAFETY] Market is CLOSED. Waiting until "
+                    f"{next_resolution_start.strftime('%Y-%m-%d %H:%M:%S %Z')} to flatten positions."
+                )
+                while not should_exit:
+                    now_et = datetime.now(et_tz)
+                    if now_et >= next_resolution_start:
+                        break
+                    wait_timeout = min(30, max(1, int((next_resolution_start - now_et).total_seconds())))
+                    if shutdown_event.wait(wait_timeout):
+                        break
+                if should_exit or shutdown_event.is_set():
+                    return
+                open_positions = tws_app.request_open_positions(account=ACCOUNT_NUMBER, timeout=5.0)
+                continue
+
+            open_positions = executor.ensure_account_flat_before_startup(
+                account=ACCOUNT_NUMBER,
+                market_session=current_session,
+                poll_timeout=5.0,
+                max_attempts=12,
+                pause_seconds=5.0,
+            )
+            if not open_positions:
+                print("[SAFETY] Existing broker positions flattened. Proceeding with sniper startup.")
+                break
+
+            print("[SAFETY] Broker positions still remain after flatten attempts. Retrying shortly...")
+            if shutdown_event.wait(10):
+                return
+            open_positions = tws_app.request_open_positions(account=ACCOUNT_NUMBER, timeout=5.0)
+
         if shutdown_event.wait(2):
             return
 
@@ -1804,14 +1891,6 @@ def run_clean_momentum_sniper():
         scanner = RealtimeBroadScanner(unique_symbols)
         initialize_alert_score_audit_file()
 
-        executor = ExecutionEngine(
-            tws_app=tws_app,
-            account=ACCOUNT_NUMBER,
-            tp_pct=TP_PCT,
-            sl_pct=SL_PCT,
-            investment_per_trade=INVESTMENT_PER_TRADE,
-            telemetry=telemetry,
-        )
         sniper_manager = CleanMomentumSniperManager(telemetry=telemetry)
         symbol_states: Dict[str, SniperSymbolState] = {symbol: SniperSymbolState(symbol) for symbol in unique_symbols}
 
@@ -1997,6 +2076,7 @@ def run_clean_momentum_sniper():
             if shutdown_event.wait(1):
                 break
     finally:
+        active_executor = None
         telemetry.log_event("scanner_stopped")
         telemetry.log_event("clean_sniper_stopped")
         if tws_app is not None:

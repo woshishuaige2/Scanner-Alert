@@ -196,6 +196,15 @@ Recent changes:
     - `15s` must avoid a nearby red-flag confirmation failure
   - the latest main-frame candle now has to show strong body expansion and strong volume expansion versus the prior candle, plus a minimum dollar-volume floor
 - sniper size now doubles when an entry passes the stricter `extreme_clean` filter
+- Stage 2 entry branching is now split more cleanly:
+  - flush entries require `clean_passed` plus flush / pullback / stop validation
+  - continuation entries still require the stricter parabolic `extreme_clean` gate
+  - this keeps flush entries available for strong structurally clean setups even if they do not qualify as rare parabolic continuations
+- sniper now has stronger operational position safety:
+  - on startup, it queries live broker positions for the configured account and auto-flattens any non-zero positions before the bot continues
+  - if startup happens while the market is closed, it waits for the next tradable session and then resumes the flatten process before proceeding
+  - on `Ctrl+C`, the bot now immediately submits close-all exits for tracked positions and also attempts to flatten any remaining broker positions before shutdown
+  - design intent is that no position should be intentionally left open when the sniper process is no longer running
 
 ## Shared `ExecutionEngine` context
 

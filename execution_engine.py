@@ -4,6 +4,7 @@ Handles order placement, position tracking, and risk management (TP/SL).
 """
 import math
 import threading
+import time
 from collections import deque
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
@@ -176,6 +177,124 @@ class ExecutionEngine:
         order.eTradeOnly = False
         order.firmQuoteOnly = False
         return order
+
+    def _build_market_buy_order(self, order_id: int, quantity: int) -> Order:
+        order = Order()
+        order.orderId = order_id
+        order.action = "BUY"
+        order.orderType = "MKT"
+        order.totalQuantity = quantity
+        order.account = self.account
+        order.tif = "DAY"
+        order.outsideRth = False
+        order.transmit = True
+        order.eTradeOnly = False
+        order.firmQuoteOnly = False
+        return order
+
+    def _external_position_reference_price(self, item: Dict) -> float:
+        symbol = item.get("symbol", "")
+        with self.tws_app.lock:
+            quote = dict(self.tws_app.realtime_data.get(symbol, {}))
+
+        bid = float(quote.get("bid", 0.0) or 0.0)
+        ask = float(quote.get("ask", 0.0) or 0.0)
+        price = float(quote.get("price", 0.0) or 0.0)
+        avg_cost = abs(float(item.get("avgCost", 0.0) or 0.0))
+        position = float(item.get("position", 0.0) or 0.0)
+
+        if position > 0:
+            return bid or price or ask or avg_cost or 0.01
+        return ask or price or bid or avg_cost or 0.01
+
+    def flatten_external_positions(
+        self,
+        positions: List[Dict],
+        market_session: str = "REGULAR",
+        *,
+        reason: str = "startup_flatten",
+        aggressive_buffer_pct: float = 5.0,
+    ) -> int:
+        """Submit flatten orders for broker positions not tracked in self.positions."""
+        tradable_sessions = {"PREMARKET", "REGULAR", "AFTERHOURS"}
+        if market_session not in tradable_sessions:
+            print(f"[EXEC] Skipping external position flatten: market session is {market_session}.")
+            return 0
+
+        submitted = 0
+        for item in positions:
+            symbol = (item.get("symbol") or "").strip().upper()
+            sec_type = (item.get("secType") or "STK").strip().upper()
+            raw_position = float(item.get("position", 0.0) or 0.0)
+            quantity = int(round(abs(raw_position)))
+            if not symbol or quantity <= 0:
+                continue
+            if sec_type and sec_type != "STK":
+                print(f"[EXEC] Skipping external {sec_type} position for {symbol}; only STK auto-flatten is supported.")
+                continue
+
+            order_id = self.tws_app.next_order_id
+            self.tws_app.next_order_id += 1
+            contract = self._create_contract(symbol)
+            action = "SELL" if raw_position > 0 else "BUY"
+
+            if market_session == "REGULAR":
+                order = (
+                    self._build_market_sell_order(order_id, quantity)
+                    if action == "SELL"
+                    else self._build_market_buy_order(order_id, quantity)
+                )
+            else:
+                reference_price = self._external_position_reference_price(item)
+                if action == "SELL":
+                    limit_price = max(0.01, self._round_price(reference_price * (1.0 - aggressive_buffer_pct / 100.0)))
+                    order = self._build_limit_sell_order(order_id, quantity, limit_price, outside_rth=True)
+                else:
+                    limit_price = max(0.01, self._round_price(reference_price * (1.0 + aggressive_buffer_pct / 100.0)))
+                    order = self._build_limit_buy_order(order_id, quantity, limit_price, outside_rth=True)
+                order.tif = "IOC"
+
+            self._register_order(order_id, symbol, reason)
+            self.tws_app.placeOrder(order.orderId, contract, order)
+            submitted += 1
+            print(f"[EXEC] Submitted {reason} order {order_id} for {symbol}: {action} {quantity} shares")
+            self._log_event(
+                "external_flatten_order_submitted",
+                symbol=symbol,
+                order_id=order_id,
+                reason=reason,
+                market_session=market_session,
+                action=action,
+                quantity=quantity,
+            )
+        return submitted
+
+    def ensure_account_flat_before_startup(
+        self,
+        *,
+        account: Optional[str] = None,
+        market_session: str = "REGULAR",
+        poll_timeout: float = 5.0,
+        max_attempts: int = 12,
+        pause_seconds: float = 5.0,
+    ) -> List[Dict]:
+        """Repeatedly flatten broker positions until the account is flat or attempts are exhausted."""
+        remaining = self.tws_app.request_open_positions(account=account or self.account, timeout=poll_timeout)
+        attempt = 0
+        while remaining and attempt < max_attempts:
+            attempt += 1
+            print(f"[EXEC] Startup safety flatten attempt {attempt}: {len(remaining)} broker position(s) remain.")
+            submitted = self.flatten_external_positions(
+                remaining,
+                market_session=market_session,
+                reason=f"startup_flatten_attempt_{attempt}",
+                aggressive_buffer_pct=min(25.0, 5.0 * attempt),
+            )
+            if submitted <= 0:
+                break
+            time.sleep(max(1.0, pause_seconds))
+            remaining = self.tws_app.request_open_positions(account=account or self.account, timeout=poll_timeout)
+        return remaining
 
     def _cancel_pending_entry_locked(self, symbol: str, pos: Dict, reason: str):
         if pos.get('entry_cancel_requested'):

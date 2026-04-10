@@ -76,6 +76,10 @@ class TWSDataApp(EClient, EWrapper):
         self.historical_news_events = {} # reqId -> threading.Event
         self.news_cache = {} # symbol -> list of headlines
 
+        # Broker position snapshot storage
+        self.positions_snapshot = []
+        self.positions_event = threading.Event()
+
     @staticmethod
     def normalize_stock_volume(value) -> float:
         """
@@ -107,6 +111,21 @@ class TWSDataApp(EClient, EWrapper):
     def execDetails(self, reqId, contract, execution):
         """Handle execution details"""
         pass
+
+    def position(self, account, contract, position, avgCost):
+        """Receive broker position snapshot rows."""
+        with self.lock:
+            self.positions_snapshot.append({
+                "account": account,
+                "symbol": getattr(contract, "symbol", ""),
+                "secType": getattr(contract, "secType", ""),
+                "position": float(position or 0.0),
+                "avgCost": float(avgCost or 0.0),
+            })
+
+    def positionEnd(self):
+        """Called when reqPositions snapshot is complete."""
+        self.positions_event.set()
 
     def fundamentalData(self, reqId: int, data: str):
         """Receive fundamental data XML"""
@@ -668,6 +687,31 @@ class TWSDataApp(EClient, EWrapper):
             if symbol in self.realtime_data:
                 return self.realtime_data[symbol].get('vwap')
         return None
+
+    def request_open_positions(self, account: Optional[str] = None, timeout: float = 5.0) -> List[Dict]:
+        """Return current non-zero broker positions, optionally filtered to one account."""
+        with self.lock:
+            self.positions_snapshot = []
+            self.positions_event.clear()
+
+        self.reqPositions()
+        self.positions_event.wait(timeout)
+        try:
+            self.cancelPositions()
+        except Exception:
+            pass
+
+        with self.lock:
+            snapshot = list(self.positions_snapshot)
+
+        filtered = []
+        for item in snapshot:
+            if account and item["account"] != account:
+                continue
+            if abs(item["position"]) <= 0:
+                continue
+            filtered.append(item)
+        return filtered
 
 
 
