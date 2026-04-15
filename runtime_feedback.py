@@ -49,7 +49,7 @@ class RuntimeTelemetry:
     def _write_json_snapshot(self, target_path: str, payload: dict, required: bool = True) -> bool:
         temp_path = f"{target_path}.{os.getpid()}.{threading.get_ident()}.tmp"
         last_error = None
-        for attempt in range(3):
+        for attempt in range(10):
             try:
                 with open(temp_path, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2)
@@ -65,10 +65,12 @@ class RuntimeTelemetry:
                     except OSError:
                         pass
 
-        if required and last_error:
-            raise last_error
         if last_error:
-            print(f"[WARNING] Could not update shared runtime state {target_path}: {last_error}")
+            severity = "ERROR" if required else "WARNING"
+            print(
+                f"[{severity}] Could not update shared runtime state {target_path} "
+                f"after repeated retries: {last_error}"
+            )
         return False
 
     def log_event(self, event_type: str, **payload):
