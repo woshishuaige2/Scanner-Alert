@@ -172,6 +172,10 @@ Important sniper rules:
 
 Recent changes:
 - sniper clean-context logic was changed from a blunt rolling window to an impulse-anchored window
+- previous-close loading was fixed for premarket:
+  - IBKR daily historical bars can return only completed RTH days before the current regular session opens
+  - the scanner now uses the latest completed daily bar before today instead of blindly using `bars[-2]`
+  - this prevents premarket GAIN% from accidentally referencing two trading sessions ago
 - sniper can now accept clean 1m squeeze structure as an alternate Stage 2 path
 - sniper total-fade tolerance is now tiered by extension instead of using only a flat max-fade cap
 - sniper entry trigger was changed from a micro-pullback-low rule to a sudden flush trigger

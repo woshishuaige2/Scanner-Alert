@@ -655,13 +655,28 @@ class TWSDataApp(EClient, EWrapper):
             what_to_show="TRADES",
             use_rth=1,
         )
+        if not bars:
+            return None
+
+        today = datetime.now().date()
+        completed_prior_bars = []
+        for bar in bars:
+            bar_date = str(bar.get('date', '')).split()[0]
+            if len(bar_date) == 8 and bar_date.isdigit():
+                try:
+                    if datetime.strptime(bar_date, "%Y%m%d").date() < today:
+                        completed_prior_bars.append(bar)
+                except ValueError:
+                    pass
+
+        if completed_prior_bars:
+            return completed_prior_bars[-1]['close']
+
+        # Fallback for unexpected date formats. If TWS includes today's partial
+        # daily bar, use the prior bar; otherwise use the only/latest completed bar.
         if len(bars) >= 2:
-            # bars[-1] is today's current bar, bars[-2] is the previous day's complete bar
             return bars[-2]['close']
-        elif len(bars) == 1:
-            # If only one bar returned, it might be the previous day's close if today hasn't started
-            return bars[0]['close']
-        return None
+        return bars[-1]['close']
     
     def fetch_avg_daily_volume(self, symbol: str, days: int = 10) -> Optional[float]:
         """Calculate average daily volume from historical data (fallback when fundamental data unavailable)."""
