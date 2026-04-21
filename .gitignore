@@ -22,6 +22,7 @@ env/
 *.log
 tws_errors.log
 runtime_feedback/
+alert_history/
 
 # OS
 .DS_Store

@@ -13,6 +13,20 @@ from ibapi.order import Order
 import scanner_config as config
 
 class ExecutionEngine:
+    EXIT_ROLES = {
+        'partial_exit',
+        'final_exit',
+        'eod_exit',
+        'time_exit',
+        'wall_clock_exit',
+        'volume_fade_exit',
+        'structure_exit',
+        'reopen_weak_exit',
+        'flush_fail_exit',
+        'extended_hours_stop_exit',
+        'session_close_exit',
+    }
+
     def __init__(self, tws_app, account: str, tp_pct: float = 1.0, sl_pct: float = 10.0, investment_per_trade: float = 1000.0, telemetry=None):
         self.tws_app = tws_app
         self.account = account
@@ -113,6 +127,10 @@ class ExecutionEngine:
     def _get_trade_structure_mode(pos: Dict) -> str:
         entry_context = pos.get('entry_context') or {}
         return entry_context.get('structure_mode', '') or ''
+
+    @staticmethod
+    def _get_trade_id(pos: Dict) -> Optional[str]:
+        return pos.get('trade_id')
 
     def register_position_event_callback(self, callback):
         self.position_event_callbacks.append(callback)
@@ -354,6 +372,7 @@ class ExecutionEngine:
                         if symbol in self.positions and self.positions[symbol]['status'] == 'SUBMITTED':
                             pos = self.positions[symbol]
                             self.trade_history.append({
+                                'trade_id': self._get_trade_id(pos),
                                 'symbol': symbol,
                                 'type': 'FAILED',
                                 'reason': f"REJECTED: {errorString[:30]}...",
@@ -436,6 +455,7 @@ class ExecutionEngine:
                         )
                     self._log_event(
                         "position_opened",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         actual_entry_price=pos['actual_entry_price'],
@@ -443,6 +463,7 @@ class ExecutionEngine:
                     )
                     self._emit_position_event(
                         "position_opened",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         actual_entry_price=pos['actual_entry_price'],
@@ -475,6 +496,7 @@ class ExecutionEngine:
                     if pos['status'] == 'SUBMITTED':
                         failure_reason = pos.get('pending_cancel_reason') or status
                         self.trade_history.append({
+                            'trade_id': self._get_trade_id(pos),
                             'symbol': symbol,
                             'type': 'FAILED',
                             'reason': failure_reason,
@@ -503,12 +525,34 @@ class ExecutionEngine:
                             reason=pos.get('pending_cancel_reason') or status,
                             filled_shares=pos.get('filled_shares', 0),
                         )
-                elif role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit', 'flush_fail_exit']:
+                elif role in self.EXIT_ROLES:
                     if pos.get('active_exit_order_id') == orderId:
                         pos['exit_pending'] = False
                         pos['active_exit_order_id'] = None
+                        pos['last_exit_cancelled_at'] = datetime.now()
+                        pos['last_exit_cancelled_status'] = status
+                        self._log_event(
+                            "exit_order_not_filled",
+                            trade_id=self._get_trade_id(pos),
+                            symbol=symbol,
+                            order_id=orderId,
+                            role=role,
+                            status=status,
+                            filled=filled_qty,
+                            remaining=remaining,
+                            remaining_shares=pos.get('remaining_shares'),
+                        )
+                        self._emit_position_event(
+                            "exit_order_not_filled",
+                            trade_id=self._get_trade_id(pos),
+                            symbol=symbol,
+                            order_id=orderId,
+                            role=role,
+                            status=status,
+                            remaining_shares=pos.get('remaining_shares'),
+                        )
 
-            if delta_filled > 0 and role in ['partial_exit', 'final_exit', 'eod_exit', 'time_exit', 'wall_clock_exit', 'volume_fade_exit', 'structure_exit', 'reopen_weak_exit', 'flush_fail_exit', 'extended_hours_stop_exit', 'session_close_exit']:
+            if delta_filled > 0 and role in self.EXIT_ROLES:
                 exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('last_price', pos.get('actual_entry_price', pos['entry_price']))
                 exit_shares = min(int(delta_filled), pos['remaining_shares'])
                 pos['remaining_shares'] = max(0, pos['remaining_shares'] - exit_shares)
@@ -519,6 +563,7 @@ class ExecutionEngine:
                 if role == 'partial_exit':
                     pos['partial_taken'] = True
                     self.trade_history.append({
+                        'trade_id': self._get_trade_id(pos),
                         'symbol': symbol,
                         'type': 'PARTIAL',
                         'exit_type': 'PARTIAL',
@@ -532,6 +577,7 @@ class ExecutionEngine:
                     print(f"[EXEC] >>> PARTIAL EXIT: {symbol} sold {exit_shares} at ${exit_price:.2f} <<<")
                     self._log_event(
                         "partial_exit_filled",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         exit_price=exit_price,
@@ -540,6 +586,7 @@ class ExecutionEngine:
                     )
                     self._emit_position_event(
                         "partial_exit_filled",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         exit_price=exit_price,
@@ -578,6 +625,7 @@ class ExecutionEngine:
                     if pos['remaining_shares'] > 0:
                         self._log_event(
                             "exit_partial_fill_updated",
+                            trade_id=self._get_trade_id(pos),
                             symbol=symbol,
                             order_id=orderId,
                             exit_type=exit_type,
@@ -587,6 +635,7 @@ class ExecutionEngine:
                         )
                         self._emit_position_event(
                             "exit_partial_fill_updated",
+                            trade_id=self._get_trade_id(pos),
                             symbol=symbol,
                             order_id=orderId,
                             exit_type=exit_type,
@@ -596,6 +645,7 @@ class ExecutionEngine:
                         )
                     else:
                         self.trade_history.append({
+                            'trade_id': self._get_trade_id(pos),
                             'symbol': symbol,
                             'type': 'CLOSED',
                             'exit_type': exit_type,
@@ -609,6 +659,7 @@ class ExecutionEngine:
                         print(f"[EXEC] >>> POSITION CLOSED: {symbol} via {exit_type} at ${exit_price:.2f} <<<")
                         self._log_event(
                             "position_closed",
+                            trade_id=self._get_trade_id(pos),
                             symbol=symbol,
                             order_id=orderId,
                             exit_type=exit_type,
@@ -617,6 +668,7 @@ class ExecutionEngine:
                         )
                         self._emit_position_event(
                             "position_closed",
+                            trade_id=self._get_trade_id(pos),
                             symbol=symbol,
                             order_id=orderId,
                             exit_type=exit_type,
@@ -633,6 +685,7 @@ class ExecutionEngine:
                 if pos['remaining_shares'] > 0:
                     self._log_event(
                         "stop_partial_fill_updated",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         exit_price=exit_price,
@@ -641,6 +694,7 @@ class ExecutionEngine:
                     )
                     self._emit_position_event(
                         "stop_partial_fill_updated",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         exit_price=exit_price,
@@ -650,6 +704,7 @@ class ExecutionEngine:
                 else:
                     self._cancel_protective_orders_locked(pos, filled_order_id=orderId)
                     self.trade_history.append({
+                        'trade_id': self._get_trade_id(pos),
                         'symbol': symbol,
                         'type': 'CLOSED',
                         'exit_type': 'SL',
@@ -663,6 +718,7 @@ class ExecutionEngine:
                     print(f"[EXEC] >>> POSITION CLOSED: {symbol} via SL at ${exit_price:.2f} <<<")
                     self._log_event(
                         "position_closed",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         exit_type="SL",
@@ -671,6 +727,7 @@ class ExecutionEngine:
                     )
                     self._emit_position_event(
                         "position_closed",
+                        trade_id=self._get_trade_id(pos),
                         symbol=symbol,
                         order_id=orderId,
                         exit_type="SL",
@@ -741,6 +798,7 @@ class ExecutionEngine:
         self.tws_app.placeOrder(order.orderId, self._create_contract(symbol), order)
         self._log_event(
             "exit_order_submitted",
+            trade_id=pos.get('trade_id'),
             symbol=symbol,
             order_id=order_id,
             role=role,
@@ -770,6 +828,7 @@ class ExecutionEngine:
         print(f"[EXEC] Submitted {role} order {order_id} for {symbol}: {quantity} shares")
         self._log_event(
             "exit_order_submitted",
+            trade_id=pos.get('trade_id'),
             symbol=symbol,
             order_id=order_id,
             role=role,
@@ -876,6 +935,7 @@ class ExecutionEngine:
                 )
             
             self.positions[symbol] = {
+                'trade_id': f"{symbol}-{parent_id}",
                 'entry_price': entry_price,
                 'entry_context': dict(entry_context or {}),
                 'position_size_multiplier': position_size_multiplier,
@@ -921,6 +981,8 @@ class ExecutionEngine:
                 'last_exit_rejection_at': None,
                 'last_exit_rejection_reason': None,
                 'last_exit_rejection_role': None,
+                'last_exit_cancelled_at': None,
+                'last_exit_cancelled_status': None,
                 'volume_history': deque(maxlen=128),
                 'peak_volume_rate_15s': 0.0,
                 'volume_fade_warning_at': None,
@@ -944,6 +1006,7 @@ class ExecutionEngine:
                 print(f"[EXEC] Entry submitted for {symbol}: {shares} shares | first target ${partial_target_price:.2f} | stop ${stop_price:.2f}")
             self._log_event(
                 "entry_submitted",
+                trade_id=self.positions[symbol].get('trade_id'),
                 symbol=symbol,
                 parent_order_id=parent_id,
                 stop_order_id=stop_id,
@@ -1347,6 +1410,7 @@ class ExecutionEngine:
             details = []
             for symbol, pos in self.positions.items():
                 details.append({
+                    'trade_id': pos.get('trade_id'),
                     'symbol': symbol,
                     'status': pos['status'],
                     'entry': pos.get('actual_entry_price') or pos['entry_price'],
@@ -1354,6 +1418,10 @@ class ExecutionEngine:
                     'tp': pos['partial_target_price'],
                     'sl': pos['current_stop_price'],
                     'shares': pos['remaining_shares'],
+                    'exit_pending': pos.get('exit_pending', False),
+                    'active_exit_order_id': pos.get('active_exit_order_id'),
+                    'last_exit_rejection_reason': pos.get('last_exit_rejection_reason'),
+                    'last_exit_cancelled_status': pos.get('last_exit_cancelled_status'),
                     'time': pos.get('filled_at') or pos.get('submitted_at')
                 })
             return details

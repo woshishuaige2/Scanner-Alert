@@ -142,6 +142,35 @@ def _compute_buffered_structure_stop(current_price: float, chosen_stop_ref: Opti
     return stop_price
 
 
+def _select_structure_stop(
+    current_price: float,
+    stop_ref_candidates: List[Optional[float]],
+    min_distance_pct: float,
+    max_distance_pct: float,
+) -> tuple[Optional[float], Optional[float], Optional[float]]:
+    valid_refs = sorted(
+        {
+            float(candidate)
+            for candidate in stop_ref_candidates
+            if candidate is not None and current_price > 0 and 0 < float(candidate) < current_price
+        },
+        reverse=True,
+    )
+    closest_candidate = (None, None, None)
+
+    for stop_ref in valid_refs:
+        stop_price = _compute_buffered_structure_stop(current_price, stop_ref)
+        if stop_price is None:
+            continue
+        stop_distance_pct = ((current_price - stop_price) / current_price) * 100.0
+        if closest_candidate == (None, None, None):
+            closest_candidate = (stop_price, stop_distance_pct, stop_ref)
+        if min_distance_pct <= stop_distance_pct <= max_distance_pct:
+            return stop_price, stop_distance_pct, stop_ref
+
+    return closest_candidate
+
+
 def _format_display_price(value: Optional[float]) -> str:
     if value is None:
         return "N/A"
@@ -726,13 +755,13 @@ def _analyze_fast_clean_move(
     flush_triggered = flush_drop_pct >= config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT
     pullback_in_range = fade_from_peak_pct <= allowed_pullback_pct
 
-    stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
-    chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
-    stop_price = _compute_buffered_structure_stop(current_price, chosen_stop_ref)
-    stop_distance_pct = None
-    if stop_price is not None:
-        if current_price > 0:
-            stop_distance_pct = ((current_price - stop_price) / current_price) * 100.0
+    stop_ref_candidates = [pullback_low, support_price]
+    stop_price, stop_distance_pct, chosen_stop_ref = _select_structure_stop(
+        current_price,
+        stop_ref_candidates,
+        config.SNIPER_MIN_STOP_DISTANCE_PCT,
+        config.SNIPER_MAX_STOP_DISTANCE_PCT,
+    )
 
     valid_stop = (
         stop_price is not None
@@ -803,6 +832,7 @@ def _analyze_fast_clean_move(
         "flush_drop_pct": flush_drop_pct,
         "flush_reference_price": flush_reference_price,
         "stop_distance_pct": stop_distance_pct,
+        "chosen_stop_ref": chosen_stop_ref,
         "flush_entry_ready": flush_entry_ready,
         "continuation_entry_ready": continuation_entry_ready,
         "entry_style": "flush" if flush_entry_ready else ("continuation" if continuation_entry_ready else ""),
@@ -991,13 +1021,13 @@ def _analyze_one_minute_clean_move(
     flush_triggered = flush_drop_pct >= config.SNIPER_FLUSH_ENTRY_MIN_DROP_PCT
     pullback_in_range = fade_from_peak_pct <= allowed_pullback_pct
 
-    stop_ref_candidates = [candidate for candidate in (pullback_low, support_price) if candidate is not None and candidate < current_price]
-    chosen_stop_ref = max(stop_ref_candidates) if stop_ref_candidates else None
-    stop_price = _compute_buffered_structure_stop(current_price, chosen_stop_ref)
-    stop_distance_pct = None
-    if stop_price is not None:
-        if current_price > 0:
-            stop_distance_pct = ((current_price - stop_price) / current_price) * 100.0
+    stop_ref_candidates = [pullback_low, support_price]
+    stop_price, stop_distance_pct, chosen_stop_ref = _select_structure_stop(
+        current_price,
+        stop_ref_candidates,
+        config.SNIPER_MIN_STOP_DISTANCE_PCT,
+        config.SNIPER_MAX_STOP_DISTANCE_PCT,
+    )
 
     valid_stop = (
         stop_price is not None
@@ -1066,6 +1096,7 @@ def _analyze_one_minute_clean_move(
         "flush_drop_pct": flush_drop_pct,
         "flush_reference_price": flush_reference_price,
         "stop_distance_pct": stop_distance_pct,
+        "chosen_stop_ref": chosen_stop_ref,
         "flush_entry_ready": flush_entry_ready,
         "continuation_entry_ready": continuation_entry_ready,
         "entry_style": "flush" if flush_entry_ready else ("continuation" if continuation_entry_ready else ""),
@@ -1321,6 +1352,88 @@ class CleanMomentumSniperManager:
         )
         return True
 
+    def _maybe_invalidate_pending_setup(
+        self,
+        symbol: str,
+        candidate: Dict[str, Any],
+        symbol_state: SniperSymbolState,
+        analysis: Dict[str, Any],
+        now: datetime,
+        filtered_events: deque,
+    ) -> bool:
+        current_price = symbol_state.price or 0.0
+        alert_price = float(candidate.get("alert_price", 0.0) or 0.0)
+        post_alert_high = max(float(candidate.get("post_alert_high", alert_price) or alert_price), current_price)
+        candidate["post_alert_high"] = post_alert_high
+
+        if analysis.get("entry_ready") or current_price <= 0:
+            candidate["pending_support_break_started_at"] = None
+            return False
+
+        structure_mode = analysis.get("structure_mode") or ""
+        support_price = analysis.get("support_price")
+        support_label = analysis.get("support_label") or "support"
+
+        if structure_mode in {"15s/30s", "1m"} and support_price and support_price > 0:
+            support_break_threshold = support_price * (
+                1 - config.SNIPER_PENDING_SUPPORT_BREAK_BUFFER_PCT / 100.0
+            )
+            if current_price < support_break_threshold:
+                breach_started_at = candidate.get("pending_support_break_started_at")
+                if breach_started_at is None:
+                    candidate["pending_support_break_started_at"] = now
+                    return False
+                if (now - breach_started_at).total_seconds() >= config.SNIPER_PENDING_SUPPORT_BREAK_PERSIST_SECONDS:
+                    self.pending_entries.pop(symbol, None)
+                    self._set_cooldown(symbol, now)
+                    reason = (
+                        f"{structure_mode} pending setup broke {support_label} "
+                        f"${support_price:.2f} by {config.SNIPER_PENDING_SUPPORT_BREAK_BUFFER_PCT:.2f}%"
+                    )
+                    append_sniper_event(filtered_events, f"{symbol} sniper setup invalidated")
+                    self._log_event(
+                        "sniper_setup_invalidated",
+                        symbol=symbol,
+                        reason="selected_mode_support_break",
+                        detail=reason,
+                        price=current_price,
+                        support_price=support_price,
+                        structure_mode=structure_mode,
+                        effective_wait_seconds=round(self._get_effective_wait_seconds(candidate, now), 1),
+                    )
+                    return True
+            else:
+                candidate["pending_support_break_started_at"] = None
+            return False
+
+        candidate["pending_support_break_started_at"] = None
+        if alert_price <= 0 or post_alert_high <= 0:
+            return False
+
+        post_alert_drop_pct = ((post_alert_high - current_price) / post_alert_high) * 100.0
+        alert_loss_pct = ((alert_price - current_price) / alert_price) * 100.0
+        if (
+            post_alert_drop_pct >= config.SNIPER_PENDING_SEVERE_DROP_PCT
+            and alert_loss_pct >= config.SNIPER_PENDING_ALERT_LOSS_BUFFER_PCT
+        ):
+            self.pending_entries.pop(symbol, None)
+            self._set_cooldown(symbol, now)
+            append_sniper_event(filtered_events, f"{symbol} sniper setup invalidated")
+            self._log_event(
+                "sniper_setup_invalidated",
+                symbol=symbol,
+                reason="severe_post_alert_damage",
+                price=current_price,
+                alert_price=alert_price,
+                post_alert_high=post_alert_high,
+                post_alert_drop_pct=post_alert_drop_pct,
+                alert_loss_pct=alert_loss_pct,
+                effective_wait_seconds=round(self._get_effective_wait_seconds(candidate, now), 1),
+            )
+            return True
+
+        return False
+
     def discard_symbol(self, symbol: str) -> None:
         self.pending_entries.pop(symbol, None)
         self.cooldowns.pop(symbol, None)
@@ -1387,6 +1500,8 @@ class CleanMomentumSniperManager:
             existing["alert_score"] = score
             existing["reasons"] = list(alert_event.get("reasons", []))
             existing["latest_analysis"] = None
+            existing["post_alert_high"] = alert_price
+            existing["pending_support_break_started_at"] = None
             self._reset_pending_pause_state(existing)
             return
 
@@ -1397,6 +1512,8 @@ class CleanMomentumSniperManager:
             "alert_score": score,
             "reasons": list(alert_event.get("reasons", [])),
             "latest_analysis": None,
+            "post_alert_high": alert_price,
+            "pending_support_break_started_at": None,
             "paused_seconds": 0.0,
             "market_pause_state": "ACTIVE",
             "market_pause_detected_at": None,
@@ -1492,6 +1609,8 @@ class CleanMomentumSniperManager:
             reasons=list(analysis.get("reasons", [])),
             metrics=dict(analysis.get("metrics", {})),
         )
+        if self._maybe_invalidate_pending_setup(symbol, candidate, symbol_state, analysis, now, filtered_events):
+            return
         if not analysis.get("entry_ready"):
             return
 

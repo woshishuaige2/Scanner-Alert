@@ -176,6 +176,15 @@ Recent changes:
   - IBKR daily historical bars can return only completed RTH days before the current regular session opens
   - the scanner now uses the latest completed daily bar before today instead of blindly using `bars[-2]`
   - this prevents premarket GAIN% from accidentally referencing two trading sessions ago
+- sniper structure stops now avoid hair-trigger entries:
+  - the minimum allowed stop distance was raised from `0.35%` to `0.75%`
+  - stop selection now checks nearby structure first but can fall through to a deeper valid structure reference
+  - this is meant to avoid RPAY-style premarket flush entries stopping out from normal one-tick noise
+- sniper pending setups now have conservative damage invalidation:
+  - this is cleanup logic for queued alerts, not an entry rule
+  - selected `15s/30s` or `1m` setups can be canceled if price breaks the selected mode's support with a small buffer and persistence
+  - unknown/waiting setups are canceled only after severe post-alert damage plus loss of the original alert price
+  - goal is to remove obviously broken RPAY-style queued alerts sooner without killing meaningful pullbacks
 - sniper can now accept clean 1m squeeze structure as an alternate Stage 2 path
 - sniper total-fade tolerance is now tiered by extension instead of using only a flat max-fade cap
 - sniper entry trigger was changed from a micro-pullback-low rule to a sudden flush trigger

@@ -2,6 +2,7 @@
 Ross Cameron-style Scanner Configuration
 Togglable conditions for preliminary screening.
 """
+import os
 
 # PRELIMINARY SCREENING TOGGLES
 ENABLE_LOW_FLOAT_MED_RVOL = True
@@ -157,7 +158,7 @@ FAST_IGNITION_VOLUME_MULTIPLIER = 2.0   # 5s burst volume vs trailing average
 FAST_IGNITION_MAX_RETRACEMENT_PCT = 1.0 # Allowed pullback from local high
 
 # DISCORD ALERT CONFIGURATION
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1474054384131248310/43pw1SxLPf2j9Rj1gRrh6SL3SZ9zuHhqn2QmRFZ-sZ7a_DnordIXbbHFKxyaGjYzoSAg"
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
 # TWS CONNECTION CONFIGURATION
 # 7496 for Live Trading, 7497 for Paper Trading
@@ -219,7 +220,7 @@ SNIPER_PULLBACK_EXTENSION_FACTOR = 0.20          # Allow entry pullback up to th
 SNIPER_PULLBACK_MAX_CAP_PCT = 5.0                # Hard cap on adaptive entry pullback allowance from peak
 SNIPER_STOP_BUFFER_PCT = 0.20                    # Small noise buffer below the chosen structure stop
 SNIPER_STOP_BUFFER_MIN_DOLLARS = 0.01            # Minimum absolute buffer so low-priced stops stay below structure after cent rounding
-SNIPER_MIN_STOP_DISTANCE_PCT = 0.35              # Avoid stops that sit unrealistically close to entry
+SNIPER_MIN_STOP_DISTANCE_PCT = 0.75              # Avoid hair-trigger stops that sit inside normal premarket noise
 SNIPER_MAX_STOP_DISTANCE_PCT = 3.0               # Skip setups whose valid structure stop is too far away
 SNIPER_CONTINUATION_MAX_STOP_DISTANCE_PCT = 2.0  # Tighter stop cap for continuation entries without a flush
 SNIPER_POST_ENTRY_BOUNCE_CHECK_SECONDS = 5.0     # If a flush entry does not bounce within this many seconds, cut it
@@ -228,6 +229,10 @@ SNIPER_POST_ENTRY_MAX_ADVERSE_PCT = 0.75         # If the flush keeps extending 
 SNIPER_POST_ENTRY_ADVERSE_EXTENSION_FACTOR = 0.25 # Allow adverse move up to this fraction of extension_pct for strong trends
 SNIPER_POST_ENTRY_MAX_ADVERSE_CAP_PCT = 5.0      # Hard cap on the adaptive adverse-move allowance before bounce confirmation
 SNIPER_STRUCTURE_BREAK_PERSIST_SECONDS = 1.0     # 15s structure break must persist to count as invalid
+SNIPER_PENDING_SUPPORT_BREAK_BUFFER_PCT = 0.20   # Pending setup must break selected-mode support by this buffer before invalidation starts
+SNIPER_PENDING_SUPPORT_BREAK_PERSIST_SECONDS = 1.0 # Selected-mode support break must persist before canceling a pending setup
+SNIPER_PENDING_SEVERE_DROP_PCT = 3.0             # Unknown-mode pending setups are canceled only after this much post-alert damage
+SNIPER_PENDING_ALERT_LOSS_BUFFER_PCT = 0.50      # Severe damage must also lose alert price by this buffer before canceling
 
 # DYNAMIC EXIT MANAGEMENT (Used by execution_engine.py)
 DYNAMIC_EXIT_PARTIAL_FRACTION = 0.5              # Fraction to sell at the first target before trailing the runner
