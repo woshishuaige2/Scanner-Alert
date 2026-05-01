@@ -24,6 +24,7 @@ class ExecutionEngine:
         'reopen_weak_exit',
         'flush_fail_exit',
         'extended_hours_stop_exit',
+        'stop_guard_exit',
         'session_close_exit',
     }
 
@@ -69,6 +70,18 @@ class ExecutionEngine:
             return normalized_stop
         safe_stop = self._floor_price(actual_entry_price - 0.01)
         return max(0.01, self._round_price(safe_stop))
+
+    def _initial_disaster_stop_price(self, actual_entry_price: float) -> float:
+        if actual_entry_price <= 0 or config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_PCT <= 0:
+            return self._round_price(actual_entry_price)
+        raw_stop = actual_entry_price * (1 - config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_PCT / 100.0)
+        return max(0.01, self._floor_price(raw_stop))
+
+    def _regular_hours_initial_stop_price(self, strategy_stop_price: float, reference_entry_price: float) -> float:
+        disaster_stop_price = self._initial_disaster_stop_price(reference_entry_price)
+        if disaster_stop_price <= 0:
+            return self._round_price(strategy_stop_price)
+        return min(self._round_price(strategy_stop_price), disaster_stop_price)
 
     def _create_contract(self, symbol: str) -> Contract:
         contract = Contract()
@@ -343,6 +356,24 @@ class ExecutionEngine:
             return self._round_price(ask)
         return self._round_price(pos.get('entry_price', 0.0))
 
+    def _aggressive_stop_sell_limit_price(self, pos: Dict, current_price: float) -> float:
+        references = [
+            float(value)
+            for value in (
+                pos.get('last_bid', 0.0),
+                current_price,
+                pos.get('last_price', 0.0),
+                pos.get('last_ask', 0.0),
+            )
+            if value and float(value) > 0
+        ]
+        reference_price = min(references) if references else float(pos.get('current_stop_price', 0.0) or 0.0)
+        if reference_price <= 0:
+            return 0.01
+        pct_buffer = reference_price * (config.DYNAMIC_EXIT_STOP_GUARD_LIMIT_BUFFER_PCT / 100.0)
+        dollar_buffer = max(pct_buffer, config.DYNAMIC_EXIT_STOP_GUARD_LIMIT_MIN_DOLLARS)
+        return max(0.01, self._floor_price(reference_price - dollar_buffer))
+
     def _on_tws_error(self, reqId: int, errorCode: int, errorString: str):
         """Detect rejections and blacklist symbols"""
         # Error 201: Order rejected
@@ -392,6 +423,8 @@ class ExecutionEngine:
                         if pos.get('active_exit_order_id') == reqId:
                             pos['exit_pending'] = False
                             pos['active_exit_order_id'] = None
+                            pos['active_exit_role'] = None
+                            pos['active_exit_limit_price'] = None
                             pos['last_exit_rejection_at'] = datetime.now()
                             pos['last_exit_rejection_reason'] = errorString
                             pos['last_exit_rejection_role'] = role
@@ -434,10 +467,24 @@ class ExecutionEngine:
                     pos['shares'] = total_filled_shares if total_filled_shares > 0 else pos.get('requested_shares', pos['shares'])
                     pos['remaining_shares'] = pos['shares']
                     pos['partial_target_price'] = self._round_price(pos['actual_entry_price'] * (1 + self.tp_pct / 100))
+                    strategy_stop_price = self._normalize_initial_long_stop(
+                        pos.get('strategy_stop_price') or pos.get('current_stop_price'),
+                        pos['actual_entry_price'],
+                    )
+                    pos['strategy_stop_price'] = strategy_stop_price
                     desired_stop_price = self._round_price(
                         pos.get('current_stop_price')
                         or (pos['actual_entry_price'] * (1 - self.sl_pct / 100))
                     )
+                    if pos.get('initial_disaster_stop_active') and pos.get('uses_broker_stop', True):
+                        desired_stop_price = self._regular_hours_initial_stop_price(
+                            strategy_stop_price,
+                            pos['actual_entry_price'],
+                        )
+                        pos['initial_disaster_stop_until'] = (
+                            datetime.now()
+                            + timedelta(seconds=config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_GRACE_SECONDS)
+                        )
                     pos['current_stop_price'] = self._normalize_initial_long_stop(
                         desired_stop_price,
                         pos['actual_entry_price'],
@@ -451,6 +498,18 @@ class ExecutionEngine:
                             desired_stop_price=desired_stop_price,
                             adjusted_stop_price=pos['current_stop_price'],
                             actual_entry_price=pos['actual_entry_price'],
+                            order_id=orderId,
+                        )
+                    if pos.get('initial_disaster_stop_active'):
+                        self._log_event(
+                            "initial_disaster_stop_armed",
+                            trade_id=self._get_trade_id(pos),
+                            symbol=symbol,
+                            disaster_stop_price=pos['current_stop_price'],
+                            strategy_stop_price=pos.get('strategy_stop_price'),
+                            actual_entry_price=pos['actual_entry_price'],
+                            grace_seconds=config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_GRACE_SECONDS,
+                            bounce_pct=config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_BOUNCE_PCT,
                             order_id=orderId,
                         )
                     self._log_event(
@@ -475,6 +534,11 @@ class ExecutionEngine:
                     if avgFillPrice > 0:
                         pos['actual_entry_price'] = avgFillPrice
                         pos['partial_target_price'] = self._round_price(pos['actual_entry_price'] * (1 + self.tp_pct / 100))
+                        if pos.get('initial_disaster_stop_active') and pos.get('uses_broker_stop', True):
+                            pos['current_stop_price'] = self._regular_hours_initial_stop_price(
+                                pos.get('strategy_stop_price') or pos.get('current_stop_price'),
+                                pos['actual_entry_price'],
+                            )
                     if added_shares > 0:
                         pos['filled_shares'] = total_filled_shares
                         pos['shares'] = total_filled_shares
@@ -529,6 +593,8 @@ class ExecutionEngine:
                     if pos.get('active_exit_order_id') == orderId:
                         pos['exit_pending'] = False
                         pos['active_exit_order_id'] = None
+                        pos['active_exit_role'] = None
+                        pos['active_exit_limit_price'] = None
                         pos['last_exit_cancelled_at'] = datetime.now()
                         pos['last_exit_cancelled_status'] = status
                         self._log_event(
@@ -556,9 +622,13 @@ class ExecutionEngine:
                 exit_price = avgFillPrice if avgFillPrice > 0 else pos.get('last_price', pos.get('actual_entry_price', pos['entry_price']))
                 exit_shares = min(int(delta_filled), pos['remaining_shares'])
                 pos['remaining_shares'] = max(0, pos['remaining_shares'] - exit_shares)
-                pos['exit_pending'] = False
-                if pos.get('active_exit_order_id') == orderId:
+                reported_remaining = float(remaining) if remaining is not None else 0.0
+                order_still_working = pos['remaining_shares'] > 0 and reported_remaining > 0 and status not in {'Filled', 'Cancelled', 'ApiCancelled', 'Inactive'}
+                pos['exit_pending'] = order_still_working
+                if pos.get('active_exit_order_id') == orderId and not order_still_working:
                     pos['active_exit_order_id'] = None
+                    pos['active_exit_role'] = None
+                    pos['active_exit_limit_price'] = None
 
                 if role == 'partial_exit':
                     pos['partial_taken'] = True
@@ -618,6 +688,8 @@ class ExecutionEngine:
                         exit_type = "FLUSH_FAIL"
                     elif role == 'extended_hours_stop_exit':
                         exit_type = "EH_STOP"
+                    elif role == 'stop_guard_exit':
+                        exit_type = "STOP_GUARD"
                     elif role == 'session_close_exit':
                         exit_type = "SESSION_CLOSE"
                     else:
@@ -753,6 +825,92 @@ class ExecutionEngine:
         if active_exit_order_id is not None and active_exit_order_id != filled_order_id:
             self.tws_app.cancelOrder(active_exit_order_id)
 
+    def _replace_active_limit_exit_locked(self, symbol: str, quantity: int, limit_price: float, role: str) -> bool:
+        pos = self.positions[symbol]
+        order_id = pos.get('active_exit_order_id')
+        if order_id is None or quantity <= 0:
+            return False
+        order = self._build_limit_sell_order(order_id, quantity, limit_price, outside_rth=True)
+        if order_id in self.order_to_symbol:
+            self.order_to_symbol[order_id]['role'] = role
+        self.tws_app.placeOrder(order.orderId, self._create_contract(symbol), order)
+        pos['active_exit_role'] = role
+        pos['active_exit_limit_price'] = self._round_price(limit_price)
+        pos['last_stop_guard_reprice_at'] = datetime.now()
+        self._log_event(
+            "stop_guard_exit_repriced",
+            trade_id=pos.get('trade_id'),
+            symbol=symbol,
+            order_id=order_id,
+            role=role,
+            quantity=quantity,
+            limit_price=limit_price,
+            stop_price=pos.get('current_stop_price'),
+            price=pos.get('last_price'),
+        )
+        return True
+
+    def _maybe_submit_stop_guard_exit_locked(
+        self,
+        symbol: str,
+        pos: Dict,
+        now: datetime,
+        price: float,
+        market_session: str,
+    ) -> bool:
+        stop_price = float(pos.get('current_stop_price', 0.0) or 0.0)
+        if price <= 0 or stop_price <= 0 or price > stop_price or pos.get('remaining_shares', 0) <= 0:
+            return False
+
+        if market_session in {"PREMARKET", "AFTERHOURS"}:
+            limit_price = self._aggressive_stop_sell_limit_price(pos, price)
+            if pos.get('exit_pending'):
+                active_role = pos.get('active_exit_role')
+                active_limit = pos.get('active_exit_limit_price')
+                last_reprice_at = pos.get('last_stop_guard_reprice_at') or pos.get('active_exit_submitted_at')
+                reprice_due = (
+                    last_reprice_at is None
+                    or (now - last_reprice_at).total_seconds() >= config.DYNAMIC_EXIT_STOP_GUARD_REPRICE_SECONDS
+                )
+                needs_lower_limit = active_limit is None or limit_price < active_limit
+                if active_role in self.EXIT_ROLES and reprice_due and needs_lower_limit:
+                    self._replace_active_limit_exit_locked(
+                        symbol,
+                        pos['remaining_shares'],
+                        limit_price,
+                        'extended_hours_stop_exit',
+                    )
+                return True
+
+            if self._submit_limit_exit_locked(symbol, pos['remaining_shares'], 'extended_hours_stop_exit', limit_price=limit_price):
+                self._log_event(
+                    "extended_hours_stop_exit_submitted",
+                    symbol=symbol,
+                    stop_price=stop_price,
+                    price=price,
+                    bid=pos.get('last_bid'),
+                    ask=pos.get('last_ask'),
+                    shares=pos['remaining_shares'],
+                    limit_price=limit_price,
+                )
+            return True
+
+        trigger_price = stop_price * (1 - config.DYNAMIC_EXIT_STOP_GUARD_TRIGGER_BUFFER_PCT / 100.0)
+        if price > trigger_price:
+            return False
+        if pos.get('exit_pending'):
+            return True
+        if self._submit_market_exit_locked(symbol, pos['remaining_shares'], 'stop_guard_exit'):
+            self._log_event(
+                "stop_guard_exit_submitted",
+                symbol=symbol,
+                stop_price=stop_price,
+                trigger_price=trigger_price,
+                price=price,
+                shares=pos['remaining_shares'],
+            )
+        return True
+
     def _submit_stop_update_locked(self, symbol: str, new_stop_price: float, quantity: int):
         pos = self.positions[symbol]
         if quantity <= 0:
@@ -795,6 +953,10 @@ class ExecutionEngine:
         self._register_order(order_id, symbol, role)
         pos['exit_pending'] = True
         pos['active_exit_order_id'] = order_id
+        pos['active_exit_role'] = role
+        pos['active_exit_limit_price'] = self._round_price(limit_price)
+        pos['active_exit_submitted_at'] = datetime.now()
+        pos['last_stop_guard_reprice_at'] = None
         self.tws_app.placeOrder(order.orderId, self._create_contract(symbol), order)
         self._log_event(
             "exit_order_submitted",
@@ -824,6 +986,9 @@ class ExecutionEngine:
         self._register_order(order_id, symbol, role)
         pos['exit_pending'] = True
         pos['active_exit_order_id'] = order_id
+        pos['active_exit_role'] = role
+        pos['active_exit_limit_price'] = None
+        pos['active_exit_submitted_at'] = datetime.now()
         self.tws_app.placeOrder(order.orderId, self._create_contract(symbol), order)
         print(f"[EXEC] Submitted {role} order {order_id} for {symbol}: {quantity} shares")
         self._log_event(
@@ -867,12 +1032,14 @@ class ExecutionEngine:
                 stop_price = self._round_price(entry_price * (1 - self.sl_pct / 100))
             else:
                 stop_price = self._round_price(stop_price)
+            strategy_stop_price = stop_price
 
             is_extended_hours = market_session in {"PREMARKET", "AFTERHOURS"}
             spread_pct = self._compute_spread_pct(bid, ask, entry_price)
             limit_price = None
             parent_order_type = "MKT"
             should_attach_initial_stop = True
+            initial_disaster_stop_active = False
 
             if is_extended_hours:
                 if bid <= 0 or ask <= 0:
@@ -904,6 +1071,9 @@ class ExecutionEngine:
                 )
                 parent_order_type = "LMT"
                 should_attach_initial_stop = False
+            elif config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_PCT > 0:
+                stop_price = self._regular_hours_initial_stop_price(strategy_stop_price, entry_price)
+                initial_disaster_stop_active = stop_price < strategy_stop_price
             
             parent_id = self.tws_app.next_order_id
             stop_id = parent_id + 1
@@ -946,6 +1116,12 @@ class ExecutionEngine:
                 'remaining_shares': shares,
                 'partial_target_price': partial_target_price,
                 'current_stop_price': stop_price,
+                'strategy_stop_price': strategy_stop_price,
+                'initial_disaster_stop_active': initial_disaster_stop_active,
+                'initial_disaster_stop_until': None,
+                'initial_disaster_stop_pct': (
+                    config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_PCT if initial_disaster_stop_active else 0.0
+                ),
                 'parent_id': parent_id,
                 'stop_id': stop_id,
                 'stop_parent_id': parent_id if should_attach_initial_stop else None,
@@ -978,6 +1154,10 @@ class ExecutionEngine:
                 'partial_taken': False,
                 'exit_pending': False,
                 'active_exit_order_id': None,
+                'active_exit_role': None,
+                'active_exit_limit_price': None,
+                'active_exit_submitted_at': None,
+                'last_stop_guard_reprice_at': None,
                 'last_exit_rejection_at': None,
                 'last_exit_rejection_reason': None,
                 'last_exit_rejection_role': None,
@@ -1002,6 +1182,11 @@ class ExecutionEngine:
                     f"[EXEC] Extended-hours entry submitted for {symbol}: {shares} shares "
                     f"limit ${limit_price:.2f} | first target ${partial_target_price:.2f} | stop ${stop_price:.2f}"
                 )
+            elif initial_disaster_stop_active:
+                print(
+                    f"[EXEC] Entry submitted for {symbol}: {shares} shares | first target ${partial_target_price:.2f} "
+                    f"| initial disaster stop ${stop_price:.2f} | strategy stop ${strategy_stop_price:.2f}"
+                )
             else:
                 print(f"[EXEC] Entry submitted for {symbol}: {shares} shares | first target ${partial_target_price:.2f} | stop ${stop_price:.2f}")
             self._log_event(
@@ -1014,6 +1199,9 @@ class ExecutionEngine:
                 shares=shares,
                 first_target=partial_target_price,
                 stop_price=stop_price,
+                strategy_stop_price=strategy_stop_price,
+                initial_disaster_stop_active=initial_disaster_stop_active,
+                initial_disaster_stop_pct=config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_PCT if initial_disaster_stop_active else 0.0,
                 market_session=market_session,
                 entry_order_type=parent_order_type,
                 entry_limit_price=limit_price,
@@ -1175,23 +1363,51 @@ class ExecutionEngine:
             if volume > 0:
                 pos['volume_history'].append((now, volume))
 
+            filled_at = pos.get('filled_at')
+            if (
+                pos.get('initial_disaster_stop_active')
+                and pos.get('uses_broker_stop', True)
+                and filled_at is not None
+                and pos.get('actual_entry_price', 0) > 0
+            ):
+                held_seconds = (now - filled_at).total_seconds()
+                bounce_target = pos['actual_entry_price'] * (
+                    1 + config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_BOUNCE_PCT / 100.0
+                )
+                grace_until = pos.get('initial_disaster_stop_until')
+                grace_expired = (
+                    grace_until is not None
+                    and now >= grace_until
+                ) or (
+                    config.DYNAMIC_EXIT_INITIAL_DISASTER_STOP_GRACE_SECONDS <= 0
+                    and held_seconds >= 0
+                )
+                bounce_confirmed = pos.get('highest_price', 0.0) >= bounce_target
+                if grace_expired or bounce_confirmed:
+                    strategy_stop_price = self._normalize_initial_long_stop(
+                        pos.get('strategy_stop_price') or pos.get('current_stop_price'),
+                        pos['actual_entry_price'],
+                    )
+                    if strategy_stop_price > pos.get('current_stop_price', 0):
+                        self._submit_stop_update_locked(symbol, strategy_stop_price, pos['remaining_shares'])
+                    pos['initial_disaster_stop_active'] = False
+                    pos['initial_disaster_stop_until'] = None
+                    self._log_event(
+                        "initial_disaster_stop_tightened",
+                        symbol=symbol,
+                        stop_price=pos.get('current_stop_price'),
+                        strategy_stop_price=strategy_stop_price,
+                        actual_entry_price=pos.get('actual_entry_price'),
+                        held_seconds=round(held_seconds, 1),
+                        trigger="bounce_confirmed" if bounce_confirmed else "grace_expired",
+                    )
+
+            if self._maybe_submit_stop_guard_exit_locked(symbol, pos, now, price, market_session):
+                return
+
             if pos.get('exit_pending'):
                 return
 
-            if market_session in {"PREMARKET", "AFTERHOURS"} and price <= pos.get('current_stop_price', 0):
-                if self._submit_limit_exit_locked(symbol, pos['remaining_shares'], 'extended_hours_stop_exit'):
-                    self._log_event(
-                        "extended_hours_stop_exit_submitted",
-                        symbol=symbol,
-                        stop_price=pos.get('current_stop_price'),
-                        bid=bid,
-                        ask=ask,
-                        price=price,
-                        shares=pos['remaining_shares'],
-                    )
-                return
-
-            filled_at = pos.get('filled_at')
             if (
                 filled_at is not None
                 and config.DYNAMIC_EXIT_MAX_WALL_CLOCK_HOLD_SECONDS > 0

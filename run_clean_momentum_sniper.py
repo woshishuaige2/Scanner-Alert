@@ -51,6 +51,10 @@ filtered_alerts = deque(maxlen=25)
 shutdown_event = threading.Event()
 
 
+def _tws_is_connected(app) -> bool:
+    return bool(app is not None and getattr(app, "connected", False))
+
+
 def append_sniper_event(events: deque, message: str) -> None:
     events.appendleft((datetime.now(), message))
 
@@ -80,23 +84,26 @@ def _format_trade_reference_timeframe(trade: Dict[str, Any]) -> str:
 def signal_handler(sig, frame):
     global should_exit
     print("\n[INFO] Graceful exit requested...")
+    should_exit = True
+    shutdown_event.set()
     executor = active_executor
     if executor is not None:
         try:
-            print("[INFO] Emergency exit: submitting close-all orders for open positions...")
-            executor.close_all_positions(market_session=get_market_session())
-            broker_positions = executor.tws_app.request_open_positions(account=ACCOUNT_NUMBER, timeout=5.0)
-            if broker_positions:
-                print("[INFO] Emergency exit: flattening any remaining broker positions...")
-                executor.flatten_external_positions(
-                    broker_positions,
-                    market_session=get_market_session(),
-                    reason="sigint_flatten",
-                )
+            if _tws_is_connected(executor.tws_app):
+                print("[INFO] Emergency exit: submitting close-all orders for open positions...")
+                executor.close_all_positions(market_session=get_market_session())
+                broker_positions = executor.tws_app.request_open_positions(account=ACCOUNT_NUMBER, timeout=5.0)
+                if broker_positions:
+                    print("[INFO] Emergency exit: flattening any remaining broker positions...")
+                    executor.flatten_external_positions(
+                        broker_positions,
+                        market_session=get_market_session(),
+                        reason="sigint_flatten",
+                    )
+            else:
+                print("[INFO] TWS is already disconnected; skipping broker close/open-position requests.")
         except Exception as exc:
             print(f"[WARNING] Close-all on exit failed: {exc}")
-    should_exit = True
-    shutdown_event.set()
 
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -182,8 +189,23 @@ def _format_display_price(value: Optional[float]) -> str:
 
 def _next_main_loop_start(now_et: datetime) -> datetime:
     start_today = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+    afterhours_end_today = now_et.replace(hour=20, minute=0, second=0, microsecond=0)
+
+    if now_et.weekday() >= 5:
+        candidate = start_today
+        if now_et >= candidate:
+            candidate += timedelta(days=1)
+        while candidate.weekday() >= 5:
+            candidate += timedelta(days=1)
+        return candidate
+
     if now_et < start_today:
         return start_today
+    if now_et >= afterhours_end_today:
+        candidate = start_today + timedelta(days=1)
+        while candidate.weekday() >= 5:
+            candidate += timedelta(days=1)
+        return candidate
     return now_et
 
 
@@ -2119,6 +2141,10 @@ def run_clean_momentum_sniper():
         eod_triggered = False
 
         while not should_exit:
+            if not _tws_is_connected(tws_app):
+                print("[INFO] TWS is disconnected. Stopping clean momentum sniper.")
+                shutdown_event.set()
+                break
 
             if (datetime.now() - last_session_check).total_seconds() > 60:
                 if scanner.check_session_transition():
